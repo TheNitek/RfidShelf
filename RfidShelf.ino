@@ -1,66 +1,49 @@
 /**
-
+ * Put this file https://github.com/esp8266/Arduino/blob/master/libraries/ESP8266WebServer/examples/SDWebServer/SdRoot/edit/index.htm
+ * in the root folder of the SD card for webinterface
 */
 
+#include <ESP8266WiFi.h>
+#include <WiFiClient.h>
+#include <DNSServer.h>
+#include <ESP8266WebServer.h>
+#include <WiFiManager.h>
 #include <SPI.h>
 #include <MFRC522.h>
+#include <Adafruit_VS1053.h>
+#include <SD.h>
 
-//Add the SdFat Libraries
-#include <SdFat.h>
-#include <SdFatUtil.h>
+#define RC522_CS_PIN          D0
+#define SD_CS_PIN             D2
 
-/*
-   For the RFID to work while MP3 plays, you have to change
-   #define USE_MP3_REFILL_MEANS USE_MP3_INTx
-   to
-   #define USE_MP3_REFILL_MEANS USE_MP3_Polled
-   in SFEMP3Shield.h
-*/
-#include <SFEMP3Shield.h>
+#define BREAKOUT_RESET  D4     // VS1053 reset pin (output)
+#define BREAKOUT_CS     D8     // VS1053 chip select pin (output)
+#define BREAKOUT_DCS    D3    // VS1053 Data/command select pin (output)
+#define DREQ            D1    // VS1053 Data request, ideally an Interrupt pin
 
-#define RST_PIN         5           // Configurable, see typical pin layout above
-#define SS_PIN          10          // Configurable, see typical pin layout above
+Adafruit_VS1053_FilePlayer musicPlayer =
+  Adafruit_VS1053_FilePlayer(BREAKOUT_RESET, BREAKOUT_CS, BREAKOUT_DCS, DREQ, SD_CS_PIN);
 
-MFRC522 mfrc522(SS_PIN, RST_PIN);   // Create MFRC522 instance.
+WiFiManager wifiManager;
+
+ESP8266WebServer server(80);
+
+MFRC522 mfrc522(RC522_CS_PIN, UINT8_MAX);   // Create MFRC522 instance.
 
 MFRC522::MIFARE_Key key;
 
 // Init array that will store new NUID
 byte nuidPICC[4];
 
+boolean playing = false;
 
-// Below is not needed if interrupt driven. Safe to remove if not using.
-#if defined(USE_MP3_REFILL_MEANS) && USE_MP3_REFILL_MEANS == USE_MP3_Timer1
-#include <TimerOne.h>
-#elif defined(USE_MP3_REFILL_MEANS) && USE_MP3_REFILL_MEANS == USE_MP3_SimpleTimer
-#include <SimpleTimer.h>
-#endif
+File currentFolder;
 
-SdFat sd;
+File uploadFile;
 
-SFEMP3Shield MP3player;
 
 void setup() {
   Serial.begin(115200);
-  while (!Serial);    // Do nothing if no serial port is opened (added for Arduinos based on ATMEGA32U4)
-
-  //Initialize the SdCard.
-  if (!sd.begin(SD_SEL, SPI_FULL_SPEED)) sd.initErrorHalt();
-  // depending upon your SdCard environment, SPI_HAVE_SPEED may work better.
-  if (!sd.chdir("/")) sd.errorHalt("sd.chdir");
-
-  //Initialize the MP3 Player Shield
-  uint8_t result = MP3player.begin();
-  //check result, see readme for error codes.
-  if (result != 0) {
-    Serial.print(F("Error code: "));
-    Serial.print(result);
-    Serial.println(F(" when trying to start MP3 player"));
-    if ( result == 6 ) {
-      Serial.println(F("Warning: patch file not found, skipping.")); // can be removed for space, if needed.
-      Serial.println(F("Use the \"d\" command to verify SdCard can be read")); // can be removed for space, if needed.
-    }
-  }
 
   SPI.begin();        // Init SPI bus
   mfrc522.PCD_Init(); // Init MFRC522 card
@@ -72,26 +55,86 @@ void setup() {
   Serial.print(F("Using rfid key (for A and B):"));
   dump_byte_array(key.keyByte, MFRC522::MF_KEY_SIZE);
   Serial.println();
+
+  //Initialize the SdCard.
+  if (!SD.begin(SD_CS_PIN)) Serial.println(F("SD.begin failed"));
+  if (!(currentFolder = SD.open("/"))) Serial.println(F("sd.chdir"));
+  while (File file = currentFolder.openNextFile())
+  {
+    if(file.isDirectory()){
+      switchFolder(file.name());
+      file.close();
+    }
+  }
+
+
+  // initialise the music player
+  if (! musicPlayer.begin()) { // initialise the music player
+    Serial.println(F("Couldn't find VS1053, do you have the right pins defined?"));
+    while(1) delay(500);
+  }
+  Serial.println(F("VS1053 found"));
+
+  // Fix for the design fuckup of the cheap LC Technology MP3 shield
+  // see http://www.bajdi.com/lcsoft-vs1053-mp3-module/#comment-33773
+  musicPlayer.sciWrite(VS1053_REG_WRAMADDR, VS1053_GPIO_DDR);
+  musicPlayer.sciWrite(VS1053_REG_WRAM, 0x0003);
+  musicPlayer.GPIO_digitalWrite(0x0000);
+  musicPlayer.softReset();
+
+  Serial.print(F("SampleRate "));
+  Serial.println(musicPlayer.sciRead(VS1053_REG_AUDATA));
+
+  musicPlayer.setVolume(40, 40);
+
+  wifiManager.autoConnect("MP3-SHELF", "ikealack");
+  
+  Serial.print("Connected! IP address: ");
+  Serial.println(WiFi.localIP());
+
+  server.on("/playMp3", HTTP_GET, handlePlayMp3);
+  server.on("/stopMp3", HTTP_GET, handleStopMp3);
+  server.on("/list", HTTP_GET, printDirectory);
+  server.on("/edit", HTTP_DELETE, handleDelete);
+  server.on("/edit", HTTP_PUT, handleCreate);
+  server.on("/edit", HTTP_POST, [](){ returnOK(); }, handleFileUpload);
+  server.onNotFound(handleNotFound);
+
+  server.begin();
+
+  Serial.println(F("Init done"));
 }
 
-/**
-   Main loop.
-*/
 void loop() {
-#if defined(USE_MP3_REFILL_MEANS) \
-      && ( (USE_MP3_REFILL_MEANS == USE_MP3_SimpleTimer) \
-      ||   (USE_MP3_REFILL_MEANS == USE_MP3_Polled)      )
+  if (musicPlayer.playingMusic) {
+    musicPlayer.feedBuffer();
+  } else if(playing) {
+    playMp3();
+  }
 
-  MP3player.available();
-#endif
+  server.handleClient();
 
-  // Look for new cards
-  if ( ! mfrc522.PICC_IsNewCardPresent())
+}
+
+void handleRfid() {
+    // Look for new cards
+  if ( ! mfrc522.PICC_IsNewCardPresent()) {
     return;
+  }
 
   // Select one of the cards
-  if ( ! mfrc522.PICC_ReadCardSerial())
+  if ( ! mfrc522.PICC_ReadCardSerial()) {
     return;
+  }
+
+  if (mfrc522.uid.uidByte[0] == nuidPICC[0] &&
+      mfrc522.uid.uidByte[1] == nuidPICC[1] &&
+      mfrc522.uid.uidByte[2] == nuidPICC[2] &&
+      mfrc522.uid.uidByte[3] == nuidPICC[3] ) {
+    mfrc522.PICC_HaltA();
+    Serial.println(F("Card already read"));
+    return;
+  }
 
   // Show some details of the PICC (that is: the tag/card)
   Serial.print(F("Card UID:"));
@@ -107,32 +150,26 @@ void loop() {
     return;
   }
 
-  if (mfrc522.uid.uidByte[0] == nuidPICC[0] &&
-      mfrc522.uid.uidByte[1] == nuidPICC[1] &&
-      mfrc522.uid.uidByte[2] == nuidPICC[2] &&
-      mfrc522.uid.uidByte[3] == nuidPICC[3] ) {
-    Serial.println(F("Card already read"));
-    return;
-  }
-
-  // Store NUID into nuidPICC array
-  for (byte i = 0; i < 4; i++) {
-    nuidPICC[i] = mfrc522.uid.uidByte[i];
-  }
-
   char folder[17];
-  readBlock(1, 0, folder);
-  Serial.print(F("Folder on rfid: "));
-  Serial.println(folder);
-  playFolder(folder);
+  if (readRfidBlock(1, 0, folder)) {
 
-  delay(100);
+    // Store NUID into nuidPICC array
+    for (byte i = 0; i < 4; i++) {
+      nuidPICC[i] = mfrc522.uid.uidByte[i];
+    }
+
+    switchFolder(folder);
+    stopMp3();
+    yield();
+    playMp3();
+  }
+
 }
 
-void readBlock(uint8_t sector, uint8_t relativeBlock, char *outputBuffer) {
+boolean readRfidBlock(uint8_t sector, uint8_t relativeBlock, char *outputBuffer) {
   if (relativeBlock > 3) {
     Serial.println(F("Invalid block number"));
-    return;
+    return false;
   }
 
   // Block 4 is trailer block
@@ -146,19 +183,18 @@ void readBlock(uint8_t sector, uint8_t relativeBlock, char *outputBuffer) {
   if (status != MFRC522::STATUS_OK) {
     Serial.print(F("PCD_Authenticate() failed: "));
     Serial.println(mfrc522.GetStatusCodeName(status));
-    return;
+    return false;
   }
 
-  // Read data from the block
-  Serial.print(F("Reading data from block "));
-  Serial.print(absoluteBlock);
-  Serial.println(F(" ..."));
+  Serial.print(F("Reading block "));
+  Serial.println(absoluteBlock);
   byte buffer[18];
   byte bufferSize = sizeof(buffer);
   status = (MFRC522::StatusCode) mfrc522.MIFARE_Read(absoluteBlock, buffer, &bufferSize);
   if (status != MFRC522::STATUS_OK) {
     Serial.print(F("MIFARE_Read() failed: "));
     Serial.println(mfrc522.GetStatusCodeName(status));
+    return false;
   }
   Serial.print(F("Data in block ")); Serial.print(absoluteBlock); Serial.println(F(":"));
   dump_byte_array(buffer, 16);
@@ -171,11 +207,12 @@ void readBlock(uint8_t sector, uint8_t relativeBlock, char *outputBuffer) {
   // Stop encryption on PCD
   mfrc522.PCD_StopCrypto1();
 
-  for (byte i = 0; i < bufferSize; i++) {
+  for (byte i = 0; i < 16; i++) {
     outputBuffer[i] = buffer[i];
   }
   outputBuffer[bufferSize] = '\0';
 
+  return true;
 }
 
 /**
@@ -188,55 +225,236 @@ void dump_byte_array(byte *buffer, byte bufferSize) {
   }
 }
 
-void playFolder(char *folder) {
-  Serial.println(F("Music Files found:"));
-  SdFile file;
-  char filename[20];
-  sd.chdir(folder, true);
-  while (file.openNext(sd.vwd(), O_READ))
-  {
-    file.getFilename(filename);
-    if ( isFnMusic(filename) ) {
-      MP3player.stopTrack();
-      uint8_t result = MP3player.playMP3(filename);
-
-      //check result, see readme for error codes.
-      if (result != 0) {
-        Serial.print(F("Error code: "));
-        Serial.print(result);
-        Serial.println(F(" when trying to play track"));
-      } else {
-
-        Serial.println(F("Playing:"));
-
-        char title[30]; // buffer to contain the extract the Title from the current filehandles
-        char artist[30]; // buffer to contain the extract the artist name from the current filehandles
-        char album[30]; // buffer to contain the extract the album name from the current filehandles
-
-        //we can get track info by using the following functions and arguments
-        //the functions will extract the requested information, and put it in the array we pass in
-        MP3player.trackTitle((char*)&title);
-        MP3player.trackArtist((char*)&artist);
-        MP3player.trackAlbum((char*)&album);
-
-        //print out the arrays of track information
-        Serial.write((byte*)&title, 30);
-        Serial.println();
-        Serial.print(F("by:  "));
-        Serial.write((byte*)&artist, 30);
-        Serial.println();
-        Serial.print(F("Album:  "));
-        Serial.write((byte*)&album, 30);
-        Serial.println();
-      }
-      file.close();
-      return;
-    } else {
-      Serial.print(F("Not a music file: "));
-      Serial.println(filename);
-    }
-    file.close();
-  }
-
+void switchFolder(const char *folder) {
+  // TODO do SD.exists(folder) check here, but it keeps crashing the ESP
+  Serial.print(F("Switching folder to "));
+  Serial.println(folder);
+  currentFolder.close();
+  currentFolder = SD.open(folder);
 }
 
+void stopMp3() {
+    playing = false;
+    musicPlayer.stopPlaying();
+}
+
+void playMp3() {
+  while (File file = currentFolder.openNextFile())
+  {
+
+    char filename[30] = "";
+    strcat(filename, "/");
+    strcat(filename, currentFolder.name());
+    strcat(filename, "/");
+    strcat(filename, file.name());
+    file.close();
+
+    if(!file.isDirectory() && isMP3File(filename)){ 
+      Serial.print(F("Playing "));
+      Serial.println(filename);
+
+      playing = true;
+      musicPlayer.startPlayingFile(filename);
+      return;
+    } else {
+      Serial.print(F("Ignoring "));
+      Serial.println(filename);
+    }
+  }
+  // Start again
+  currentFolder.rewindDirectory();
+}
+
+bool isMP3File(const char* filename) {
+  int   numChars;
+  char  dotMP3[] = ".MP3";
+
+  if (filename) {
+    numChars = strlen(filename);
+    if (numChars > 4) {
+      byte index = 0;
+      for (byte i = numChars - 4; i < numChars; i++) {
+        if (!(toupper(filename[i]) == dotMP3[index])) {
+          return false;
+        }
+        index++;
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
+void returnOK() {
+  server.send(200, "text/plain", "");
+}
+
+void returnFail(String msg) {
+  server.send(500, "text/plain", msg + "\r\n");
+}
+
+bool loadFromSdCard(String path){
+  String dataType = "text/plain";
+  if(path.endsWith("/")) path += "index.htm";
+
+  if(path.endsWith(".htm")) dataType = "text/html";
+  else if(path.endsWith(".css")) dataType = "text/css";
+  else if(path.endsWith(".js")) dataType = "application/javascript";
+
+  File dataFile = SD.open(path.c_str());
+  if(dataFile.isDirectory()){
+    path += "/index.htm";
+    dataType = "text/html";
+    dataFile = SD.open(path.c_str());
+  }
+
+  if (!dataFile)
+    return false;
+
+  if (server.hasArg("download")) dataType = "application/octet-stream";
+
+  if (server.streamFile(dataFile, dataType) != dataFile.size()) {
+    Serial.println("Sent less data than expected!");
+  }
+
+  dataFile.close();
+  return true;
+}
+
+void handlePlayMp3() {
+  playMp3();
+  returnOK();
+}
+
+void handleStopMp3() {
+  stopMp3();
+  returnOK();
+}
+void handleFileUpload(){
+  if(server.uri() != "/edit") return;
+  HTTPUpload& upload = server.upload();
+  if(upload.status == UPLOAD_FILE_START){
+    if(SD.exists((char *)upload.filename.c_str())) SD.remove((char *)upload.filename.c_str());
+    uploadFile = SD.open(upload.filename.c_str(), FILE_WRITE);
+    Serial.print("Upload: START, filename: "); Serial.println(upload.filename);
+  } else if(upload.status == UPLOAD_FILE_WRITE){
+    if(uploadFile) uploadFile.write(upload.buf, upload.currentSize);
+    Serial.print("Upload: WRITE, Bytes: "); Serial.println(upload.currentSize);
+  } else if(upload.status == UPLOAD_FILE_END){
+    if(uploadFile) uploadFile.close();
+    Serial.print("Upload: END, Size: "); Serial.println(upload.totalSize);
+  }
+}
+
+void deleteRecursive(String path){
+  File file = SD.open((char *)path.c_str());
+  if(!file.isDirectory()){
+    file.close();
+    SD.remove((char *)path.c_str());
+    return;
+  }
+
+  file.rewindDirectory();
+  while(true) {
+    File entry = file.openNextFile();
+    if (!entry) break;
+    String entryPath = path + "/" +entry.name();
+    if(entry.isDirectory()){
+      entry.close();
+      deleteRecursive(entryPath);
+    } else {
+      entry.close();
+      SD.remove((char *)entryPath.c_str());
+    }
+    yield();
+  }
+
+  SD.rmdir((char *)path.c_str());
+  file.close();
+}
+
+void handleDelete(){
+  if(server.args() == 0) return returnFail("BAD ARGS");
+  String path = server.arg(0);
+  if(path == "/" || !SD.exists((char *)path.c_str())) {
+    returnFail("BAD PATH");
+    return;
+  }
+  deleteRecursive(path);
+  returnOK();
+}
+
+void handleCreate(){
+  if(server.args() == 0) return returnFail("BAD ARGS");
+  String path = server.arg(0);
+  if(path == "/" || SD.exists((char *)path.c_str())) {
+    returnFail("BAD PATH");
+    return;
+  }
+
+  if(path.indexOf('.') > 0){
+    File file = SD.open((char *)path.c_str(), FILE_WRITE);
+    if(file){
+      file.write((const char *)0);
+      file.close();
+    }
+  } else {
+    SD.mkdir((char *)path.c_str());
+  }
+  returnOK();
+}
+
+void printDirectory() {
+  if(!server.hasArg("dir")) return returnFail("BAD ARGS");
+  String path = server.arg("dir");
+  if(path != "/" && !SD.exists((char *)path.c_str())) return returnFail("BAD PATH");
+  File dir = SD.open((char *)path.c_str());
+  path = String();
+  if(!dir.isDirectory()){
+    dir.close();
+    return returnFail("NOT DIR");
+  }
+  dir.rewindDirectory();
+  server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  server.send(200, "text/json", "");
+  WiFiClient client = server.client();
+
+  server.sendContent("[");
+  for (int cnt = 0; true; ++cnt) {
+    File entry = dir.openNextFile();
+    if (!entry)
+    break;
+
+    String output;
+    if (cnt > 0)
+      output = ',';
+
+    output += "{\"type\":\"";
+    output += (entry.isDirectory()) ? "dir" : "file";
+    output += "\",\"name\":\"";
+    output += entry.name();
+    output += "\"";
+    output += "}";
+    server.sendContent(output);
+    entry.close();
+ }
+ server.sendContent("]");
+ dir.close();
+}
+
+void handleNotFound(){
+  if(loadFromSdCard(server.uri())) return;
+  String message = "SDCARD Not Detected\n\n";
+  message += "URI: ";
+  message += server.uri();
+  message += "\nMethod: ";
+  message += (server.method() == HTTP_GET)?"GET":"POST";
+  message += "\nArguments: ";
+  message += server.args();
+  message += "\n";
+  for (uint8_t i=0; i<server.args(); i++){
+    message += " NAME:"+server.argName(i) + "\n VALUE:" + server.arg(i) + "\n";
+  }
+  server.send(404, "text/plain", message);
+  Serial.print(message);
+}
