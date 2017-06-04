@@ -9,7 +9,7 @@ cache:
         - "~/.platformio"
 
 env:
-    - PLATFORMIO_CI_SRC=RfidShelf/RfidShelf.ino
+    - PLATFORMIO_CI_SRC=RfidShelf.ino
 
 install:
     - pip install -U platformio
