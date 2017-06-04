@@ -1,60 +1,76 @@
-/**
-   Put this file https://github.com/esp8266/Arduino/blob/master/libraries/ESP8266WebServer/examples/SDWebServer/SdRoot/edit/index.htm
-   in the root folder of the SD card for webinterface
-*/
-
 #include <ESP8266WiFi.h>
 #include <DNSServer.h>
 #include <ESP8266WebServer.h>
 #include <WiFiManager.h>
+#include <ESP8266mDNS.h>
+#include <WiFiUdp.h>
+#include <ArduinoOTA.h>
 #include <SPI.h>
 #include <MFRC522.h>
-#include <Adafruit_VS1053.h>
 #include <SdFat.h>
+#include <Adafruit_VS1053.h>
 
-#define RC522_CS_PIN          D3
-#define SD_CS_PIN             D2
+// Legacy wiring
+//#define RC522_CS        D3
+//#define BREAKOUT_CS     D4     // VS1053 chip select pin (output)
+//#define BREAKOUT_RESET  D8     // VS1053 reset pin (output)
+//#define AMP_POWER       -1
 
-#define BREAKOUT_RESET  D4     // VS1053 reset pin (output)
-#define BREAKOUT_CS     D8     // VS1053 chip select pin (output)
+#define RC522_CS        D8
+#define SD_CS           D2
+
+#define BREAKOUT_RESET  -1     // VS1053 reset pin (output)
+#define BREAKOUT_CS     D3     // VS1053 chip select pin (output)
 #define BREAKOUT_DCS    D0    // VS1053 Data/command select pin (output)
-#define DREQ            D1    // VS1053 Data request, ideally an Interrupt pin
+#define DREQ            D1    // VS1053 Data request (input)
+
+#define AMP_POWER       D4
 
 Adafruit_VS1053_FilePlayer musicPlayer =
-  Adafruit_VS1053_FilePlayer(BREAKOUT_RESET, BREAKOUT_CS, BREAKOUT_DCS, DREQ, SD_CS_PIN);
+  Adafruit_VS1053_FilePlayer(BREAKOUT_RESET, BREAKOUT_CS, BREAKOUT_DCS, DREQ, SD_CS);
 
 WiFiManager wifiManager;
 
 ESP8266WebServer server(80);
 
-MFRC522 mfrc522(RC522_CS_PIN, UINT8_MAX);   // Create MFRC522 instance.
+MFRC522 mfrc522(RC522_CS, UINT8_MAX);   // Create MFRC522 instance.
 
 MFRC522::MIFARE_Key key;
 
 
-// Init array that will store new NUID
-byte nuidPICC[4];
-
-boolean playing = false;
+// Init array that will store new card uid
+byte lastCardUid[4];
+bool playing = false;
+bool pairing = false;
+String currentFile = "";
 
 SdFat SD;
-
 SdFile uploadFile;
 
 void setup() {
   Serial.begin(115200);
   Serial.println();
+  Serial.println("Starting ...");
+
+  // Seems to make flashing more reliable
+  delay(100);
+
+  if(AMP_POWER > 0) {
+    // Disable amp
+    pinMode(AMP_POWER, OUTPUT);
+    digitalWrite(AMP_POWER, LOW);
+  }
 
   // Init SPI SS pins
-  pinMode(RC522_CS_PIN, OUTPUT);
-  digitalWrite(RC522_CS_PIN, HIGH);
-  pinMode(SD_CS_PIN, OUTPUT);
-  digitalWrite(SD_CS_PIN, HIGH);
+  pinMode(RC522_CS, OUTPUT);
+  digitalWrite(RC522_CS, HIGH);
+  pinMode(SD_CS, OUTPUT);
+  digitalWrite(SD_CS, HIGH);
   pinMode(BREAKOUT_CS, OUTPUT);
   digitalWrite(BREAKOUT_CS, HIGH);
   pinMode(BREAKOUT_DCS, OUTPUT);
   digitalWrite(BREAKOUT_DCS, HIGH);
-
+  
   SPI.begin();        // Init SPI bus
   mfrc522.PCD_Init(); // Init MFRC522 card
 
@@ -67,7 +83,7 @@ void setup() {
   Serial.println();
 
   //Initialize the SdCard.
-  if (!SD.begin(SD_CS_PIN)) SD.initErrorHalt();
+  if (!SD.begin(SD_CS)) SD.initErrorHalt();
 
   // initialise the music player
   if (! musicPlayer.begin()) { // initialise the music player
@@ -83,13 +99,26 @@ void setup() {
   musicPlayer.sciWrite(VS1053_REG_WRAMADDR, VS1053_GPIO_DDR);
   musicPlayer.sciWrite(VS1053_REG_WRAM, 0x0003);
   musicPlayer.GPIO_digitalWrite(0x0000);
-
   musicPlayer.softReset();
+
+  if (patchVS1053()) {
+    // Enable Mono Output
+    musicPlayer.sciWrite(VS1053_REG_WRAMADDR, 0x1e09);
+    musicPlayer.sciWrite(VS1053_REG_WRAM, 0x0001);
+
+    // Enable differential output
+    /*uint16_t mode = VS1053_MODE_SM_DIFF | VS1053_MODE_SM_SDINEW;
+      musicPlayer.sciWrite(VS1053_REG_MODE, mode); */
+  } else {
+    Serial.println("Could not load patch");
+  }
 
   Serial.print(F("SampleRate "));
   Serial.println(musicPlayer.sciRead(VS1053_REG_AUDATA));
 
-  musicPlayer.setVolume(40, 40);
+  musicPlayer.setVolume(10, 10);
+
+  musicPlayer.dumpRegs();
 
   wifiManager.autoConnect("MP3-SHELF", "lacklack");
 
@@ -102,6 +131,25 @@ void setup() {
   server.onNotFound(handleNotFound);
 
   server.begin();
+
+  ArduinoOTA.onStart([]() {
+    Serial.println("Start");
+  });
+  ArduinoOTA.onEnd([]() {
+    Serial.println("\nEnd");
+  });
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+  });
+  ArduinoOTA.onError([](ota_error_t error) {
+    Serial.printf("Error[%u]: ", error);
+    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+    else if (error == OTA_END_ERROR) Serial.println("End Failed");
+  });
+  ArduinoOTA.begin();
 
   Serial.println(F("Init done"));
 }
@@ -116,6 +164,7 @@ void loop() {
 
   handleRfid();
   server.handleClient();
+  ArduinoOTA.handle();
 }
 
 void handleRfid() {
@@ -129,10 +178,11 @@ void handleRfid() {
     return;
   }
 
-  if (mfrc522.uid.uidByte[0] == nuidPICC[0] &&
-      mfrc522.uid.uidByte[1] == nuidPICC[1] &&
-      mfrc522.uid.uidByte[2] == nuidPICC[2] &&
-      mfrc522.uid.uidByte[3] == nuidPICC[3] ) {
+  if (!pairing && (
+        mfrc522.uid.uidByte[0] == lastCardUid[0] &&
+        mfrc522.uid.uidByte[1] == lastCardUid[1] &&
+        mfrc522.uid.uidByte[2] == lastCardUid[2] &&
+        mfrc522.uid.uidByte[3] == lastCardUid[3] )) {
     mfrc522.PICC_HaltA();
     Serial.println(F("Card already read"));
     return;
@@ -152,36 +202,91 @@ void handleRfid() {
     return;
   }
 
-  char folder[17];
-  if (readRfidBlock(1, 0, folder)) {
+  if (pairing) {
+    char writeFolder[17];
+    SD.vwd()->getName(writeFolder, 17);
+    writeRfidBlock(1, 0, writeFolder);
+    pairing = false;
+  }
+
+  byte readBuffer[18];
+  if (readRfidBlock(1, 0, readBuffer,sizeof(readBuffer))) {
+    
+    char readFolder[18];
+    readFolder[0] = '/';
+    // allthough sizeof(readBuffer) == 18, we only get 16 byte of data
+    for (byte i = 0; i < 16; i++) {
+      readFolder[i+1] = readBuffer[i];
+    }
+    // readBuffer will already contain \0 if the folder name is < 16 chars, but otherwise we need to add it
+    readFolder[17] = '\0';
 
     // Store NUID into nuidPICC array
     for (byte i = 0; i < 4; i++) {
-      nuidPICC[i] = mfrc522.uid.uidByte[i];
+      lastCardUid[i] = mfrc522.uid.uidByte[i];
     }
 
-    switchFolder(folder);
-    stopMp3();
-    yield();
-    playMp3();
+    if (switchFolder(readFolder)) {
+      stopMp3();
+      yield();
+      playMp3();
+    }
   }
+
+  // Halt PICC
+  mfrc522.PICC_HaltA();
+  // Stop encryption on PCD
+  mfrc522.PCD_StopCrypto1();
 
 }
 
-boolean readRfidBlock(uint8_t sector, uint8_t relativeBlock, char *outputBuffer) {
+bool writeRfidBlock(uint8_t sector, uint8_t relativeBlock, char *newContent) {
+  uint8_t absoluteBlock = (sector * 4) + relativeBlock;
+  MFRC522::StatusCode status;
+
+
+  // Authenticate using key A
+  Serial.println(F("Authenticating using key A..."));
+  status = mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, absoluteBlock, &key, &(mfrc522.uid));
+  if (status != MFRC522::STATUS_OK) {
+    Serial.print(F("PCD_Authenticate() failed: "));
+    Serial.println(mfrc522.GetStatusCodeName(status));
+    return false;
+  }
+
+  byte buffer[16];
+  for (byte i = 0; i < 16; i++) {
+    buffer[i] = newContent[i];
+  }
+
+  // Write block
+  Serial.print(F("Writing data to block: ")); Serial.println(newContent);
+  status = (MFRC522::StatusCode) mfrc522.MIFARE_Write(absoluteBlock, buffer, 16);
+  if (status != MFRC522::STATUS_OK) {
+    Serial.print(F("MIFARE_Write() failed: "));
+    Serial.println(mfrc522.GetStatusCodeName(status));
+    return false;
+  }
+  return true;
+}
+
+/**
+ * read a block from a rfid card into outputBuffer which needs to be >= 18 bytes long
+ */
+bool readRfidBlock(uint8_t sector, uint8_t relativeBlock, byte *outputBuffer, byte bufferSize) {
   if (relativeBlock > 3) {
     Serial.println(F("Invalid block number"));
     return false;
   }
 
   // Block 4 is trailer block
-  byte trailerBlock   = (sector * 4) + 3;
-  byte absoluteBlock = (sector * 4) + relativeBlock;
+  //uint8_t trailerBlock   = (sector * 4) + 3;
+  uint8_t absoluteBlock = (sector * 4) + relativeBlock;
   MFRC522::StatusCode status;
 
   // Authenticate using key A
   Serial.println(F("Authenticating using key A..."));
-  status = (MFRC522::StatusCode) mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, trailerBlock, &key, &(mfrc522.uid));
+  status = (MFRC522::StatusCode) mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, absoluteBlock, &key, &(mfrc522.uid));
   if (status != MFRC522::STATUS_OK) {
     Serial.print(F("PCD_Authenticate() failed: "));
     Serial.println(mfrc522.GetStatusCodeName(status));
@@ -190,29 +295,16 @@ boolean readRfidBlock(uint8_t sector, uint8_t relativeBlock, char *outputBuffer)
 
   Serial.print(F("Reading block "));
   Serial.println(absoluteBlock);
-  byte buffer[18];
-  byte bufferSize = sizeof(buffer);
-  status = (MFRC522::StatusCode) mfrc522.MIFARE_Read(absoluteBlock, buffer, &bufferSize);
+  status = (MFRC522::StatusCode) mfrc522.MIFARE_Read(absoluteBlock, outputBuffer, &bufferSize);
   if (status != MFRC522::STATUS_OK) {
     Serial.print(F("MIFARE_Read() failed: "));
     Serial.println(mfrc522.GetStatusCodeName(status));
     return false;
   }
   Serial.print(F("Data in block ")); Serial.print(absoluteBlock); Serial.println(F(":"));
-  print_byte_array(buffer, 16);
+  print_byte_array(outputBuffer, 16);
   Serial.println();
   Serial.println();
-
-
-  // Halt PICC
-  mfrc522.PICC_HaltA();
-  // Stop encryption on PCD
-  mfrc522.PCD_StopCrypto1();
-
-  for (byte i = 0; i < 16; i++) {
-    outputBuffer[i] = buffer[i];
-  }
-  outputBuffer[bufferSize] = '\0';
 
   return true;
 }
@@ -225,56 +317,85 @@ void print_byte_array(byte *buffer, byte bufferSize) {
   }
 }
 
-void switchFolder(const char *folder) {
+bool switchFolder(char *folder) {
   Serial.print(F("Switching folder to "));
   Serial.println(folder);
 
   if (!SD.exists(folder)) {
     Serial.println(F("Folder does not exist"));
-    return;
+    return false;
   }
   SD.chdir(folder);
   SD.vwd()->rewind();
+  currentFile = "";
+  return true;
 }
 
 void stopMp3() {
   playing = false;
+  if(AMP_POWER > 0) {
+    digitalWrite(AMP_POWER, LOW);
+  }
   musicPlayer.stopPlaying();
 }
 
 void playMp3() {
   SdFile file;
+  SD.vwd()->rewind();
+
+  char filenameChar[100];
+  SD.vwd()->getName(filenameChar, 100);
+  String dirname = "/" + String(filenameChar) + "/";
+
+  String nextFile = "";
+
   while (file.openNext(SD.vwd(), O_READ))
   {
-    char filenameChar[100];
-    String filename = "/";
 
-    SD.vwd()->getName(filenameChar, 100);
-    filename += filenameChar;
-
-    filename += "/";
     file.getName(filenameChar, 100);
-    filename += filenameChar;
-
     file.close();
 
-    if (!file.isDir() && isMP3File(filename)) {
-      Serial.print(F("Playing "));
-      Serial.println(filename);
-
-      playing = true;
-      musicPlayer.startPlayingFile((char *)filename.c_str());
-      return;
-    } else {
+    String tmpFile = String(filenameChar);
+    if (file.isDir() && !isMP3File(tmpFile)) {
       Serial.print(F("Ignoring "));
-      Serial.println(filename);
+      Serial.println(tmpFile);
+      continue;
+    }
+
+    if(currentFile < tmpFile && (tmpFile < nextFile || nextFile == "")) {
+      nextFile = tmpFile;
     }
   }
-  // Start again
-  SD.vwd()->rewind();
+
+  // Start folder from the beginning
+  if(nextFile == "" && currentFile != ""){
+    currentFile = "";
+    playMp3();
+    return;
+  }
+
+  // No currentFile && no nextFile => Nothing to play!
+  if(nextFile == "") {
+    Serial.print(F("No mp3 files in "));
+    Serial.println(dirname);
+    stopMp3();
+    return;
+  }
+
+  String fullpath = dirname + nextFile;
+
+  Serial.print(F("Playing "));
+  Serial.println(fullpath);
+
+  playing = true;
+  musicPlayer.startPlayingFile((char *)fullpath.c_str());
+
+  if(AMP_POWER > 0) {
+    digitalWrite(AMP_POWER, HIGH);
+  }
 }
 
-bool isMP3File(String filename) {
+bool isMP3File(String &filename) {
   return filename.endsWith(".mp3");
 }
 
@@ -282,11 +403,11 @@ void returnOK() {
   server.send(200, "text/plain", "");
 }
 
-void returnServerError(String msg) {
-  server.send(500, "text/plain", msg);
+void returnHttpStatus(uint8_t statusCode, String msg) {
+  server.send(statusCode, "text/plain", msg);
 }
 
-void renderDirectory(String path) {
+void renderDirectory(String &path) {
   SdFile dir;
   dir.open(path.c_str(), O_READ);
 
@@ -300,7 +421,8 @@ void renderDirectory(String path) {
       "function deleteUrl(url){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('DELETE', url); xhr.send();}"
       "function upload(folder){ var fileInput = document.getElementById('fileInput'); if(fileInput.files.length === 0){ alert('Choose a file first'); return; } xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }};"
       "var formData = new FormData(); for(var i = 0; i < fileInput.files.length; i++) { formData.append('data', fileInput.files[i], folder.concat(fileInput.files[i].name)); }; xhr.open('POST', '/'); xhr.send(formData); }"
-      "function mkdir() { var folder = document.getElementById('folder'); if(folder != ''){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; var formData = new FormData(); formData.append('folder', folder.value); xhr.open('POST', '/'); xhr.send(formData);}}"
+      "function writeRfid(url){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', url); var formData = new FormData(); formData.append('write', 1); xhr.send(formData);}"
+      "function mkdir() { var folder = document.getElementById('folder'); if(folder != ''){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('folder', folder.value); xhr.send(formData);}}"
       "</script></head><body>"));
 
   String output;
@@ -324,7 +446,10 @@ void renderDirectory(String path) {
 
     String output = F("<div id=\"{name}\">{icon}<a href=\"{path}\">{name}</a> <a href=\"#\" onclick=\"deleteUrl('{name}'); return false;\">&#x2718;</a>");
     if (entry.isDir()) {
-      //output += F("<a href=\"#\" onclick=\"\">&#x1f4be;</a>");
+      // Currently only foldernames <= 16 characters can be written onto the rfid
+      if (filename.length() <= 16) {
+        output += F("<a href=\"#\" onclick=\"writeRfid('{name}');\">&#x1f4be;</a>");
+      }
       output.replace("{icon}", F("&#x1f4c2; "));
       output.replace("{path}", filename + "/");
     } else {
@@ -344,7 +469,7 @@ void renderDirectory(String path) {
   server.client().stop();
 }
 
-bool loadFromSdCard(String path) {
+bool loadFromSdCard(String &path) {
   String dataType = "text/plain";
 
   if (path.endsWith(".HTM")) dataType = "text/html";
@@ -369,6 +494,16 @@ bool loadFromSdCard(String path) {
   }
   dataFile.close();
   return true;
+}
+
+void handleWriteRfid(String &folder) {
+  if (switchFolder((char *)folder.c_str())) {
+    stopMp3();
+    pairing = true;
+    returnOK();
+  } else {
+    returnHttpStatus((uint8_t)404, "Not found");
+  }
 }
 
 void handlePlayMp3() {
@@ -428,11 +563,12 @@ void handleFileUpload() {
 
 void handleNotFound() {
   String path = server.urlDecode(server.uri());
+  Serial.println(F("Request to: ") + path);
   if (server.method() == HTTP_GET) {
     if (loadFromSdCard(path)) return;
   } else if (server.method() == HTTP_DELETE) {
     if (server.uri() == "/" || !SD.exists((char *)path.c_str())) {
-      returnServerError("BAD PATH: " + server.uri());
+      returnHttpStatus((uint8_t)500, "BAD PATH: " + server.uri());
       return;
     }
 
@@ -451,14 +587,57 @@ void handleNotFound() {
       SD.mkdir((char *)server.arg("folder").c_str());
       returnOK();
       return;
-    } else if ((server.uri() == "/") || SD.exists((char *)path.c_str())) {
+    } else if (server.uri() == "/") {
       Serial.println(F("Probably got an upload request"));
       returnOK();
       return;
+    } else if (SD.exists((char *)path.c_str())) {
+      if (server.hasArg("write") && path.length() <= 16) {
+        handleWriteRfid(path);
+        returnOK();
+        return;
+      }
     }
-    // 404 otherwise
   }
 
-  server.send(404, "text/plain", F("Not found"));
+  // 404 otherwise
+  returnHttpStatus((uint8_t)404, "Not found");
   Serial.println("404: " + path);
+}
+
+bool patchVS1053() {
+  uint16_t i = 0;
+
+  Serial.println(F("Installing patch to VS1053"));
+
+  SdFile file;
+  if (!file.open("patches.053", O_READ)) return false;
+
+  uint16_t addr, n, val;
+
+  while (file.read(&addr, 2) && file.read(&n, 2)) {
+    i += 2;
+    if (n & 0x8000U) {
+      n &= 0x7FFF;
+      if (!file.read(&val, 2)) {
+        file.close();
+        return false;
+      }
+      while (n--) {
+        musicPlayer.sciWrite(addr, val);
+      }
+    } else {
+      while (n--) {
+        if (!file.read(&val, 2)) {
+          file.close();
+          return false;
+        }
+        i++;
+        musicPlayer.sciWrite(addr, val);
+      }
+    }
+  }
+  file.close(); //Close out this track
+
+  Serial.print(F("Number of bytes: ")); Serial.println(i);
 }
