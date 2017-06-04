@@ -15,7 +15,7 @@ install:
     - pip install -U platformio
 
 script:
-    - platformio ci --board=<ID_1> --board=<ID_2> --board=<ID_N>
+    - platformio ci --board=espressif8266
 notifications:
   email:
     on_success: change
