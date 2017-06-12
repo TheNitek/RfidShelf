@@ -1,9 +1,12 @@
 # RfidShelf
 Make your shelf play MP3s!
 
-Use some cheap hardware (Esp8266/NodeMcu, RC522, VS1053 MP3 breakout board) to create an RFID controlled MP3 (and more) shelf. Impression of the first prototype: [![RfidShelf Prototype](http://img.youtube.com/vi/39uuoB3o7k8/0.jpg)](http://www.youtube.com/watch?v=39uuoB3o7k8 "RfidShelf Prototype")
+Use some cheap hardware (Esp8266/NodeMcu, RC522, VS1053 MP3 breakout board) to create an RFID controlled MP3 (and more) shelf. Impression of the first prototype:
+
+[![RfidShelf Prototype](http://img.youtube.com/vi/39uuoB3o7k8/0.jpg)](http://www.youtube.com/watch?v=39uuoB3o7k8 "RfidShelf Prototype")
 
 This is how the first "test subject" reacted:
+
 [![RfidShelf Test](http://img.youtube.com/vi/FcALmyrhR3w/0.jpg)](http://www.youtube.com/watch?v=FcALmyrhR3w "RfidShelf Test")
 
 ## The idea
@@ -32,11 +35,11 @@ I tried a variety of hardware combinations both focusing on being cheap and easy
 
 ### Cheap (~30€)
 Disclaimer: I had some noise issues with this version, probably due to all the wires flying around
-![RfidBoardBaseplate](images/baseplate.jpg)
 * [Base plate for NodeMcu (also available as a kit including the NodeMcu) ~1,50](https://www.aliexpress.com/item/Nodemcu-base-plate-Lua-WIFI-NodeMcu-development-board-ESP8266-serial-port/32678372845.html)
 * [VS1053 MP3 + SD Board ~6,50€](https://www.aliexpress.com/item/VS1053-VS1053B-MP3-Module-Breakout-Board-With-SD-Card-Slot-VS1053B-Ogg-Real-time-Recording-For/32809994212.html)
 * [PAM8302 Amplifier ~1,00€](https://www.aliexpress.com/item/CJMCU-832-PAM8302-2-5W-single-channel-Class-D-Audio-power-amplifier-module-PAM8302A-development-board/32708571731.html)
 * SD Card (NOT a micro SD but a big one!)
+![RfidBoardBaseplate](images/baseplate.jpg)
 
 ### ShelfBoard based (~40€)
 Same as the "cheap" version but instead of the base plate use the custom [ShelfBoard (~10,00€)](https://PCBs.io/share/z7aNg).
