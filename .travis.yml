@@ -10,7 +10,7 @@ cache:
 
 env:
     - PLATFORMIO_CI_SRC=RfidShelf.ino
-
+before_install: cd RfidShelf
 install:
     - pip install -U platformio
 
