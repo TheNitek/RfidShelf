@@ -27,6 +27,12 @@ Rfid cards can the be assigned a folder containing MP3 files on a SD card, playe
 * /ShelfBoard KiCad source files for the shelf board pcb
 * /ShelfBoard/gerber current shelf board gerber files
 
+## Tools required
+* Electric drill
+* Hole saw (if you don't have one, you can [get it at ikea](http://www.ikea.com/us/en/catalog/products/20302332/) together with the shelf)
+* Soldering iron
+* Long, stable screw driver or something similar
+
 ## Hardware
 I tried a variety of hardware combinations both focusing on being cheap and easy to assemble. Based on that I can recommend a few setups, depending on your budget and your ability/willingness to solder. Most items can be bought on Aliexpress for a few bucks, the links are only meant to be an example.
 
