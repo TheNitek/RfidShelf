@@ -3,8 +3,8 @@
 #include <ESP8266WebServer.h>
 #include <WiFiManager.h>
 #include <ESP8266mDNS.h>
-#include <WiFiUdp.h>
-#include <ArduinoOTA.h>
+#include <ESP8266HTTPClient.h>
+#include <ESP8266httpUpdate.h>
 #include <SPI.h>
 #include <MFRC522.h>
 #include <SdFat.h>
@@ -37,6 +37,8 @@ MFRC522 mfrc522(RC522_CS, UINT8_MAX);   // Create MFRC522 instance.
 
 MFRC522::MIFARE_Key key;
 
+#define MAJOR_VERSION 1
+#define MINOR_VERSION 0
 
 // Init array that will store new card uid
 byte lastCardUid[4];
@@ -120,6 +122,7 @@ void setup() {
 
   musicPlayer.dumpRegs();
 
+  wifiManager.setConfigPortalTimeout(3 * 60);
   wifiManager.autoConnect("MP3-SHELF", "lacklack");
 
   Serial.print("Connected! IP address: ");
@@ -131,25 +134,6 @@ void setup() {
   server.onNotFound(handleNotFound);
 
   server.begin();
-
-  ArduinoOTA.onStart([]() {
-    Serial.println("Start");
-  });
-  ArduinoOTA.onEnd([]() {
-    Serial.println("\nEnd");
-  });
-  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
-  });
-  ArduinoOTA.onError([](ota_error_t error) {
-    Serial.printf("Error[%u]: ", error);
-    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
-    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
-    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
-    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
-    else if (error == OTA_END_ERROR) Serial.println("End Failed");
-  });
-  ArduinoOTA.begin();
 
   Serial.println(F("Init done"));
 }
@@ -164,7 +148,6 @@ void loop() {
 
   handleRfid();
   server.handleClient();
-  ArduinoOTA.handle();
 }
 
 void handleRfid() {
@@ -205,7 +188,10 @@ void handleRfid() {
   if (pairing) {
     char writeFolder[17];
     SD.vwd()->getName(writeFolder, 17);
-    writeRfidBlock(1, 0, writeFolder);
+    writeRfidBlock(1, 0, writeFolder, 17);
+    // Prepare cards for configurable repeat and random play
+    // Using a string is lame, but works - Space it not an issue here
+    writeRfidBlock(2, 0, "1000000000000000", 17);
     pairing = false;
   }
 
@@ -240,7 +226,7 @@ void handleRfid() {
 
 }
 
-bool writeRfidBlock(uint8_t sector, uint8_t relativeBlock, char *newContent) {
+bool writeRfidBlock(uint8_t sector, uint8_t relativeBlock, char *newContent, uint8_t contentSize) {
   uint8_t absoluteBlock = (sector * 4) + relativeBlock;
   MFRC522::StatusCode status;
 
@@ -255,7 +241,11 @@ bool writeRfidBlock(uint8_t sector, uint8_t relativeBlock, char *newContent) {
   }
 
   byte buffer[16];
-  for (byte i = 0; i < 16; i++) {
+  uint8_t bufferSize = 16;
+  if(contentSize < bufferSize) {
+    bufferSize = contentSize;
+  }
+  for (byte i = 0; i < bufferSize; i++) {
     buffer[i] = newContent[i];
   }
 
@@ -423,6 +413,7 @@ void renderDirectory(String &path) {
       "var formData = new FormData(); for(var i = 0; i < fileInput.files.length; i++) { formData.append('data', fileInput.files[i], folder.concat(fileInput.files[i].name)); }; xhr.open('POST', '/'); xhr.send(formData); }"
       "function writeRfid(url){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', url); var formData = new FormData(); formData.append('write', 1); xhr.send(formData);}"
       "function mkdir() { var folder = document.getElementById('folder'); if(folder != ''){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('folder', folder.value); xhr.send(formData);}}"
+      "function ota() { var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { document.write('Please wait and do NOT turn of the power!'); location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('ota', 1); xhr.send(formData);}"
       "</script></head><body>"));
 
   String output;
@@ -444,7 +435,7 @@ void renderDirectory(String &path) {
     // TODO encode special characters
     String filename = String(filenameChar);
 
-    String output = F("<div id=\"{name}\">{icon}<a href=\"{path}\">{name}</a> <a href=\"#\" onclick=\"deleteUrl('{name}'); return false;\">&#x2718;</a>");
+    output = F("<div id=\"{name}\">{icon}<a href=\"{path}\">{name}</a> <a href=\"#\" onclick=\"deleteUrl('{name}'); return false;\">&#x2718;</a>");
     if (entry.isDir()) {
       // Currently only foldernames <= 16 characters can be written onto the rfid
       if (filename.length() <= 16) {
@@ -464,6 +455,12 @@ void renderDirectory(String &path) {
     output.replace("{name}", filename);
     server.sendContent(output);
     entry.close();
+  }
+  if (path == "/") {
+    output = F("<br><br><form>Version {major}.{minor} <input type=\"button\" value=\"Update Firmware\" onclick=\"ota()\"</form>");
+    output.replace("{major}", String(MAJOR_VERSION));
+    output.replace("{minor}", String(MINOR_VERSION));
+    server.sendContent(output);
   }
   server.sendContent(F("</body></html>"));
   server.client().stop();
@@ -585,6 +582,25 @@ void handleNotFound() {
     if (server.hasArg("folder")) {
       Serial.println(F("Creating folder"));
       SD.mkdir((char *)server.arg("folder").c_str());
+      returnOK();
+      return;
+    } else if (server.hasArg("ota")) {
+      Serial.println(F("Starting OTA"));
+      t_httpUpdate_return ret = ESPhttpUpdate.update("http://download.naeveke.de/board/latest.bin");
+      
+      switch(ret) {
+          case HTTP_UPDATE_FAILED:
+              Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s\n", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
+              returnHttpStatus(200, "Update failed, please try again");
+              return;
+          case HTTP_UPDATE_NO_UPDATES:
+              Serial.println(F("HTTP_UPDATE_NO_UPDATES"));
+              returnHttpStatus(200, "No update available");
+              return;
+          case HTTP_UPDATE_OK:
+              Serial.println(F("HTTP_UPDATE_OK"));
+              break;
+      }
       returnOK();
       return;
     } else if (server.uri() == "/") {
