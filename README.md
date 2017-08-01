@@ -88,3 +88,5 @@ The Adafruit board offers a good sound quality and already has an amp on board. 
 
 ## Disclaimer
 Everything in this project I did up to my best knowledge. Nevertheless this comes without guarantee. Do not hold me responsible in case something unexpected/undesired happens.
+
+[![Build Status](https://travis-ci.org/TheNitek/RfidShelf.svg?branch=master)](https://travis-ci.org/TheNitek/RfidShelf)
