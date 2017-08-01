@@ -38,7 +38,7 @@ MFRC522 mfrc522(RC522_CS, UINT8_MAX);   // Create MFRC522 instance.
 MFRC522::MIFARE_Key key;
 
 #define MAJOR_VERSION 1
-#define MINOR_VERSION 0
+#define MINOR_VERSION 1
 
 // Init array that will store new card uid
 byte lastCardUid[4];
@@ -50,14 +50,14 @@ SdFat SD;
 SdFile uploadFile;
 
 void setup() {
+  // Seems to make flashing more reliable
+  delay(100);
+
   Serial.begin(115200);
   Serial.println();
   Serial.println("Starting ...");
 
-  // Seems to make flashing more reliable
-  delay(100);
-
-  if(AMP_POWER > 0) {
+  if (AMP_POWER > 0) {
     // Disable amp
     pinMode(AMP_POWER, OUTPUT);
     digitalWrite(AMP_POWER, LOW);
@@ -72,7 +72,7 @@ void setup() {
   digitalWrite(BREAKOUT_CS, HIGH);
   pinMode(BREAKOUT_DCS, OUTPUT);
   digitalWrite(BREAKOUT_DCS, HIGH);
-  
+
   SPI.begin();        // Init SPI bus
   mfrc522.PCD_Init(); // Init MFRC522 card
 
@@ -123,7 +123,11 @@ void setup() {
   musicPlayer.dumpRegs();
 
   wifiManager.setConfigPortalTimeout(3 * 60);
-  wifiManager.autoConnect("MP3-SHELF", "lacklack");
+  if (!wifiManager.autoConnect("MP3-SHELF-SETUP", "lacklack")) {
+    Serial.println(F("Setup timed out, starting AP"));
+    WiFi.mode(WIFI_AP);
+    WiFi.softAP("MP3-SHELF", "lacklack");
+  }
 
   Serial.print("Connected! IP address: ");
   Serial.println(WiFi.localIP());
@@ -196,13 +200,13 @@ void handleRfid() {
   }
 
   byte readBuffer[18];
-  if (readRfidBlock(1, 0, readBuffer,sizeof(readBuffer))) {
-    
+  if (readRfidBlock(1, 0, readBuffer, sizeof(readBuffer))) {
+
     char readFolder[18];
     readFolder[0] = '/';
     // allthough sizeof(readBuffer) == 18, we only get 16 byte of data
     for (byte i = 0; i < 16; i++) {
-      readFolder[i+1] = readBuffer[i];
+      readFolder[i + 1] = readBuffer[i];
     }
     // readBuffer will already contain \0 if the folder name is < 16 chars, but otherwise we need to add it
     readFolder[17] = '\0';
@@ -226,7 +230,7 @@ void handleRfid() {
 
 }
 
-bool writeRfidBlock(uint8_t sector, uint8_t relativeBlock, char *newContent, uint8_t contentSize) {
+bool writeRfidBlock(uint8_t sector, uint8_t relativeBlock, const char *newContent, uint8_t contentSize) {
   uint8_t absoluteBlock = (sector * 4) + relativeBlock;
   MFRC522::StatusCode status;
 
@@ -242,7 +246,7 @@ bool writeRfidBlock(uint8_t sector, uint8_t relativeBlock, char *newContent, uin
 
   byte buffer[16];
   uint8_t bufferSize = 16;
-  if(contentSize < bufferSize) {
+  if (contentSize < bufferSize) {
     bufferSize = contentSize;
   }
   for (byte i = 0; i < bufferSize; i++) {
@@ -261,8 +265,8 @@ bool writeRfidBlock(uint8_t sector, uint8_t relativeBlock, char *newContent, uin
 }
 
 /**
- * read a block from a rfid card into outputBuffer which needs to be >= 18 bytes long
- */
+   read a block from a rfid card into outputBuffer which needs to be >= 18 bytes long
+*/
 bool readRfidBlock(uint8_t sector, uint8_t relativeBlock, byte *outputBuffer, byte bufferSize) {
   if (relativeBlock > 3) {
     Serial.println(F("Invalid block number"));
@@ -323,7 +327,7 @@ bool switchFolder(char *folder) {
 
 void stopMp3() {
   playing = false;
-  if(AMP_POWER > 0) {
+  if (AMP_POWER > 0) {
     digitalWrite(AMP_POWER, LOW);
   }
   musicPlayer.stopPlaying();
@@ -352,20 +356,20 @@ void playMp3() {
       continue;
     }
 
-    if(currentFile < tmpFile && (tmpFile < nextFile || nextFile == "")) {
+    if (currentFile < tmpFile && (tmpFile < nextFile || nextFile == "")) {
       nextFile = tmpFile;
     }
   }
 
   // Start folder from the beginning
-  if(nextFile == "" && currentFile != ""){
+  if (nextFile == "" && currentFile != "") {
     currentFile = "";
     playMp3();
     return;
   }
 
   // No currentFile && no nextFile => Nothing to play!
-  if(nextFile == "") {
+  if (nextFile == "") {
     Serial.print(F("No mp3 files in "));
     Serial.println(dirname);
     stopMp3();
@@ -380,7 +384,7 @@ void playMp3() {
   playing = true;
   musicPlayer.startPlayingFile((char *)fullpath.c_str());
 
-  if(AMP_POWER > 0) {
+  if (AMP_POWER > 0) {
     digitalWrite(AMP_POWER, HIGH);
   }
 }
@@ -587,19 +591,19 @@ void handleNotFound() {
     } else if (server.hasArg("ota")) {
       Serial.println(F("Starting OTA"));
       t_httpUpdate_return ret = ESPhttpUpdate.update("http://download.naeveke.de/board/latest.bin");
-      
-      switch(ret) {
-          case HTTP_UPDATE_FAILED:
-              Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s\n", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
-              returnHttpStatus(200, "Update failed, please try again");
-              return;
-          case HTTP_UPDATE_NO_UPDATES:
-              Serial.println(F("HTTP_UPDATE_NO_UPDATES"));
-              returnHttpStatus(200, "No update available");
-              return;
-          case HTTP_UPDATE_OK:
-              Serial.println(F("HTTP_UPDATE_OK"));
-              break;
+
+      switch (ret) {
+        case HTTP_UPDATE_FAILED:
+          Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s\n", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
+          returnHttpStatus(200, "Update failed, please try again");
+          return;
+        case HTTP_UPDATE_NO_UPDATES:
+          Serial.println(F("HTTP_UPDATE_NO_UPDATES"));
+          returnHttpStatus(200, "No update available");
+          return;
+        case HTTP_UPDATE_OK:
+          Serial.println(F("HTTP_UPDATE_OK"));
+          break;
       }
       returnOK();
       return;
