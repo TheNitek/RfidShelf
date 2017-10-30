@@ -49,7 +49,7 @@ Some light soldering is required to attach the pin headers to the MFRC-522
 * Jumper Wires
 
 ### Cheap (~30€)
-Disclaimer: I had some noise issues with this version, probably due to all the wires flying around.  
+Disclaimer: I had some noise issues with this version, probably due to all the wires flying around.
 Some more light soldering is required to attach the pin headers to the amplifier.
 * [Base plate for NodeMcu (also available as a kit including the NodeMcu) ~1,50](https://www.aliexpress.com/item/Nodemcu-base-plate-Lua-WIFI-NodeMcu-development-board-ESP8266-serial-port/32678372845.html)
 * [VS1053 MP3 + SD Board ~6,50€](https://www.aliexpress.com/item/VS1053-VS1053B-MP3-Module-Breakout-Board-With-SD-Card-Slot-VS1053B-Ogg-Real-time-Recording-For/32809994212.html)
@@ -76,10 +76,6 @@ The Adafruit board offers a good sound quality and already has an amp on board. 
 ## Wiring
 ![Wiring](images/wiring.jpg)
 (See /Fritzing folder for vector/svg version if this image)
-
-## More Pictures
-![Shelf](images/shelf.jpg)
-![Shelf with speaker](images/shelfspeaker.jpg)
 
 ## Random Notes
 * Instead of cards you can also use those blue key fob Rfid tags, like the one included in most MFRC-522 kits. Maybe you can "implant" it into a teddy or something similar.
