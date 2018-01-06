@@ -216,10 +216,18 @@ void handleRfid() {
       lastCardUid[i] = mfrc522.uid.uidByte[i];
     }
 
-    if (switchFolder(readFolder)) {
+    
+
+    if(readFolder[1] == '\0') {
+      Serial.println(F("Stopping playback"));
       stopMp3();
       yield();
-      playMp3();
+    } else {
+      if (switchFolder(readFolder)) {
+        stopMp3();
+        yield();
+        playMp3();
+      }
     }
   }
 
@@ -418,7 +426,7 @@ void renderDirectory(String &path) {
       "function writeRfid(url){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', url); var formData = new FormData(); formData.append('write', 1); xhr.send(formData);}"
       "function mkdir() { var folder = document.getElementById('folder'); if(folder != ''){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('folder', folder.value); xhr.send(formData);}}"
       "function ota() { var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { document.write('Please wait and do NOT turn of the power!'); location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('ota', 1); xhr.send(formData);}"
-      "</script></head><body>"));
+      "</script><link rel=\"icon\" href=\"data:;base64,iVBORw0KGgo=\"></head><body>"));
 
   String output;
   if (path == "/") {
@@ -584,7 +592,9 @@ void handleNotFound() {
     return;
   } else if (server.method() == HTTP_POST) {
     if (server.hasArg("folder")) {
-      Serial.println(F("Creating folder"));
+      Serial.print(F("Creating folder"));
+      Serial.print(F(" "));
+      Serial.println(server.arg("folder"));
       SD.mkdir((char *)server.arg("folder").c_str());
       returnOK();
       return;
