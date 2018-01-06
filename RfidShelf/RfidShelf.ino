@@ -132,7 +132,6 @@ void setup() {
   Serial.print("Connected! IP address: ");
   Serial.println(WiFi.localIP());
 
-  server.on("/playMp3", HTTP_GET, handlePlayMp3);
   server.on("/stopMp3", HTTP_GET, handleStopMp3);
   server.on("/", HTTP_POST, handleNotFound, handleFileUpload);
   server.onNotFound(handleNotFound);
@@ -319,7 +318,7 @@ void print_byte_array(byte *buffer, byte bufferSize) {
   }
 }
 
-bool switchFolder(char *folder) {
+bool switchFolder(const char *folder) {
   Serial.print(F("Switching folder to "));
   Serial.println(folder);
 
@@ -358,7 +357,7 @@ void playMp3() {
     file.close();
 
     String tmpFile = String(filenameChar);
-    if (file.isDir() && !isMP3File(tmpFile)) {
+    if (file.isDir() || !isMP3File(tmpFile)) {
       Serial.print(F("Ignoring "));
       Serial.println(tmpFile);
       continue;
@@ -390,6 +389,7 @@ void playMp3() {
   Serial.println(fullpath);
 
   playing = true;
+  currentFile = nextFile;
   musicPlayer.startPlayingFile((char *)fullpath.c_str());
 
   if (AMP_POWER > 0) {
@@ -424,13 +424,15 @@ void renderDirectory(String &path) {
       "function upload(folder){ var fileInput = document.getElementById('fileInput'); if(fileInput.files.length === 0){ alert('Choose a file first'); return; } xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }};"
       "var formData = new FormData(); for(var i = 0; i < fileInput.files.length; i++) { formData.append('data', fileInput.files[i], folder.concat(fileInput.files[i].name)); }; xhr.open('POST', '/'); xhr.send(formData); }"
       "function writeRfid(url){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', url); var formData = new FormData(); formData.append('write', 1); xhr.send(formData);}"
-      "function mkdir() { var folder = document.getElementById('folder'); if(folder != ''){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('folder', folder.value); xhr.send(formData);}}"
+      "function play(url){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', url); var formData = new FormData(); formData.append('play', 1); xhr.send(formData);}"
+      "function mkdir() { var folder = document.getElementById('folder'); if(folder != ''){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('newFolder', folder.value); xhr.send(formData);}}"
       "function ota() { var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { document.write('Please wait and do NOT turn of the power!'); location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('ota', 1); xhr.send(formData);}"
       "</script><link rel=\"icon\" href=\"data:;base64,iVBORw0KGgo=\"></head><body>"));
 
   String output;
   if (path == "/") {
-    output = F("<form><input type=\"text\" name=\"folder\" id=\"folder\"><input type=\"button\" value=\"mkdir\" onclick=\"mkdir()\"></form>");
+    output = F("<div>Currently playing: <strong>{currentFile}</strong></div><form><input type=\"text\" name=\"folder\" id=\"folder\"><input type=\"button\" value=\"mkdir\" onclick=\"mkdir()\"></form>");
+    output.replace("{currentFile}", currentFile);
     output.replace("{folder}", path);
     server.sendContent(output);
   } else {
@@ -451,7 +453,7 @@ void renderDirectory(String &path) {
     if (entry.isDir()) {
       // Currently only foldernames <= 16 characters can be written onto the rfid
       if (filename.length() <= 16) {
-        output += F("<a href=\"#\" onclick=\"writeRfid('{name}');\">&#x1f4be;</a>");
+        output += F("<a href=\"#\" onclick=\"writeRfid('{name}');\">&#x1f4be;</a> <a href=\"#\" onclick=\"play('{name}');\">&#9654;</a>");
       }
       output.replace("{icon}", F("&#x1f4c2; "));
       output.replace("{path}", filename + "/");
@@ -513,11 +515,6 @@ void handleWriteRfid(String &folder) {
   } else {
     returnHttpStatus((uint8_t)404, "Not found");
   }
-}
-
-void handlePlayMp3() {
-  playMp3();
-  returnOK();
 }
 
 void handleStopMp3() {
@@ -591,11 +588,14 @@ void handleNotFound() {
     returnOK();
     return;
   } else if (server.method() == HTTP_POST) {
-    if (server.hasArg("folder")) {
+    if (server.hasArg("newFolder")) {
       Serial.print(F("Creating folder"));
       Serial.print(F(" "));
-      Serial.println(server.arg("folder"));
-      SD.mkdir((char *)server.arg("folder").c_str());
+      Serial.println(server.arg("newFolder"));
+      stopMp3();
+      yield();
+      switchFolder("/");
+      SD.mkdir((char *)server.arg("newFolder").c_str());
       returnOK();
       return;
     } else if (server.hasArg("ota")) {
@@ -624,6 +624,12 @@ void handleNotFound() {
     } else if (SD.exists((char *)path.c_str())) {
       if (server.hasArg("write") && path.length() <= 16) {
         handleWriteRfid(path);
+        returnOK();
+        return;
+      } else if(server.hasArg("play") && switchFolder((char *)path.c_str())) {
+        stopMp3();
+        yield();
+        playMp3();
         returnOK();
         return;
       }
@@ -667,7 +673,7 @@ bool patchVS1053() {
       }
     }
   }
-  file.close(); //Close out this track
+  file.close();
 
   Serial.print(F("Number of bytes: ")); Serial.println(i);
 }
