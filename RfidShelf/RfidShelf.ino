@@ -43,6 +43,7 @@ MFRC522::MIFARE_Key key;
 // Init array that will store new card uid
 byte lastCardUid[4];
 bool playing = false;
+bool playingByCard = true;
 bool pairing = false;
 String currentFile = "";
 
@@ -87,7 +88,10 @@ void setup() {
   Serial.println();
 
   //Initialize the SdCard.
-  if (!SD.begin(SD_CS)) SD.initErrorHalt();
+  if (!SD.begin(SD_CS)) {
+    Serial.println(F("Could not initialize SD card"));
+    SD.initErrorHalt();
+  }
 
   // initialise the music player
   if (!musicPlayer.begin()) { // initialise the music player
@@ -162,7 +166,7 @@ void loop() {
 void handleRfid() {
 
   // While playing check if the tag is still present
-  if (playing) {
+  if (playing && playingByCard) {
 
     // Since wireless communication is voodoo we'll give it a few retrys before killing the music
     for (int i = 0; i < 3; i++) {
@@ -214,6 +218,8 @@ void handleRfid() {
     pairing = false;
   }
 
+  // Reset watchdog timer
+  yield();
   byte readBuffer[18];
   if (readRfidBlock(1, 0, readBuffer, sizeof(readBuffer))) {
 
@@ -227,8 +233,13 @@ void handleRfid() {
     // Store uid
     memcpy(lastCardUid, mfrc522.uid.uidByte, 4 * sizeof(byte) );
 
+    if (playing) {
+      stopMp3();
+    }
+    
     if (readFolder[1] != '\0' && switchFolder(readFolder)) {
       playMp3();
+      playingByCard = true;
     }
   }
 
@@ -241,12 +252,10 @@ void handleRfid() {
 
 bool writeRfidBlock(uint8_t sector, uint8_t relativeBlock, const char *newContent, uint8_t contentSize) {
   uint8_t absoluteBlock = (sector * 4) + relativeBlock;
-  MFRC522::StatusCode status;
-
 
   // Authenticate using key A
   Serial.println(F("Authenticating using key A..."));
-  status = mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, absoluteBlock, &key, &(mfrc522.uid));
+  MFRC522::StatusCode status = mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, absoluteBlock, &key, &(mfrc522.uid));
   if (status != MFRC522::STATUS_OK) {
     Serial.print(F("PCD_Authenticate() failed: "));
     Serial.println(mfrc522.GetStatusCodeName(status));
@@ -262,7 +271,7 @@ bool writeRfidBlock(uint8_t sector, uint8_t relativeBlock, const char *newConten
 
   // Write block
   Serial.print(F("Writing data to block: ")); Serial.println(newContent);
-  status = (MFRC522::StatusCode) mfrc522.MIFARE_Write(absoluteBlock, buffer, 16);
+  status = mfrc522.MIFARE_Write(absoluteBlock, buffer, 16);
   if (status != MFRC522::STATUS_OK) {
     Serial.print(F("MIFARE_Write() failed: "));
     Serial.println(mfrc522.GetStatusCodeName(status));
@@ -280,14 +289,11 @@ bool readRfidBlock(uint8_t sector, uint8_t relativeBlock, byte *outputBuffer, by
     return false;
   }
 
-  // Block 4 is trailer block
-  //uint8_t trailerBlock   = (sector * 4) + 3;
   uint8_t absoluteBlock = (sector * 4) + relativeBlock;
-  MFRC522::StatusCode status;
 
   // Authenticate using key A
   Serial.println(F("Authenticating using key A..."));
-  status = (MFRC522::StatusCode) mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, absoluteBlock, &key, &(mfrc522.uid));
+  MFRC522::StatusCode status = (MFRC522::StatusCode) mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, absoluteBlock, &key, &(mfrc522.uid));
   if (status != MFRC522::STATUS_OK) {
     Serial.print(F("PCD_Authenticate() failed: "));
     Serial.println(mfrc522.GetStatusCodeName(status));
@@ -296,7 +302,7 @@ bool readRfidBlock(uint8_t sector, uint8_t relativeBlock, byte *outputBuffer, by
 
   Serial.print(F("Reading block "));
   Serial.println(absoluteBlock);
-  status = (MFRC522::StatusCode) mfrc522.MIFARE_Read(absoluteBlock, outputBuffer, &bufferSize);
+  status = mfrc522.MIFARE_Read(absoluteBlock, outputBuffer, &bufferSize);
   if (status != MFRC522::STATUS_OK) {
     Serial.print(F("MIFARE_Read() failed: "));
     Serial.println(mfrc522.GetStatusCodeName(status));
@@ -333,6 +339,7 @@ bool switchFolder(const char *folder) {
 }
 
 void stopMp3() {
+  Serial.println(F("Stopping playback"));
   playing = false;
   if (AMP_POWER > 0) {
     digitalWrite(AMP_POWER, LOW);
@@ -629,8 +636,8 @@ void handleNotFound() {
         return;
       } else if (server.hasArg("play") && switchFolder((char *)path.c_str())) {
         stopMp3();
-        yield();
         playMp3();
+        playingByCard = false;
         returnOK();
         return;
       }
