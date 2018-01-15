@@ -43,11 +43,14 @@ MFRC522::MIFARE_Key key;
 // Init array that will store new card uid
 byte lastCardUid[4];
 bool playing = false;
+bool playingByCard = true;
 bool pairing = false;
 String currentFile = "";
 
 SdFat SD;
 SdFile uploadFile;
+
+unsigned long lastRfidCheck;
 
 void setup() {
   // Seems to make flashing more reliable
@@ -80,15 +83,18 @@ void setup() {
     key.keyByte[i] = 0xFF;
   }
 
-  Serial.print(F("Using rfid key (for A and B):"));
+  Serial.print(F("Using rfid key (for A and B): "));
   print_byte_array(key.keyByte, MFRC522::MF_KEY_SIZE);
   Serial.println();
 
   //Initialize the SdCard.
-  if (!SD.begin(SD_CS)) SD.initErrorHalt();
+  if (!SD.begin(SD_CS)) {
+    Serial.println(F("Could not initialize SD card"));
+    SD.initErrorHalt();
+  }
 
   // initialise the music player
-  if (! musicPlayer.begin()) { // initialise the music player
+  if (!musicPlayer.begin()) { // initialise the music player
     Serial.println(F("Couldn't find VS1053, do you have the right pins defined?"));
     while (1) delay(500);
   }
@@ -149,28 +155,42 @@ void loop() {
     playMp3();
   }
 
-  handleRfid();
+  if (!playing || (millis() - lastRfidCheck > 500)) {
+    handleRfid();
+    lastRfidCheck = millis();
+  }
+
   server.handleClient();
 }
 
 void handleRfid() {
-  // Look for new cards
-  if ( ! mfrc522.PICC_IsNewCardPresent()) {
-    return;
+
+  // While playing check if the tag is still present
+  if (playing && playingByCard) {
+
+    // Since wireless communication is voodoo we'll give it a few retrys before killing the music
+    for (int i = 0; i < 3; i++) {
+      // Detect Tag without looking for collisions
+      byte bufferATQA[2];
+      byte bufferSize = sizeof(bufferATQA);
+
+      MFRC522::StatusCode result = mfrc522.PICC_WakeupA(bufferATQA, &bufferSize);
+
+      if (result == mfrc522.STATUS_OK && mfrc522.PICC_ReadCardSerial() && (
+            mfrc522.uid.uidByte[0] == lastCardUid[0] &&
+            mfrc522.uid.uidByte[1] == lastCardUid[1] &&
+            mfrc522.uid.uidByte[2] == lastCardUid[2] &&
+            mfrc522.uid.uidByte[3] == lastCardUid[3] )) {
+        mfrc522.PICC_HaltA();
+        return;
+      }
+    }
+
+    stopMp3();
   }
 
-  // Select one of the cards
-  if ( ! mfrc522.PICC_ReadCardSerial()) {
-    return;
-  }
-
-  if (!pairing && (
-        mfrc522.uid.uidByte[0] == lastCardUid[0] &&
-        mfrc522.uid.uidByte[1] == lastCardUid[1] &&
-        mfrc522.uid.uidByte[2] == lastCardUid[2] &&
-        mfrc522.uid.uidByte[3] == lastCardUid[3] )) {
-    mfrc522.PICC_HaltA();
-    Serial.println(F("Card already read"));
+  // Look for new cards and select one if it exists
+  if (!mfrc522.PICC_IsNewCardPresent() ||  !mfrc522.PICC_ReadCardSerial()) {
     return;
   }
 
@@ -183,7 +203,7 @@ void handleRfid() {
   Serial.println(mfrc522.PICC_GetTypeName(piccType));
 
   // Check for compatibility
-  if ( piccType != MFRC522::PICC_TYPE_MIFARE_1K ) {
+  if (piccType != MFRC522::PICC_TYPE_MIFARE_1K ) {
     Serial.println(F("Unsupported card."));
     return;
   }
@@ -198,35 +218,28 @@ void handleRfid() {
     pairing = false;
   }
 
+  // Reset watchdog timer
+  yield();
   byte readBuffer[18];
   if (readRfidBlock(1, 0, readBuffer, sizeof(readBuffer))) {
 
     char readFolder[18];
     readFolder[0] = '/';
     // allthough sizeof(readBuffer) == 18, we only get 16 byte of data
-    for (byte i = 0; i < 16; i++) {
-      readFolder[i + 1] = readBuffer[i];
-    }
+    memcpy(readFolder + 1 , readBuffer, 16 * sizeof(byte) );
     // readBuffer will already contain \0 if the folder name is < 16 chars, but otherwise we need to add it
     readFolder[17] = '\0';
 
-    // Store NUID into nuidPICC array
-    for (byte i = 0; i < 4; i++) {
-      lastCardUid[i] = mfrc522.uid.uidByte[i];
-    }
+    // Store uid
+    memcpy(lastCardUid, mfrc522.uid.uidByte, 4 * sizeof(byte) );
 
-    
-
-    if(readFolder[1] == '\0') {
-      Serial.println(F("Stopping playback"));
+    if (playing) {
       stopMp3();
-      yield();
-    } else {
-      if (switchFolder(readFolder)) {
-        stopMp3();
-        yield();
-        playMp3();
-      }
+    }
+    
+    if (readFolder[1] != '\0' && switchFolder(readFolder)) {
+      playMp3();
+      playingByCard = true;
     }
   }
 
@@ -239,12 +252,10 @@ void handleRfid() {
 
 bool writeRfidBlock(uint8_t sector, uint8_t relativeBlock, const char *newContent, uint8_t contentSize) {
   uint8_t absoluteBlock = (sector * 4) + relativeBlock;
-  MFRC522::StatusCode status;
-
 
   // Authenticate using key A
   Serial.println(F("Authenticating using key A..."));
-  status = mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, absoluteBlock, &key, &(mfrc522.uid));
+  MFRC522::StatusCode status = mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, absoluteBlock, &key, &(mfrc522.uid));
   if (status != MFRC522::STATUS_OK) {
     Serial.print(F("PCD_Authenticate() failed: "));
     Serial.println(mfrc522.GetStatusCodeName(status));
@@ -256,13 +267,11 @@ bool writeRfidBlock(uint8_t sector, uint8_t relativeBlock, const char *newConten
   if (contentSize < bufferSize) {
     bufferSize = contentSize;
   }
-  for (byte i = 0; i < bufferSize; i++) {
-    buffer[i] = newContent[i];
-  }
+  memcpy(buffer, newContent, bufferSize * sizeof(byte) );
 
   // Write block
   Serial.print(F("Writing data to block: ")); Serial.println(newContent);
-  status = (MFRC522::StatusCode) mfrc522.MIFARE_Write(absoluteBlock, buffer, 16);
+  status = mfrc522.MIFARE_Write(absoluteBlock, buffer, 16);
   if (status != MFRC522::STATUS_OK) {
     Serial.print(F("MIFARE_Write() failed: "));
     Serial.println(mfrc522.GetStatusCodeName(status));
@@ -280,14 +289,11 @@ bool readRfidBlock(uint8_t sector, uint8_t relativeBlock, byte *outputBuffer, by
     return false;
   }
 
-  // Block 4 is trailer block
-  //uint8_t trailerBlock   = (sector * 4) + 3;
   uint8_t absoluteBlock = (sector * 4) + relativeBlock;
-  MFRC522::StatusCode status;
 
   // Authenticate using key A
   Serial.println(F("Authenticating using key A..."));
-  status = (MFRC522::StatusCode) mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, absoluteBlock, &key, &(mfrc522.uid));
+  MFRC522::StatusCode status = (MFRC522::StatusCode) mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, absoluteBlock, &key, &(mfrc522.uid));
   if (status != MFRC522::STATUS_OK) {
     Serial.print(F("PCD_Authenticate() failed: "));
     Serial.println(mfrc522.GetStatusCodeName(status));
@@ -296,7 +302,7 @@ bool readRfidBlock(uint8_t sector, uint8_t relativeBlock, byte *outputBuffer, by
 
   Serial.print(F("Reading block "));
   Serial.println(absoluteBlock);
-  status = (MFRC522::StatusCode) mfrc522.MIFARE_Read(absoluteBlock, outputBuffer, &bufferSize);
+  status = mfrc522.MIFARE_Read(absoluteBlock, outputBuffer, &bufferSize);
   if (status != MFRC522::STATUS_OK) {
     Serial.print(F("MIFARE_Read() failed: "));
     Serial.println(mfrc522.GetStatusCodeName(status));
@@ -333,6 +339,7 @@ bool switchFolder(const char *folder) {
 }
 
 void stopMp3() {
+  Serial.println(F("Stopping playback"));
   playing = false;
   if (AMP_POWER > 0) {
     digitalWrite(AMP_POWER, LOW);
@@ -341,6 +348,8 @@ void stopMp3() {
 }
 
 void playMp3() {
+  // IO takes time, reset watchdog timer so it does not kill us
+  yield();
   SdFile file;
   SD.vwd()->rewind();
 
@@ -589,8 +598,7 @@ void handleNotFound() {
     return;
   } else if (server.method() == HTTP_POST) {
     if (server.hasArg("newFolder")) {
-      Serial.print(F("Creating folder"));
-      Serial.print(F(" "));
+      Serial.print(F("Creating folder "));
       Serial.println(server.arg("newFolder"));
       stopMp3();
       yield();
@@ -626,10 +634,10 @@ void handleNotFound() {
         handleWriteRfid(path);
         returnOK();
         return;
-      } else if(server.hasArg("play") && switchFolder((char *)path.c_str())) {
+      } else if (server.hasArg("play") && switchFolder((char *)path.c_str())) {
         stopMp3();
-        yield();
         playMp3();
+        playingByCard = false;
         returnOK();
         return;
       }
