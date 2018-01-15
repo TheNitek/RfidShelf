@@ -78,7 +78,9 @@ void setup() {
   SPI.begin();        // Init SPI bus
   mfrc522.PCD_Init(); // Init MFRC522 card
 
-  key.keyByte = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+  for (byte i = 0; i < 6; i++) {
+    key.keyByte[i] = 0xFF;
+  }
 
   Serial.print(F("Using rfid key (for A and B): "));
   print_byte_array(key.keyByte, MFRC522::MF_KEY_SIZE);
