@@ -64,6 +64,7 @@ void setup() {
     // Disable amp
     pinMode(AMP_POWER, OUTPUT);
     digitalWrite(AMP_POWER, LOW);
+    Serial.println(F("Amp powered down"));
   }
 
   // Init SPI SS pins
@@ -92,6 +93,7 @@ void setup() {
     Serial.println(F("Could not initialize SD card"));
     SD.initErrorHalt();
   }
+  Serial.println(F("SD initialized"));
 
   // initialise the music player
   if (!musicPlayer.begin()) { // initialise the music player
@@ -109,6 +111,8 @@ void setup() {
   musicPlayer.GPIO_digitalWrite(0x0000);
   musicPlayer.softReset();
 
+  Serial.println(F("VS1053 soft reset done"));
+
   if (patchVS1053()) {
     // Enable Mono Output
     musicPlayer.sciWrite(VS1053_REG_WRAMADDR, 0x1e09);
@@ -117,8 +121,9 @@ void setup() {
     // Enable differential output
     /*uint16_t mode = VS1053_MODE_SM_DIFF | VS1053_MODE_SM_SDINEW;
       musicPlayer.sciWrite(VS1053_REG_MODE, mode); */
+      Serial.println(F("VS1053 patch installed"));
   } else {
-    Serial.println("Could not load patch");
+    Serial.println(F("Could not load patch"));
   }
 
   Serial.print(F("SampleRate "));
@@ -127,6 +132,8 @@ void setup() {
   musicPlayer.setVolume(10, 10);
 
   musicPlayer.dumpRegs();
+
+  Serial.println(F("VS1053 found"));
 
   wifiManager.setConfigPortalTimeout(3 * 60);
   if (!wifiManager.autoConnect("MP3-SHELF-SETUP", "lacklack")) {
@@ -143,6 +150,7 @@ void setup() {
   server.onNotFound(handleNotFound);
 
   server.begin();
+  Serial.println(F("Wifi initialized"));
 
   Serial.println(F("Init done"));
 }
@@ -349,7 +357,7 @@ void stopMp3() {
 
 void playMp3() {
   // IO takes time, reset watchdog timer so it does not kill us
-  yield();
+  ESP.wdtFeed();
   SdFile file;
   SD.vwd()->rewind();
 
@@ -428,7 +436,7 @@ void renderDirectory(String &path) {
   WiFiClient client = server.client();
 
   server.sendContent(
-    F("<html><head><script>"
+    F("<html><head><meta charset=\"utf-8\"/><script>"
       "function deleteUrl(url){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('DELETE', url); xhr.send();}"
       "function upload(folder){ var fileInput = document.getElementById('fileInput'); if(fileInput.files.length === 0){ alert('Choose a file first'); return; } xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }};"
       "var formData = new FormData(); for(var i = 0; i < fileInput.files.length; i++) { formData.append('data', fileInput.files[i], folder.concat(fileInput.files[i].name)); }; xhr.open('POST', '/'); xhr.send(formData); }"
@@ -440,12 +448,12 @@ void renderDirectory(String &path) {
 
   String output;
   if (path == "/") {
-    output = F("<div>Currently playing: <strong>{currentFile}</strong></div><form><input type=\"text\" name=\"folder\" id=\"folder\"><input type=\"button\" value=\"mkdir\" onclick=\"mkdir()\"></form>");
+    output = F("<div>Currently playing: <strong>{currentFile}</strong></div><form><input type=\"text\" name=\"folder\" id=\"folder\"><input type=\"button\" value=\"mkdir\" onclick=\"mkdir(); return false;\"></form>");
     output.replace("{currentFile}", currentFile);
     output.replace("{folder}", path);
     server.sendContent(output);
   } else {
-    output = F("<form><input type=\"file\" multiple=\"true\" name=\"data\" id=\"fileInput\"><input type=\"button\" value=\"upload\" onclick=\"upload('{folder}')\"></form>");
+    output = F("<form><input type=\"file\" multiple=\"true\" name=\"data\" id=\"fileInput\"><input type=\"button\" value=\"upload\" onclick=\"upload('{folder}'); return false;\"></form>");
     output.replace("{folder}", path);
     server.sendContent(output);
     server.sendContent(F("<div><a href=\"..\">..</a></div>"));
@@ -453,34 +461,54 @@ void renderDirectory(String &path) {
 
   SdFile entry;
   while (entry.openNext(&dir, O_READ)) {
+    if (!entry.isDir()) {
+      entry.close();
+      continue;
+    }
+
     char filenameChar[100];
     entry.getName(filenameChar, 100);
     // TODO encode special characters
     String filename = String(filenameChar);
 
     output = F("<div id=\"{name}\">{icon}<a href=\"{path}\">{name}</a> <a href=\"#\" onclick=\"deleteUrl('{name}'); return false;\">&#x2718;</a>");
-    if (entry.isDir()) {
-      // Currently only foldernames <= 16 characters can be written onto the rfid
-      if (filename.length() <= 16) {
-        output += F("<a href=\"#\" onclick=\"writeRfid('{name}');\">&#x1f4be;</a> <a href=\"#\" onclick=\"play('{name}');\">&#9654;</a>");
-      }
-      output.replace("{icon}", F("&#x1f4c2; "));
-      output.replace("{path}", filename + "/");
-    } else {
-      if (isMP3File(filename)) {
-        output.replace("{icon}", F("&#x266b; "));
-      } else {
-        output.replace("{icon}", F(""));
-      }
-      output.replace("{path}", filename);
+    // Currently only foldernames <= 16 characters can be written onto the rfid
+    if (filename.length() <= 16) {
+      output += F("<a href=\"#\" onclick=\"writeRfid('{name}');\">&#x1f4be;</a> <a href=\"#\" onclick=\"play('{name}'); return false;\">&#9654;</a>");
     }
+    output.replace("{icon}", F("&#x1f4c2; "));
+    output.replace("{path}", filename + "/");
+    output += F("</div>");
+    output.replace("{name}", filename);
+    server.sendContent(output);
+    entry.close();
+  }
+  dir.rewind();
+  while (entry.openNext(&dir, O_READ)) {
+    if (entry.isDir()) {
+      entry.close();
+      continue;
+    }
+    char filenameChar[100];
+    entry.getName(filenameChar, 100);
+    Serial.println(filenameChar);
+    // TODO encode special characters
+    String filename = String(filenameChar);
+
+    output = F("<div id=\"{name}\">{icon}<a href=\"{path}\">{name}</a> <a href=\"#\" onclick=\"deleteUrl('{name}'); return false;\">&#x2718;</a>");
+    if (isMP3File(filename)) {
+      output.replace("{icon}", F("&#x266b; "));
+    } else {
+      output.replace("{icon}", F(""));
+    }
+    output.replace("{path}", filename);
     output += F("</div>");
     output.replace("{name}", filename);
     server.sendContent(output);
     entry.close();
   }
   if (path == "/") {
-    output = F("<br><br><form>Version {major}.{minor} <input type=\"button\" value=\"Update Firmware\" onclick=\"ota()\"</form>");
+    output = F("<br><br><form>Version {major}.{minor} <input type=\"button\" value=\"Update Firmware\" onclick=\"ota(); return false;\"</form>");
     output.replace("{major}", String(MAJOR_VERSION));
     output.replace("{minor}", String(MINOR_VERSION));
     server.sendContent(output);
@@ -530,6 +558,7 @@ void handleStopMp3() {
   stopMp3();
   returnOK();
 }
+
 void handleFileUpload() {
   // Upload always happens on /
   if (server.uri() != "/") {
@@ -650,14 +679,12 @@ void handleNotFound() {
 }
 
 bool patchVS1053() {
-  uint16_t i = 0;
-
   Serial.println(F("Installing patch to VS1053"));
 
   SdFile file;
   if (!file.open("patches.053", O_READ)) return false;
 
-  uint16_t addr, n, val;
+  uint16_t addr, n, val, i = 0;
 
   while (file.read(&addr, 2) && file.read(&n, 2)) {
     i += 2;
@@ -684,4 +711,5 @@ bool patchVS1053() {
   file.close();
 
   Serial.print(F("Number of bytes: ")); Serial.println(i);
+  return true;
 }
