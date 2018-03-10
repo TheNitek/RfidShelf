@@ -76,6 +76,7 @@ The Adafruit board offers a good sound quality and already has an amp on board. 
 ## Wiring
 ![Wiring](images/wiring.jpg)
 (See /Fritzing folder for vector/svg version if this image)
+![RfidBoardAdafruitWiring](images/wiring_music_maker.jpg)
 
 ## More Pictures
 ![Shelf](images/shelf.jpg)
