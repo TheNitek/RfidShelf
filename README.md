@@ -72,6 +72,7 @@ The Adafruit board offers a good sound quality and already has an amp on board. 
 * [Adafruit Music Maker FeatherWing w/ Amp ~30,00€](https://www.adafruit.com/product/3436)
 * A MicroSD Card
 ![RfidBoardAdafruit](images/adafruit.jpg)
+![RfidBoardAdafruitWiring](images/wiring_music_maker.jpg)
 
 ## Wiring
 ![Wiring](images/wiring.jpg)
