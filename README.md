@@ -78,6 +78,9 @@ The Adafruit board offers a good sound quality and already has an amp on board. 
 (See /Fritzing folder for vector/svg version if this image)
 ![RfidBoardAdafruitWiring](images/wiring_music_maker.jpg)
 
+## Build instructions
+See [hardware instructions](hardware-instructions.md)
+
 ## Random Notes
 * Instead of cards you can also use those blue key fob Rfid tags, like the one included in most MFRC-522 kits. Maybe you can "implant" it into a teddy or something similar.
 * Neutrik NAUSB-W seems to be a great alternative for the USB port if manage to get it for a fair price at ebay. It fits a round whole and therefore is easier to mount into the shelf.
