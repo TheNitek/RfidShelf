@@ -5,6 +5,8 @@ Use some cheap hardware (Esp8266/NodeMcu, RC522, VS1053 MP3 breakout board) to c
 
 [![RfidShelf Prototype](http://img.youtube.com/vi/39uuoB3o7k8/0.jpg)](http://www.youtube.com/watch?v=39uuoB3o7k8 "RfidShelf Prototype")
 
+[![RfidShelf in action](http://img.youtube.com/vi/mNQsbTEaK-0/0.jpg)(https://youtu.be/mNQsbTEaK-0 "RfidShelf in action")
+
 This is how the first "test subject" reacted:
 
 [![RfidShelf Test](http://img.youtube.com/vi/FcALmyrhR3w/0.jpg)](http://www.youtube.com/watch?v=FcALmyrhR3w "RfidShelf Test")
