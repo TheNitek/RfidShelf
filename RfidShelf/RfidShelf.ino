@@ -40,13 +40,15 @@ MFRC522::MIFARE_Key key;
 #define MAJOR_VERSION 1
 #define MINOR_VERSION 3
 
+#define DEFAULT_VOLUME 10
+
 // Init array that will store new card uid
 byte lastCardUid[4];
 bool playing = false;
 bool playingByCard = true;
 bool pairing = false;
 String currentFile = "";
-uint8_t volume = 10;
+uint8_t volume = DEFAULT_VOLUME;
 
 SdFat SD;
 SdFile uploadFile;
@@ -205,7 +207,6 @@ void handleRfid() {
   // Show some details of the PICC (that is: the tag/card)
   Serial.print(F("Card UID:"));
   print_byte_array(mfrc522.uid.uidByte, mfrc522.uid.size);
-  Serial.println();
   Serial.print(F("PICC type: "));
   MFRC522::PICC_Type piccType = mfrc522.PICC_GetType(mfrc522.uid.sak);
   Serial.println(mfrc522.PICC_GetTypeName(piccType));
@@ -216,36 +217,55 @@ void handleRfid() {
     return;
   }
 
+  uint8_t configLength = 3;
   if (pairing) {
     char writeFolder[17];
     SD.vwd()->getName(writeFolder, 17);
-    writeRfidBlock(1, 0, writeFolder, 17);
-    // Prepare cards for configurable repeat and random play
-    // Using a string is lame, but works - Space it not an issue here
-    writeRfidBlock(2, 0, "1000000000000000", 17);
+    writeRfidBlock(1, 0, (uint8_t*) writeFolder, 17);
+    // Store config (like volume)
+    uint8_t configBuffer[configLength];
+    // Magic number to mark config block and distinguish legacy cards without it
+    configBuffer[0] = 137;
+    // Length of config entry without header
+    configBuffer[1] = configLength-2;
+    configBuffer[2] = volume;
+    writeRfidBlock(2, 0, configBuffer, configLength);
     pairing = false;
   }
 
   // Reset watchdog timer
   yield();
-  byte readBuffer[18];
+  uint8_t readBuffer[18];
   if (readRfidBlock(1, 0, readBuffer, sizeof(readBuffer))) {
-
     char readFolder[18];
     readFolder[0] = '/';
     // allthough sizeof(readBuffer) == 18, we only get 16 byte of data
-    memcpy(readFolder + 1 , readBuffer, 16 * sizeof(byte) );
+    memcpy(readFolder + 1 , readBuffer, 16 * sizeof(uint8_t) );
     // readBuffer will already contain \0 if the folder name is < 16 chars, but otherwise we need to add it
     readFolder[17] = '\0';
 
     // Store uid
-    memcpy(lastCardUid, mfrc522.uid.uidByte, 4 * sizeof(byte) );
+    memcpy(lastCardUid, mfrc522.uid.uidByte, 4 * sizeof(uint8_t) );
 
     if (playing) {
       stopMp3();
     }
     
     if (readFolder[1] != '\0' && switchFolder(readFolder)) {
+      uint8_t configBuffer[18];
+      if (readRfidBlock(2, 0, configBuffer, sizeof(configBuffer))) {
+        if(configBuffer[0] == 137) {
+          if(configBuffer[1] > 0) {
+            Serial.print(F("Setting volume: ")); Serial.println(configBuffer[2]);
+            volume = configBuffer[2];
+            musicPlayer.setVolume(volume, volume);
+          }
+        }
+      } else {
+        volume = DEFAULT_VOLUME;
+        musicPlayer.setVolume(volume, volume);
+      }
+
       playMp3();
       playingByCard = true;
     }
@@ -258,7 +278,7 @@ void handleRfid() {
 
 }
 
-bool writeRfidBlock(uint8_t sector, uint8_t relativeBlock, const char *newContent, uint8_t contentSize) {
+bool writeRfidBlock(uint8_t sector, uint8_t relativeBlock, const uint8_t *newContent, uint8_t contentSize) {
   uint8_t absoluteBlock = (sector * 4) + relativeBlock;
 
   // Authenticate using key A
@@ -270,15 +290,15 @@ bool writeRfidBlock(uint8_t sector, uint8_t relativeBlock, const char *newConten
     return false;
   }
 
-  byte buffer[16];
   uint8_t bufferSize = 16;
+  byte buffer[bufferSize];
   if (contentSize < bufferSize) {
     bufferSize = contentSize;
   }
   memcpy(buffer, newContent, bufferSize * sizeof(byte) );
 
   // Write block
-  Serial.print(F("Writing data to block: ")); Serial.println(newContent);
+  Serial.print(F("Writing data to block: ")); print_byte_array(newContent, contentSize);
   status = mfrc522.MIFARE_Write(absoluteBlock, buffer, 16);
   if (status != MFRC522::STATUS_OK) {
     Serial.print(F("MIFARE_Write() failed: "));
@@ -291,7 +311,7 @@ bool writeRfidBlock(uint8_t sector, uint8_t relativeBlock, const char *newConten
 /**
    read a block from a rfid card into outputBuffer which needs to be >= 18 bytes long
 */
-bool readRfidBlock(uint8_t sector, uint8_t relativeBlock, byte *outputBuffer, byte bufferSize) {
+bool readRfidBlock(uint8_t sector, uint8_t relativeBlock, uint8_t *outputBuffer, uint8_t bufferSize) {
   if (relativeBlock > 3) {
     Serial.println(F("Invalid block number"));
     return false;
@@ -325,11 +345,12 @@ bool readRfidBlock(uint8_t sector, uint8_t relativeBlock, byte *outputBuffer, by
 }
 
 
-void print_byte_array(byte *buffer, byte bufferSize) {
-  for (byte i = 0; i < bufferSize; i++) {
+void print_byte_array(const uint8_t *buffer, const uint8_t  bufferSize) {
+  for (uint8_t i = 0; i < bufferSize; i++) {
     Serial.print(buffer[i] < 0x10 ? " 0" : " ");
     Serial.print(buffer[i], HEX);
   }
+  Serial.println();
 }
 
 bool switchFolder(const char *folder) {
@@ -464,6 +485,12 @@ void renderDirectory(String &path) {
       "</script><link rel=\"icon\" href=\"data:;base64,iVBORw0KGgo=\"></head><body>"));
 
   String output;
+  
+  if(pairing) {
+    output = F("<div style=\"font-weight: bold\">Pairing mode active. Place card on shelf to write current configuration onto it</div>");
+    server.sendContent(output);
+  }
+  
   if (path == "/") {
     output = F("<div>Currently playing: <strong>{currentFile}</strong> (<a href=\"#\" onclick=\"rootAction('stop'); return false;\">&#x25a0;</a>)</div>"
       "<div>Volume: {volume} <a href=\"#\" onclick=\"rootAction('volumeUp'); return false;\">+</a> / <a href=\"#\" onclick=\"rootAction('volumeDown'); return false;\">-</a></div>"
