@@ -38,7 +38,7 @@ MFRC522 mfrc522(RC522_CS, UINT8_MAX);   // Create MFRC522 instance.
 MFRC522::MIFARE_Key key;
 
 #define MAJOR_VERSION 1
-#define MINOR_VERSION 1
+#define MINOR_VERSION 3
 
 // Init array that will store new card uid
 byte lastCardUid[4];
@@ -46,6 +46,7 @@ bool playing = false;
 bool playingByCard = true;
 bool pairing = false;
 String currentFile = "";
+uint8_t volume = 10;
 
 SdFat SD;
 SdFile uploadFile;
@@ -129,7 +130,7 @@ void setup() {
   Serial.print(F("SampleRate "));
   Serial.println(musicPlayer.sciRead(VS1053_REG_AUDATA));
 
-  musicPlayer.setVolume(10, 10);
+  musicPlayer.setVolume(volume, volume);
 
   musicPlayer.dumpRegs();
 
@@ -145,7 +146,6 @@ void setup() {
   Serial.print("Connected! IP address: ");
   Serial.println(WiFi.localIP());
 
-  server.on("/stopMp3", HTTP_GET, handleStopMp3);
   server.on("/", HTTP_POST, handleNotFound, handleFileUpload);
   server.onNotFound(handleNotFound);
 
@@ -414,6 +414,22 @@ void playMp3() {
   }
 }
 
+void volumeUp() {
+  volume -= 5;
+  if(volume < 0) {
+    volume = 0;
+  }
+  musicPlayer.setVolume(volume, volume);
+}
+
+void volumeDown() {
+  volume += 5;
+  if(volume > 50) {
+    volume = 50;
+  }
+  musicPlayer.setVolume(volume, volume);
+}
+
 bool isMP3File(String &filename) {
   return filename.endsWith(".mp3");
 }
@@ -442,14 +458,18 @@ void renderDirectory(String &path) {
       "var formData = new FormData(); for(var i = 0; i < fileInput.files.length; i++) { formData.append('data', fileInput.files[i], folder.concat(fileInput.files[i].name)); }; xhr.open('POST', '/'); xhr.send(formData); }"
       "function writeRfid(url){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', url); var formData = new FormData(); formData.append('write', 1); xhr.send(formData);}"
       "function play(url){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', url); var formData = new FormData(); formData.append('play', 1); xhr.send(formData);}"
+      "function rootAction(action){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append(action, 1); xhr.send(formData);}"
       "function mkdir() { var folder = document.getElementById('folder'); if(folder != ''){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('newFolder', folder.value); xhr.send(formData);}}"
-      "function ota() { var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { document.write('Please wait and do NOT turn of the power!'); location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('ota', 1); xhr.send(formData);}"
+      "function ota() { var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { document.write('Please wait and do NOT turn off the power!'); location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('ota', 1); xhr.send(formData);}"
       "</script><link rel=\"icon\" href=\"data:;base64,iVBORw0KGgo=\"></head><body>"));
 
   String output;
   if (path == "/") {
-    output = F("<div>Currently playing: <strong>{currentFile}</strong></div><form><input type=\"text\" name=\"folder\" id=\"folder\"><input type=\"button\" value=\"mkdir\" onclick=\"mkdir(); return false;\"></form>");
+    output = F("<div>Currently playing: <strong>{currentFile}</strong> (<a href=\"#\" onclick=\"rootAction('stop'); return false;\">&#x25a0;</a>)</div>"
+      "<div>Volume: {volume} <a href=\"#\" onclick=\"rootAction('volumeUp'); return false;\">+</a> / <a href=\"#\" onclick=\"rootAction('volumeDown'); return false;\">-</a></div>"
+      "<form><input type=\"text\" name=\"folder\" id=\"folder\"><input type=\"button\" value=\"mkdir\" onclick=\"mkdir(); return false;\"></form>");
     output.replace("{currentFile}", currentFile);
+    output.replace("{volume}", String(50-volume));
     output.replace("{folder}", path);
     server.sendContent(output);
   } else {
@@ -514,7 +534,6 @@ void renderDirectory(String &path) {
     server.sendContent(output);
   }
   server.sendContent(F("</body></html>"));
-  server.client().stop();
 }
 
 bool loadFromSdCard(String &path) {
@@ -552,11 +571,6 @@ void handleWriteRfid(String &folder) {
   } else {
     returnHttpStatus((uint8_t)404, "Not found");
   }
-}
-
-void handleStopMp3() {
-  stopMp3();
-  returnOK();
 }
 
 void handleFileUpload() {
@@ -642,7 +656,7 @@ void handleNotFound() {
       switch (ret) {
         case HTTP_UPDATE_FAILED:
           Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s\n", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
-          returnHttpStatus(200, "Update failed, please try again");
+          returnHttpStatus((uint8_t)500, "Update failed, please try again");
           return;
         case HTTP_UPDATE_NO_UPDATES:
           Serial.println(F("HTTP_UPDATE_NO_UPDATES"));
@@ -652,6 +666,18 @@ void handleNotFound() {
           Serial.println(F("HTTP_UPDATE_OK"));
           break;
       }
+      returnOK();
+      return;
+    } else if (server.hasArg("stop")) {
+      stopMp3();
+      returnOK();
+      return;
+    } else if (server.hasArg("volumeUp")) {
+      volumeUp();
+      returnOK();
+      return;
+    } else if (server.hasArg("volumeDown")) {
+      volumeDown();
       returnOK();
       return;
     } else if (server.uri() == "/") {
