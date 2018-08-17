@@ -416,7 +416,7 @@ void playMp3() {
 
 void volumeUp() {
   volume -= 5;
-  if(volume < 0) {
+  if(volume > 50) {
     volume = 0;
   }
   musicPlayer.setVolume(volume, volume);
