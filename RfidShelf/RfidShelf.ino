@@ -253,13 +253,11 @@ void handleRfid() {
     
     if (readFolder[1] != '\0' && switchFolder(readFolder)) {
       uint8_t configBuffer[18];
-      if (readRfidBlock(2, 0, configBuffer, sizeof(configBuffer))) {
-        if(configBuffer[0] == 137) {
-          if(configBuffer[1] > 0) {
-            Serial.print(F("Setting volume: ")); Serial.println(configBuffer[2]);
-            volume = configBuffer[2];
-            musicPlayer.setVolume(volume, volume);
-          }
+      if (readRfidBlock(2, 0, configBuffer, sizeof(configBuffer)) && (configBuffer[0] == 137)) {
+        if(configBuffer[1] > 0) {
+          Serial.print(F("Setting volume: ")); Serial.println(configBuffer[2]);
+          volume = configBuffer[2];
+          musicPlayer.setVolume(volume, volume);
         }
       } else {
         volume = DEFAULT_VOLUME;
