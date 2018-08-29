@@ -42,9 +42,13 @@ MFRC522::MIFARE_Key key;
 
 #define DEFAULT_VOLUME 10
 
+#define PLAYING_NO 0
+#define PLAYING_FILE 1
+#define PLAYING_HTTP 2
+
 // Init array that will store new card uid
 byte lastCardUid[4];
-bool playing = false;
+uint8_t playing = PLAYING_NO;
 bool playingByCard = true;
 bool pairing = false;
 String currentFile = "";
@@ -54,6 +58,9 @@ SdFat SD;
 SdFile uploadFile;
 
 unsigned long lastRfidCheck;
+
+HTTPClient http;
+WiFiClient * stream;
 
 void setup() {
   // Seems to make flashing more reliable
@@ -159,13 +166,19 @@ void setup() {
 
 void loop() {
 
-  if (playing && musicPlayer.playingMusic) {
-    musicPlayer.feedBuffer();
-  } else if (playing) {
-    playMp3();
+  if (playing == PLAYING_FILE) {
+    if (musicPlayer.playingMusic) {
+      musicPlayer.feedBuffer();
+    } else {
+      playMp3();
+    }
   }
 
-  if (!playing || (millis() - lastRfidCheck > 500)) {
+  if (playing == PLAYING_HTTP) {
+    feedPlaybackFromHttp();
+  }
+
+  if ((playing == PLAYING_NO) || (millis() - lastRfidCheck > 500)) {
     handleRfid();
     lastRfidCheck = millis();
   }
@@ -176,7 +189,7 @@ void loop() {
 void handleRfid() {
 
   // While playing check if the tag is still present
-  if (playing && playingByCard) {
+  if ((playing != PLAYING_NO) && playingByCard) {
 
     // Since wireless communication is voodoo we'll give it a few retrys before killing the music
     for (int i = 0; i < 3; i++) {
@@ -237,35 +250,37 @@ void handleRfid() {
   yield();
   uint8_t readBuffer[18];
   if (readRfidBlock(1, 0, readBuffer, sizeof(readBuffer))) {
-    char readFolder[18];
-    readFolder[0] = '/';
-    // allthough sizeof(readBuffer) == 18, we only get 16 byte of data
-    memcpy(readFolder + 1 , readBuffer, 16 * sizeof(uint8_t) );
-    // readBuffer will already contain \0 if the folder name is < 16 chars, but otherwise we need to add it
-    readFolder[17] = '\0';
-
     // Store uid
     memcpy(lastCardUid, mfrc522.uid.uidByte, 4 * sizeof(uint8_t) );
 
-    if (playing) {
-      stopMp3();
-    }
-    
-    if (readFolder[1] != '\0' && switchFolder(readFolder)) {
-      uint8_t configBuffer[18];
-      if (readRfidBlock(2, 0, configBuffer, sizeof(configBuffer)) && (configBuffer[0] == 137)) {
-        if(configBuffer[1] > 0) {
-          Serial.print(F("Setting volume: ")); Serial.println(configBuffer[2]);
-          volume = configBuffer[2];
+    if(readBuffer[0] != '\0') {
+      char readFolder[18];
+      readFolder[0] = '/';
+      // allthough sizeof(readBuffer) == 18, we only get 16 byte of data
+      memcpy(readFolder + 1 , readBuffer, 16 * sizeof(uint8_t) );
+      // readBuffer will already contain \0 if the folder name is < 16 chars, but otherwise we need to add it
+      readFolder[17] = '\0';
+  
+      if (playing != PLAYING_NO) {
+        stopMp3();
+      }
+      
+      if (switchFolder(readFolder)) {
+        uint8_t configBuffer[18];
+        if (readRfidBlock(2, 0, configBuffer, sizeof(configBuffer)) && (configBuffer[0] == 137)) {
+          if(configBuffer[1] > 0) {
+            Serial.print(F("Setting volume: ")); Serial.println(configBuffer[2]);
+            volume = configBuffer[2];
+            musicPlayer.setVolume(volume, volume);
+          }
+        } else {
+          volume = DEFAULT_VOLUME;
           musicPlayer.setVolume(volume, volume);
         }
-      } else {
-        volume = DEFAULT_VOLUME;
-        musicPlayer.setVolume(volume, volume);
+  
+        playMp3();
+        playingByCard = true;
       }
-
-      playMp3();
-      playingByCard = true;
     }
   }
 
@@ -367,11 +382,15 @@ bool switchFolder(const char *folder) {
 
 void stopMp3() {
   Serial.println(F("Stopping playback"));
-  playing = false;
   if (AMP_POWER > 0) {
     digitalWrite(AMP_POWER, LOW);
   }
-  musicPlayer.stopPlaying();
+  if(playing == PLAYING_FILE) {
+    musicPlayer.stopPlaying();
+  } else if (playing == PLAYING_HTTP) {
+    // TODO stop
+  }
+  playing = PLAYING_NO;
 }
 
 void playMp3() {
@@ -424,12 +443,53 @@ void playMp3() {
   Serial.print(F("Playing "));
   Serial.println(fullpath);
 
-  playing = true;
+  playing = PLAYING_FILE;
   currentFile = nextFile;
   musicPlayer.startPlayingFile((char *)fullpath.c_str());
 
   if (AMP_POWER > 0) {
     digitalWrite(AMP_POWER, HIGH);
+  }
+}
+
+void playHttp(String url) {
+  http.begin(url);
+  int httpCode = http.GET();
+  int len = http.getSize();
+  if (httpCode != HTTP_CODE_OK && (len > 0 || len == -1)) {
+    Serial.println(F("Webradio request failed"));
+    return;
+  }
+
+  stream = http.getStreamPtr();
+  playing = PLAYING_HTTP;
+  Serial.println(F("Initialized HTTP stream"));
+}
+
+void feedPlaybackFromHttp() {
+  if(http.connected()) {
+    // get available data size
+    size_t size = stream->available();
+  
+    if (size) {
+      uint8_t buff[64] = { 0 };
+      int c = stream->readBytes(buff, ((size > sizeof(buff)) ? sizeof(buff) : size));
+
+      if (c == 0) {
+        return;
+      }
+      // VS1053 accepts at least 32byte when "ready"
+      while (!musicPlayer.readyForData()) delay(1);
+      musicPlayer.playData(buff, (c < 32 ? c : 32));
+      
+      if (c <= 32) {
+        return;
+      }
+      while (!musicPlayer.readyForData()) delay(1);
+      musicPlayer.playData(buff+32, c - 32);
+    }
+  } else {
+    Serial.println(F("HTTP not connected"));
   }
 }
 
@@ -468,7 +528,6 @@ void renderDirectory(String &path) {
   dir.rewind();
   server.setContentLength(CONTENT_LENGTH_UNKNOWN);
   server.send(200, "text/html", "");
-  WiFiClient client = server.client();
 
   server.sendContent(
     F("<html><head><meta charset=\"utf-8\"/><script>"
@@ -477,6 +536,7 @@ void renderDirectory(String &path) {
       "var formData = new FormData(); for(var i = 0; i < fileInput.files.length; i++) { formData.append('data', fileInput.files[i], folder.concat(fileInput.files[i].name)); }; xhr.open('POST', '/'); xhr.send(formData); }"
       "function writeRfid(url){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', url); var formData = new FormData(); formData.append('write', 1); xhr.send(formData);}"
       "function play(url){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', url); var formData = new FormData(); formData.append('play', 1); xhr.send(formData);}"
+      "function playHttp(){ var streamUrl = document.getElementById('streamUrl'); if(streamUrl != ''){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('streamUrl', streamUrl.value); xhr.send(formData);}}"
       "function rootAction(action){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append(action, 1); xhr.send(formData);}"
       "function mkdir() { var folder = document.getElementById('folder'); if(folder != ''){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('newFolder', folder.value); xhr.send(formData);}}"
       "function ota() { var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { document.write('Please wait and do NOT turn off the power!'); location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('ota', 1); xhr.send(formData);}"
@@ -485,15 +545,23 @@ void renderDirectory(String &path) {
   String output;
   
   if(pairing) {
-    output = F("<div style=\"font-weight: bold\">Pairing mode active. Place card on shelf to write current configuration onto it</div>");
+    char currentFolder[50];
+    SD.vwd()->getName(currentFolder, sizeof(currentFolder));
+
+    output = F("<p style=\"font-weight: bold\">Pairing mode active. Place card on shelf to write current configuration for <span style=\"color:red\">/{currentFolder}</span> onto it</p>");
+    output.replace("{currentFolder}", currentFolder);
     server.sendContent(output);
   }
   
   if (path == "/") {
-    output = F("<div>Currently playing: <strong>{currentFile}</strong> (<a href=\"#\" onclick=\"rootAction('stop'); return false;\">&#x25a0;</a>)</div>"
-      "<div>Volume: {volume} <a href=\"#\" onclick=\"rootAction('volumeUp'); return false;\">+</a> / <a href=\"#\" onclick=\"rootAction('volumeDown'); return false;\">-</a></div>"
+    if(playing != PLAYING_NO) {
+      output = F("<div>Currently playing: <strong>{currentFile}</strong> (<a href=\"#\" onclick=\"rootAction('stop'); return false;\">&#x25a0;</a>)</div>");
+      output.replace("{currentFile}", currentFile);
+      server.sendContent(output);
+    }
+    output = F("<div>Volume: {volume} <a href=\"#\" onclick=\"rootAction('volumeUp'); return false;\">+</a> / <a href=\"#\" onclick=\"rootAction('volumeDown'); return false;\">-</a></div>"
+      "<form><input type=\"text\" name=\"streamUrl\" id=\"streamUrl\"><input type=\"button\" value=\"stream\" onclick=\"playHttp(); return false;\"></form>"
       "<form><input type=\"text\" name=\"folder\" id=\"folder\"><input type=\"button\" value=\"mkdir\" onclick=\"mkdir(); return false;\"></form>");
-    output.replace("{currentFile}", currentFile);
     output.replace("{volume}", String(50-volume));
     output.replace("{folder}", path);
     server.sendContent(output);
@@ -516,10 +584,11 @@ void renderDirectory(String &path) {
     // TODO encode special characters
     String filename = String(filenameChar);
 
-    output = F("<div id=\"{name}\">{icon}<a href=\"{path}\">{name}</a> <a href=\"#\" onclick=\"deleteUrl('{name}'); return false;\">&#x2718;</a>");
+    output = F("<div id=\"{name}\">{icon}<a href=\"{path}\">{name}</a> <a href=\"#\" onclick=\"deleteUrl('{name}'); return false;\" title=\"delete\">&#x2718;</a>");
     // Currently only foldernames <= 16 characters can be written onto the rfid
     if (filename.length() <= 16) {
-      output += F("<a href=\"#\" onclick=\"writeRfid('{name}');\">&#x1f4be;</a> <a href=\"#\" onclick=\"play('{name}'); return false;\">&#9654;</a>");
+      output += F("<a href=\"#\" onclick=\"writeRfid('{name}');\" title=\"write to card\">&#x1f4be;</a> "
+        "<a href=\"#\" onclick=\"play('{name}'); return false;\" title=\"play folder\">&#9654;</a>");
     }
     output.replace("{icon}", F("&#x1f4c2; "));
     output.replace("{path}", filename + "/");
@@ -540,7 +609,7 @@ void renderDirectory(String &path) {
     // TODO encode special characters
     String filename = String(filenameChar);
 
-    output = F("<div id=\"{name}\">{icon}<a href=\"{path}\">{name}</a> <a href=\"#\" onclick=\"deleteUrl('{name}'); return false;\">&#x2718;</a>");
+    output = F("<div id=\"{name}\">{icon}<a href=\"{path}\">{name}</a> <a href=\"#\" onclick=\"deleteUrl('{name}'); return false;\" title=\"delete\">&#x2718;</a>");
     if (isMP3File(filename)) {
       output.replace("{icon}", F("&#x266b; "));
     } else {
@@ -562,12 +631,11 @@ void renderDirectory(String &path) {
 }
 
 bool loadFromSdCard(String &path) {
-  String dataType = "text/plain";
+  String dataType = "application/octet-stream";
 
   if (path.endsWith(".HTM")) dataType = "text/html";
   else if (path.endsWith(".CSS")) dataType = "text/css";
   else if (path.endsWith(".JS")) dataType = "application/javascript";
-  else dataType = "application/octet-stream";
 
   File dataFile = SD.open(path.c_str());
 
@@ -703,6 +771,12 @@ void handleNotFound() {
       return;
     } else if (server.hasArg("volumeDown")) {
       volumeDown();
+      returnOK();
+      return;
+    } else if (server.hasArg("streamUrl")) {
+      stopMp3();
+      playHttp(server.arg("streamUrl"));
+      playingByCard = false;
       returnOK();
       return;
     } else if (server.uri() == "/") {
