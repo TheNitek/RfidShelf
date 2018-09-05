@@ -8,7 +8,6 @@
 #include <MFRC522.h>
 #include <SdFat.h>
 #include <Adafruit_VS1053.h>
-#include <RingBufCPP.h>
 
 #define RC522_CS        D8
 #define SD_CS           D2
