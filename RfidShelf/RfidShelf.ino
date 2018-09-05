@@ -31,7 +31,7 @@ MFRC522 mfrc522(RC522_CS, UINT8_MAX);   // Create MFRC522 instance.
 MFRC522::MIFARE_Key key;
 
 #define MAJOR_VERSION 1
-#define MINOR_VERSION 3
+#define MINOR_VERSION 4
 
 // Lower value means louder!
 #define DEFAULT_VOLUME 10
