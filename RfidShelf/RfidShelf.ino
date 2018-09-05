@@ -2,13 +2,13 @@
 #include <DNSServer.h>
 #include <ESP8266WebServer.h>
 #include <WiFiManager.h>
-#include <ESP8266mDNS.h>
 #include <ESP8266HTTPClient.h>
 #include <ESP8266httpUpdate.h>
 #include <SPI.h>
 #include <MFRC522.h>
 #include <SdFat.h>
 #include <Adafruit_VS1053.h>
+#include <RingBufCPP.h>
 
 #define RC522_CS        D8
 #define SD_CS           D2
@@ -34,24 +34,29 @@ MFRC522::MIFARE_Key key;
 #define MAJOR_VERSION 1
 #define MINOR_VERSION 3
 
+// Lower value means louder!
 #define DEFAULT_VOLUME 10
 
 #define PLAYING_NO 0
 #define PLAYING_FILE 1
 #define PLAYING_HTTP 2
 
+// Number off consecutive http reconnects before giving up stream
+#define MAX_RECONNECTS 10
+
 // Init array that will store new card uid
 byte lastCardUid[4];
 uint8_t playing = PLAYING_NO;
 bool playingByCard = true;
 bool pairing = false;
-String currentFile = "";
+String currentFile = F("");
+String currentStreamUrl = F("");
+uint8_t reconnectCount = 0;
 uint8_t volume = DEFAULT_VOLUME;
+unsigned long lastRfidCheck;
 
 SdFat SD;
 SdFile uploadFile;
-
-unsigned long lastRfidCheck;
 
 HTTPClient http;
 WiFiClient * stream;
@@ -446,11 +451,15 @@ void playFile() {
   }
 }
 
-void playHttp(String url) {
-  http.begin(url);
+void playHttp() {
+  if(!currentStreamUrl) {
+    Serial.println(F("StreamUrl not set"));
+    return;
+  }
+  http.begin(currentStreamUrl);
   int httpCode = http.GET();
   int len = http.getSize();
-  if (httpCode != HTTP_CODE_OK && (len > 0 || len == -1)) {
+  if ((httpCode != HTTP_CODE_OK) || !(len > 0 || len == -1)) {
     Serial.println(F("Webradio request failed"));
     return;
   }
@@ -460,30 +469,29 @@ void playHttp(String url) {
   Serial.println(F("Initialized HTTP stream"));
 }
 
+/* Since there isn't much RAM to use we don't use any buffering here.
+ * Using a small ring buffer here made things worse
+ */
 void feedPlaybackFromHttp() {
   if(http.connected()) {
+    reconnectCount = 0;
     // get available data size
-    size_t size = stream->available();
-  
-    if (size) {
-      uint8_t buff[64] = { 0 };
-      int c = stream->readBytes(buff, ((size > sizeof(buff)) ? sizeof(buff) : size));
+    size_t available = stream->available();
 
-      // VS1053 accepts at least 32byte when "ready" so batch the data transfer
-      while (!musicPlayer.readyForData()) delay(1);
-      musicPlayer.playData(buff, (c < 32 ? c : 32));
-      
-      if (c <= 32) {
-        Serial.println(F("Less than 32 bytes read"));
-        return;
-      }
-      while (!musicPlayer.readyForData()) delay(1);
-      musicPlayer.playData(buff+32, c - 32);
-    } else {
-      Serial.println(F("0 bytes available"));
+    // VS1053 accepts at least 32 bytes when "ready" so we can batch the data transfer
+    while((available >= 32) && musicPlayer.readyForData()) {
+      uint8_t buff[32] = { 0 };
+      int c = stream->readBytes(buff, ((available > sizeof(buff)) ? sizeof(buff) : available));
+
+      musicPlayer.playData(buff, c);
     }
   } else {
-    Serial.println(F("HTTP not connected"));
+    Serial.println(F("Reconnecting http"));
+    stopPlayback();
+    if(reconnectCount < MAX_RECONNECTS) {
+      playHttp();
+      reconnectCount++;
+    }
   }
 }
 
@@ -773,7 +781,8 @@ void handleNotFound() {
       return;
     } else if (server.hasArg("streamUrl")) {
       stopPlayback();
-      playHttp(server.arg("streamUrl"));
+      currentStreamUrl = server.arg("streamUrl");
+      playHttp();
       playingByCard = false;
       returnOK();
       return;
