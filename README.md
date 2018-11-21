@@ -20,7 +20,7 @@ Rfid cards can the be assigned a folder containing MP3 files on a SD card, playe
 * Easy to use: kids proof!
 * Safe: No wiring on the outside, just a USB cable going in
 * Cheap: ~ 30€ depending on the parts you choose
-* Easy to managed: Web interface to configure everything needed
+* Easy to manage: Web interface to configure everything needed
 
 ## Repository structure
 * /Fritzing contains the sources for the wiring diagram
