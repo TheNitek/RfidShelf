@@ -80,8 +80,12 @@ The Adafruit board offers a good sound quality and already has an amp on board. 
 (See /Fritzing folder for vector/svg version if this image)
 ![RfidBoardAdafruitWiring](images/wiring_music_maker.jpg)
 
-## Build instructions
+## Build Instructions
 See [hardware instructions](hardware-instructions.md)
+
+## Firmware Flashing
+See [firmware flashing](RfidShelf/installation.md)
+
 
 ## Random Notes
 * Instead of cards you can also use those blue key fob Rfid tags, like the one included in most MFRC-522 kits. Maybe you can "implant" it into a teddy or something similar.
