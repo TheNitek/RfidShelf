@@ -31,7 +31,7 @@ MFRC522 mfrc522(RC522_CS, UINT8_MAX);   // Create MFRC522 instance.
 MFRC522::MIFARE_Key key;
 
 #define MAJOR_VERSION 1
-#define MINOR_VERSION 4
+#define MINOR_VERSION 5
 
 // Lower value means louder!
 #define DEFAULT_VOLUME 10
@@ -53,6 +53,7 @@ String currentStreamUrl = F("");
 uint8_t reconnectCount = 0;
 uint8_t volume = DEFAULT_VOLUME;
 unsigned long lastRfidCheck;
+uint32_t uploadStart;
 
 SdFat SD;
 SdFile uploadFile;
@@ -153,8 +154,10 @@ void setup() {
   Serial.print("Connected! IP address: ");
   Serial.println(WiFi.localIP());
 
+
   server.on("/", HTTP_POST, handleNotFound, handleFileUpload);
   server.onNotFound(handleNotFound);
+  //server.client().setNoDelay(true);
 
   server.begin();
   Serial.println(F("Wifi initialized"));
@@ -464,6 +467,7 @@ void playHttp() {
   }
 
   stream = http.getStreamPtr();
+  
   playing = PLAYING_HTTP;
   Serial.println(F("Initialized HTTP stream"));
 }
@@ -532,16 +536,24 @@ void renderDirectory(String &path) {
 
   server.sendContent(
     F("<html><head><meta charset=\"utf-8\"/><script>"
-      "function deleteUrl(url){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('DELETE', url); xhr.send();}"
-      "function upload(folder){ var fileInput = document.getElementById('fileInput'); if(fileInput.files.length === 0){ alert('Choose a file first'); return; } xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }};"
-      "var formData = new FormData(); for(var i = 0; i < fileInput.files.length; i++) { formData.append('data', fileInput.files[i], folder.concat(fileInput.files[i].name)); }; xhr.open('POST', '/'); xhr.send(formData); }"
-      "function writeRfid(url){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', url); var formData = new FormData(); formData.append('write', 1); xhr.send(formData);}"
-      "function play(url){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', url); var formData = new FormData(); formData.append('play', 1); xhr.send(formData);}"
-      "function playHttp(){ var streamUrl = document.getElementById('streamUrl'); if(streamUrl != ''){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('streamUrl', streamUrl.value); xhr.send(formData);}}"
-      "function rootAction(action){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append(action, 1); xhr.send(formData);}"
-      "function mkdir() { var folder = document.getElementById('folder'); if(folder != ''){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('newFolder', folder.value); xhr.send(formData);}}"
-      "function ota() { var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { document.write('Please wait and do NOT turn off the power!'); location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('ota', 1); xhr.send(formData);}"
-      "</script><link rel=\"icon\" href=\"data:;base64,iVBORw0KGgo=\"></head><body>"));
+      "function _(el) {return document.getElementById(el);}"
+      "function deleteUrl(url){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('DELETE', url); xhr.send();}\n"
+      "function upload(folder){ var fileInput = _('fileInput'); if(fileInput.files.length === 0){ alert('Choose a file first'); return; } xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }};\n"
+      "var formData = new FormData(); for(var i = 0; i < fileInput.files.length; i++) { formData.append('data', fileInput.files[i], folder.concat(fileInput.files[i].name)); }; xhr.open('POST', '/');\n"
+      "xhr.upload.addEventListener('progress', progressHandler, false); xhr.addEventListener('load', completeHandler, false); xhr.addEventListener('error', errorHandler, false); xhr.addEventListener('abort', abortHandler, false); _('ulDiv').style.display = 'block'; xhr.send(formData); }\n"
+      "function progressHandler(event) { var percentage = Math.round((event.loaded / event.total) * 100); _('progressBar').value = percentage; _('ulStatus').innerHTML = percentage + '% (' + Math.ceil((event.loaded/(1024*1024)) * 10)/10 + '/' + Math.ceil((event.total/(1024*1024)) * 10)/10 + 'MB) uploaded'; }\n"
+      "function completeHandler(event) { _('ulStatus').innerHTML = event.target.responseText; location.reload(); }\n"
+      "function errorHandler(event) { _('ulStatus').innerHTML = 'Upload Failed'; }\n"
+      "function abortHandler(event) { _('ulStatus').innerHTML = 'Upload Aborted'; }\n"
+      "function writeRfid(url){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', url); var formData = new FormData(); formData.append('write', 1); xhr.send(formData);}\n"
+      "function play(url){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', url); var formData = new FormData(); formData.append('play', 1); xhr.send(formData);}\n"
+      "function playHttp(){ var streamUrl = _('streamUrl'); if(streamUrl != ''){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('streamUrl', streamUrl.value); xhr.send(formData);}}\n"
+      "function rootAction(action){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append(action, 1); xhr.send(formData);}\n"
+      "function mkdir() { var folder = _('folder'); if(folder != ''){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('newFolder', folder.value); xhr.send(formData);}}\n"
+      "function ota() { var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { document.write('Please wait and do NOT turn off the power!'); location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('ota', 1); xhr.send(formData);}\n"
+      "function formatNumbers() { var numbers = document.getElementsByClassName('number'); for (var i = 0; i < numbers.length; i++) { numbers[i].innerText = Number(numbers[i].innerText).toLocaleString(); }}\n"
+      "function sortDivs(id) { var parent = _(id); var toSort = parent.childNodes; toSort = Array.prototype.slice.call(toSort, 0); toSort.sort(function (a, b) { return ('' + a.id).localeCompare(b.id); }); parent.innerHTML = ''; for(var i = 0, l = toSort.length; i < l; i++) { parent.appendChild(toSort[i]); }}\n"
+      "</script><link rel=\"icon\" href=\"data:;base64,iVBORw0KGgo=\"></head><body>\n"));
 
   String output;
   
@@ -567,13 +579,16 @@ void renderDirectory(String &path) {
     output.replace("{folder}", path);
     server.sendContent(output);
   } else {
-    output = F("<form><input type=\"file\" multiple=\"true\" name=\"data\" id=\"fileInput\"><input type=\"button\" value=\"upload\" onclick=\"upload('{folder}'); return false;\"></form>");
+    output = F("<form><p><input type=\"file\" multiple=\"true\" name=\"data\" id=\"fileInput\"><input type=\"button\" value=\"upload\" onclick=\"upload('{folder}'); return false;\"></p>"
+      "<div id=\"ulDiv\" style=\"display:none;\"><progress id=\"progressBar\" value=\"0\" max=\"100\" style=\"width:300px;\"></progress>"
+      "<p id=\"ulStatus\"></p></div></form>");
     output.replace("{folder}", path);
     server.sendContent(output);
     server.sendContent(F("<div><a href=\"..\">..</a></div>"));
   }
 
   SdFile entry;
+  server.sendContent(F("<div id=\"folders\">"));
   while (entry.openNext(&dir, O_READ)) {
     if (!entry.isDir()) {
       entry.close();
@@ -585,13 +600,12 @@ void renderDirectory(String &path) {
     // TODO encode special characters
     String filename = String(filenameChar);
 
-    output = F("<div id=\"{name}\">{icon}<a href=\"{path}\">{name}</a> <a href=\"#\" onclick=\"deleteUrl('{name}'); return false;\" title=\"delete\">&#x2718;</a>");
+    output = F("<div id=\"{name}\">&#x1f4c2; <a href=\"{path}\">{name}</a> <a href=\"#\" onclick=\"deleteUrl('{name}'); return false;\" title=\"delete\">&#x2718;</a>");
     // Currently only foldernames <= 16 characters can be written onto the rfid
     if (filename.length() <= 16) {
       output += F("<a href=\"#\" onclick=\"writeRfid('{name}');\" title=\"write to card\">&#x1f4be;</a> "
         "<a href=\"#\" onclick=\"play('{name}'); return false;\" title=\"play folder\">&#9654;</a>");
     }
-    output.replace("{icon}", F("&#x1f4c2; "));
     output.replace("{path}", filename + "/");
     output += F("</div>");
     output.replace("{name}", filename);
@@ -599,36 +613,45 @@ void renderDirectory(String &path) {
     entry.close();
   }
   dir.rewind();
+  server.sendContent(F("</div><div id=\"files\">"));
   while (entry.openNext(&dir, O_READ)) {
     if (entry.isDir()) {
       entry.close();
       continue;
     }
-    char filenameChar[100];
-    entry.getName(filenameChar, 100);
-    Serial.println(filenameChar);
+    char fileNameChar[100];
+    entry.getName(fileNameChar, 100);
+    Serial.println(fileNameChar);
     // TODO encode special characters
-    String filename = String(filenameChar);
+    String fileName = String(fileNameChar);
+    String fileSize = String(entry.fileSize());
 
-    output = F("<div id=\"{name}\">{icon}<a href=\"{path}\">{name}</a> <a href=\"#\" onclick=\"deleteUrl('{name}'); return false;\" title=\"delete\">&#x2718;</a>");
-    if (isMP3File(filename)) {
+    output = F("<div id=\"{name}\">{icon}<a href=\"{path}\">{name}</a> (<span class=\"number\">{size}</span> bytes) <a href=\"#\" onclick=\"deleteUrl('{name}'); return false;\" title=\"delete\">&#x2718;</a></div>");
+    if (isMP3File(fileName)) {
       output.replace("{icon}", F("&#x266b; "));
     } else {
       output.replace("{icon}", F(""));
     }
-    output.replace("{path}", filename);
-    output += F("</div>");
-    output.replace("{name}", filename);
+    output.replace("{path}", fileName);
+    output.replace("{name}", fileName);
+    output.replace("{size}", fileSize);
     server.sendContent(output);
     entry.close();
   }
+  server.sendContent(F("</div>"));
   if (path == "/") {
     output = F("<br><br><form>Version {major}.{minor} <input type=\"button\" value=\"Update Firmware\" onclick=\"ota(); return false;\"</form>");
     output.replace("{major}", String(MAJOR_VERSION));
     output.replace("{minor}", String(MINOR_VERSION));
     server.sendContent(output);
   }
-  server.sendContent(F("</body></html>"));
+
+  // Dirty client side UI stuff that's too complicated (for me) in C
+  server.sendContent(F("<script>"
+    "formatNumbers();"
+    "sortDivs('folders');"
+    "sortDivs('files');"
+    "</script></body></html>"));
 }
 
 bool loadFromSdCard(String &path) {
@@ -696,6 +719,7 @@ void handleFileUpload() {
     }
 
     uploadFile.open((char *)filename.c_str(), FILE_WRITE);
+    uploadStart = millis();
     Serial.print(F("UPLOAD_FILE_START: "));
     Serial.println(filename);
   } else if (upload.status == UPLOAD_FILE_WRITE) {
@@ -709,6 +733,8 @@ void handleFileUpload() {
       uploadFile.close();
       Serial.print(F("UPLOAD_FILE_END: "));
       Serial.println(upload.totalSize);
+      Serial.print(F("Took: "));
+      Serial.println(((millis()-uploadStart)/1000));
     }
   }
 }
