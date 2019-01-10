@@ -45,6 +45,8 @@ void ShelfPlayback::begin() {
 
   _musicPlayer.setVolume(_volume, _volume);
 
+  setBassAndTreble(TREBLE_AMPLITUDE, TREBLE_FREQLIMIT, BASS_AMPLITUDE, BASS_FREQLIMIT);
+
   _musicPlayer.dumpRegs();
 
   Serial.println(F("VS1053 found"));
@@ -159,6 +161,20 @@ void ShelfPlayback::volumeDown() {
   _musicPlayer.setVolume(_volume, _volume);
 }
 
+
+void ShelfPlayback::setBassAndTreble(uint8_t trebleAmplitude, uint8_t trebleFreqLimit, uint8_t bassAmplitude, uint8_t bassFreqLimit) {
+  uint16_t bassReg = 0;
+  bassReg |= trebleAmplitude;
+  bassReg <<= 4;
+  bassReg |= trebleFreqLimit;
+  bassReg <<= 4;
+  bassReg |= bassAmplitude;
+  bassReg <<= 4;
+  bassReg |= bassFreqLimit;
+  Serial.printf(F("bass value: %04x\n"), bassReg);
+  _musicPlayer.sciWrite(VS1053_REG_BASS, bassReg);
+}
+
 bool ShelfPlayback::patchVS1053() {
   Serial.println(F("Installing patch to VS1053"));
 
@@ -228,7 +244,7 @@ void ShelfPlayback::playHttp() {
     Serial.println(F("StreamUrl not set"));
     return;
   }
-  _http.begin(currentStreamUrl);
+  _http.begin(_wifiClient, currentStreamUrl);
   int httpCode = _http.GET();
   int len = _http.getSize();
   if ((httpCode != HTTP_CODE_OK) || !(len > 0 || len == -1)) {
