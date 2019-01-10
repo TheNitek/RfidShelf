@@ -2,11 +2,10 @@
 #include "ShelfPins.h"
 #include <ESP8266WiFi.h>
 #include <WiFiManager.h>
+#include <SdFat.h>
 #include "ShelfPlayback.h"
 #include "ShelfRfid.h"
 #include "ShelfWeb.h"
-#include <SPI.h>
-#include <SdFat.h>
 
 WiFiManager wifiManager;
 
@@ -14,9 +13,9 @@ unsigned long lastRfidCheck;
 
 SdFat SD;
 
-ShelfPlayback playback;
+ShelfPlayback playback(SD);
 ShelfRfid rfid(playback);
-ShelfWeb webInterface(playback, rfid);
+ShelfWeb webInterface(playback, rfid, SD);
 
 void setup() {
   // Seems to make flashing more reliable
@@ -36,16 +35,15 @@ void setup() {
   pinMode(BREAKOUT_DCS, OUTPUT);
   digitalWrite(BREAKOUT_DCS, HIGH);
 
-  SPI.begin();        // Init SPI bus
   rfid.begin();
-
+    
   //Initialize the SdCard.
   if (!SD.begin(SD_CS)) {
     Serial.println(F("Could not initialize SD card"));
     SD.initErrorHalt();
   }
   Serial.println(F("SD initialized"));
-
+  
   playback.begin();
 
   wifiManager.setConfigPortalTimeout(3 * 60);

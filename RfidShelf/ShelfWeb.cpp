@@ -1,13 +1,11 @@
 #include "ShelfWeb.h"
 
-ShelfWeb::ShelfWeb(ShelfPlayback &playback, ShelfRfid &rfid) :
-  _playback(playback),
-  _rfid(rfid) {
-    _instance = this;
-}
-
 // This sucks - Maybe refactor ShelfWeb to singleton
 ShelfWeb* ShelfWeb::_instance;
+
+ShelfWeb::ShelfWeb(ShelfPlayback &playback, ShelfRfid &rfid, SdFat &sd) : _playback(playback), _rfid(rfid), _SD(sd) {
+  _instance = this;
+}
 
 void ShelfWeb::notFoundCallback() {
   _instance->handleNotFound();

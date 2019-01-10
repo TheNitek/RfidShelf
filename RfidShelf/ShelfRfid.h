@@ -3,6 +3,7 @@
 
 #include "ShelfPins.h"
 #include "ShelfPlayback.h"
+#include <SPI.h>
 #include <MFRC522.h>
 #include <SdFat.h>
 

@@ -1,6 +1,8 @@
 #include "ShelfRfid.h"
 
 void ShelfRfid::begin() {
+  SPI.begin();        // Init SPI bus
+
   _mfrc522.PCD_Init(); // Init MFRC522 card
 
   for (byte i = 0; i < 6; i++) {

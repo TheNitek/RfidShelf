@@ -11,9 +11,11 @@
 #include "ShelfRfid.h"
 #include "ShelfVersion.h"
 
+//extern SdFat SD;
+
 class ShelfWeb {
   public:
-    ShelfWeb(ShelfPlayback &playback, ShelfRfid &rfid);
+    ShelfWeb(ShelfPlayback &playback, ShelfRfid &rfid, SdFat &sd);
     void begin();
     void work();
     static void notFoundCallback();
@@ -22,8 +24,8 @@ class ShelfWeb {
     static ShelfWeb* _instance;
     ShelfPlayback &_playback;
     ShelfRfid &_rfid;
+    SdFat &_SD;
     ESP8266WebServer _server;
-    SdFat _SD;
     SdFile _uploadFile;
     uint32_t _uploadStart;
     void returnOK();

@@ -1,6 +1,5 @@
 #include "ShelfPlayback.h"
 
-
 void ShelfPlayback::begin() {
 
   if (AMP_POWER > 0) {

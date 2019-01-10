@@ -4,6 +4,7 @@
 #include "ShelfPins.h"
 #include <Adafruit_VS1053.h>
 #include <ESP8266HTTPClient.h>
+#include <SdFat.h>
 
 
 // Lower value means louder!
@@ -16,6 +17,10 @@ enum PlaybackState {PLAYBACK_NO, PLAYBACK_FILE, PLAYBACK_HTTP};
 
 class ShelfPlayback {
   public:
+    ShelfPlayback(SdFat &sd) :
+      _musicPlayer(Adafruit_VS1053_FilePlayer(BREAKOUT_RESET, BREAKOUT_CS, BREAKOUT_DCS, DREQ, SD_CS)),
+      _SD(sd)
+      {};
     void begin();
     bool switchFolder(const char *folder);
     void switchStreamUrl(const String);
@@ -34,11 +39,12 @@ class ShelfPlayback {
   private:
     uint8_t _volume = DEFAULT_VOLUME;
     PlaybackState _playing = PLAYBACK_NO;
+    Adafruit_VS1053_FilePlayer _musicPlayer;
+    SdFat &_SD;
     String _currentFile;
     uint8_t _reconnectCount = 0;
     HTTPClient _http;
     WiFiClient * _stream;
-    Adafruit_VS1053_FilePlayer _musicPlayer = Adafruit_VS1053_FilePlayer(BREAKOUT_RESET, BREAKOUT_CS, BREAKOUT_DCS, DREQ, SD_CS);
     bool patchVS1053(void);
     void feedPlaybackFromHttp(void);
 };
