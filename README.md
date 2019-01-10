@@ -44,7 +44,7 @@ Some light soldering is required to attach the pin headers to the MFRC-522
 * [Shelf (All Ikea Lack Shelfs and even Tables should work, but I only tried the one linked) ~6€](http://www.ikea.com/de/de/catalog/products/50282177/)
 * [NodeMcu (make sure to get correct version, because the vary in size!) ~2,50€](https://www.aliexpress.com/item/V3-Wireless-module-NodeMcu-4M-bytes-Lua-WIFI-Internet-of-Things-development-board-based-ESP8266-for/32554198757.html)
 * [MFRC-522 Rfid Reader ~1,50€](https://www.aliexpress.com/item/Free-shipping-MFRC-522-RC522-RFID-RF-IC-card-sensor-module-to-send-S50-Fudan-card/1623810751.html)
-* [3W 8Ohm In-Ceiling Speaker ~6,50€](http://www.ebay.de/itm/112275116606?_trksid=p2057872.m2749.l2649&ssPageName=STRK%3AMEBIDX%3AIT)
+* [3W 8Ohm In-Ceiling Speaker ~6,50€](https://www.ebay.de/itm/Decken-Einbaulautsprecher-Mini-Halogen-Look-8cm-6cm-Einbau-weis/222389981849)
 * [USB Connector ~1,50€](https://www.aliexpress.com/item/D-type-aluminum-USB-3-0-female-to-female-connector/32608847792.html)
 * [Rfid Cards ~0,25€ each](http://www.ebay.de/itm/10pcs-NFC-thin-smart-card-tag-1k-S50-IC-13-56MHz-Read-Write-RFID-/172309355607?hash=item281e701c57)
 * Micro USB Cable + USB Power Supply (Just use one from your old smart phone)
