@@ -108,16 +108,15 @@ void ShelfWeb::renderDirectory(String &path) {
     // TODO encode special characters
     String filename = String(filenameChar);
 
-    output = F("<div id=\"{name}\">&#x1f4c2; <a href=\"{path}\">{name}</a> <a href=\"#\" onclick=\"deleteUrl('{name}'); return false;\" title=\"delete\">&#x2718;</a>");
+    output = F("<div id=\"{name}\">&#x1f4c2; <a href=\"{name}/\">{name}</a> <a href=\"#\" onclick=\"deleteUrl('{name}'); return false;\" title=\"delete\">&#x2718;</a>");
     // Currently only foldernames <= 16 characters can be written onto the rfid
     if (filename.length() <= 16) {
       output += F("<a href=\"#\" onclick=\"writeRfid('{name}');\" title=\"write to card\">&#x1f4be;</a> "
         "<a href=\"#\" onclick=\"play('{name}'); return false;\" title=\"play folder\">&#9654;</a>");
     }
-    output.replace("{path}", filename + "/");
-    output += F("</div>");
     output.replace("{name}", filename);
     _server.sendContent(output);
+    _server.sendContent(F("</div>"));
     entry.close();
   }
   dir.rewind();
@@ -134,13 +133,17 @@ void ShelfWeb::renderDirectory(String &path) {
     String fileName = String(fileNameChar);
     String fileSize = String(entry.fileSize());
 
-    output = F("<div id=\"{name}\">{icon}<a href=\"{path}\">{name}</a> (<span class=\"number\">{size}</span> bytes) <a href=\"#\" onclick=\"deleteUrl('{name}'); return false;\" title=\"delete\">&#x2718;</a> <a href=\"#\" onclick=\"playfile('{name}'); return false;\" title=\"play\">&#9654;</a></div>");
+    output = F("<div id=\"{name}\">{icon}<a href=\"{name}\">{name}</a> (<span class=\"number\">{size}</span> bytes) <a href=\"#\" onclick=\"deleteUrl('{name}'); return false;\" title=\"delete\">&#x2718;</a>{playfilebutton}</div>");
     if (Adafruit_VS1053_FilePlayer::isMP3File(fileNameChar)) {
       output.replace("{icon}", F("&#x266b; "));
     } else {
       output.replace("{icon}", F(""));
     }
-    output.replace("{path}", fileName);
+    if(Adafruit_VS1053_FilePlayer::isMP3File(fileNameChar) && (path != "/")) {
+      output.replace("{playfilebutton}", " <a href=\"#\" onclick=\"playfile('{name}'); return false;\" title=\"play\">&#9654;</a>");
+    } else {
+      output.replace("{playfilebutton}", F(""));
+    }
     output.replace("{name}", fileName);
     output.replace("{size}", fileSize);
     _server.sendContent(output);
