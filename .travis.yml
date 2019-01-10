@@ -9,13 +9,12 @@ cache:
         - "~/.platformio"
 
 env:
-    - PLATFORMIO_CI_SRC=RfidShelf.ino
-before_install: cd RfidShelf
+    - PLATFORMIO_CI_SRC=RfidShelf
 install:
     - pip install -U platformio
 
 script:
-    - platformio ci --board=nodemcuv2 --project-conf=platformio.ini
+    - platformio ci --board=nodemcuv2 --project-conf=RfidShelf/platformio.ini
 notifications:
   email:
     on_success: change
