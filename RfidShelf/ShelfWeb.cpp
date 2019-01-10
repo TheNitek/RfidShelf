@@ -54,6 +54,7 @@ void ShelfWeb::renderDirectory(String &path) {
       "function abortHandler(event) { _('ulStatus').innerHTML = 'Upload Aborted'; }\n"
       "function writeRfid(url){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', url); var formData = new FormData(); formData.append('write', 1); xhr.send(formData);}\n"
       "function play(url){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', url); var formData = new FormData(); formData.append('play', 1); xhr.send(formData);}\n"
+      "function playfile(url){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', url); var formData = new FormData(); formData.append('playfile', 1); xhr.send(formData);}\n"
       "function playHttp(){ var streamUrl = _('streamUrl'); if(streamUrl != ''){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('streamUrl', streamUrl.value); xhr.send(formData);}}\n"
       "function rootAction(action){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append(action, 1); xhr.send(formData);}\n"
       "function mkdir() { var folder = _('folder'); if(folder != ''){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('newFolder', folder.value); xhr.send(formData);}}\n"
@@ -133,7 +134,7 @@ void ShelfWeb::renderDirectory(String &path) {
     String fileName = String(fileNameChar);
     String fileSize = String(entry.fileSize());
 
-    output = F("<div id=\"{name}\">{icon}<a href=\"{path}\">{name}</a> (<span class=\"number\">{size}</span> bytes) <a href=\"#\" onclick=\"deleteUrl('{name}'); return false;\" title=\"delete\">&#x2718;</a></div>");
+    output = F("<div id=\"{name}\">{icon}<a href=\"{path}\">{name}</a> (<span class=\"number\">{size}</span> bytes) <a href=\"#\" onclick=\"deleteUrl('{name}'); return false;\" title=\"delete\">&#x2718;</a> <a href=\"#\" onclick=\"playfile('{name}'); return false;\" title=\"play\">&#9654;</a></div>");
     if (Adafruit_VS1053_FilePlayer::isMP3File(fileNameChar)) {
       output.replace("{icon}", F("&#x266b; "));
     } else {
@@ -322,6 +323,12 @@ void ShelfWeb::handleNotFound() {
       } else if (_server.hasArg("play") && _playback.switchFolder((char *)path.c_str())) {
         _playback.stopPlayback();
         _playback.playFile();
+        _playback.playingByCard = false;
+        returnOK();
+        return;
+      } else if (_server.hasArg("playfile")) {
+        _playback.stopPlayback();
+        _playback.playFile((char *)path.c_str());
         _playback.playingByCard = false;
         returnOK();
         return;

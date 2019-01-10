@@ -127,13 +127,16 @@ void ShelfPlayback::playFile() {
   }
 
   String fullpath = dirname + nextFile;
+  playFile((char *)nextFile.c_str());
+}
 
+void ShelfPlayback::playFile(const char* nextFile) {
   Serial.print(F("Playing "));
-  Serial.println(fullpath);
+  Serial.println(nextFile);
 
   _playing = PLAYBACK_FILE;
   _currentFile = nextFile;
-  _musicPlayer.startPlayingFile((char *)fullpath.c_str());
+  _musicPlayer.startPlayingFile(nextFile);
 
   if (AMP_POWER > 0) {
     digitalWrite(AMP_POWER, HIGH);
