@@ -54,7 +54,7 @@ void ShelfWeb::renderDirectory(String &path) {
       "function abortHandler(event) { _('ulStatus').innerHTML = 'Upload Aborted'; }\n"
       "function writeRfid(url){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', url); var formData = new FormData(); formData.append('write', 1); xhr.send(formData);}\n"
       "function play(url){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', url); var formData = new FormData(); formData.append('play', 1); xhr.send(formData);}\n"
-      "function playfile(url){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', url); var formData = new FormData(); formData.append('playfile', 1); xhr.send(formData);}\n"
+      "function playFile(url){ var xhr = new XMLHttpRequest(); xhr.open('POST', url); var formData = new FormData(); formData.append('playfile', 1); xhr.send(formData);}\n"
       "function playHttp(){ var streamUrl = _('streamUrl'); if(streamUrl != ''){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('streamUrl', streamUrl.value); xhr.send(formData);}}\n"
       "function rootAction(action){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append(action, 1); xhr.send(formData);}\n"
       "function mkdir() { var folder = _('folder'); if(folder != ''){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('newFolder', folder.value); xhr.send(formData);}}\n"
@@ -76,7 +76,7 @@ void ShelfWeb::renderDirectory(String &path) {
 
   if (path == "/") {
     if(_playback.playbackState() != PLAYBACK_NO) {
-      output = F("<div>Currently playing: <strong>{currentFile}</strong> (<a href=\"#\" onclick=\"rootAction('stop'); return false;\">&#x25a0;</a>)</div>");
+      output = F("<div>Currently playing: <strong>{currentFile}</strong> <a href=\"#\" onclick=\"rootAction('stop'); return false;\">&#x25a0;</a> <a href=\"#\" onclick=\"rootAction('skip'); return false;\">&#10097;&#10097;</a></div>");
       output.replace("{currentFile}", _playback.currentFile());
       _server.sendContent(output);
     }
@@ -137,12 +137,12 @@ void ShelfWeb::renderDirectory(String &path) {
     if (Adafruit_VS1053_FilePlayer::isMP3File(fileNameChar)) {
       output.replace("{icon}", F("&#x266b; "));
     } else {
-      output.replace("{icon}", F(""));
+      output.replace("{icon}", "");
     }
     if(Adafruit_VS1053_FilePlayer::isMP3File(fileNameChar) && (path != "/")) {
-      output.replace("{playfilebutton}", " <a href=\"#\" onclick=\"playfile('{name}'); return false;\" title=\"play\">&#9654;</a>");
+      output.replace("{playfilebutton}", " <a href=\"#\" onclick=\"playFile('{name}'); return false;\" title=\"play\">&#9654;</a>");
     } else {
-      output.replace("{playfilebutton}", F(""));
+      output.replace("{playfilebutton}", "");
     }
     output.replace("{name}", fileName);
     output.replace("{size}", fileSize);
@@ -270,8 +270,6 @@ void ShelfWeb::handleNotFound() {
     if (_server.hasArg("newFolder")) {
       Serial.print(F("Creating folder "));
       Serial.println(_server.arg("newFolder"));
-      _playback.stopPlayback();
-      yield();
       _playback.switchFolder("/");
       _SD.mkdir((char *)_server.arg("newFolder").c_str());
       returnOK();
@@ -299,6 +297,10 @@ void ShelfWeb::handleNotFound() {
       _playback.stopPlayback();
       returnOK();
       return;
+    } else if (_server.hasArg("skip")) {
+      _playback.skipFile();
+      returnOK();
+      return;
     } else if (_server.hasArg("volumeUp")) {
       _playback.volumeUp();
       returnOK();
@@ -324,17 +326,28 @@ void ShelfWeb::handleNotFound() {
         returnOK();
         return;
       } else if (_server.hasArg("play") && _playback.switchFolder((char *)path.c_str())) {
-        _playback.stopPlayback();
         _playback.playFile();
         _playback.playingByCard = false;
         returnOK();
         return;
       } else if (_server.hasArg("playfile")) {
-        _playback.stopPlayback();
-        _playback.playFile((char *)path.c_str());
-        _playback.playingByCard = false;
-        returnOK();
-        return;
+        char* pathCStr = (char *)path.c_str();
+        char* folderRaw = strtok(pathCStr, "/");
+        char* file = strtok(NULL, "/");
+        
+        if((folderRaw != NULL) && (file != NULL) && strlen(folderRaw) < 90) {
+        
+          char folder[100] = "/";
+          strcat(folder, folderRaw);
+          strcat(folder, "/");
+          
+          if(_playback.switchFolder(folder)) {
+            _playback.playFile(folder, file);
+            _playback.playingByCard = false;
+            returnOK();
+            return;
+          }
+        }
       }
     }
   }
@@ -346,7 +359,6 @@ void ShelfWeb::handleNotFound() {
 
 void ShelfWeb::handleWriteRfid(String &folder) {
   if (_playback.switchFolder((char *)folder.c_str())) {
-    _playback.stopPlayback();
     _rfid.pairing = true;
     returnOK();
   } else {

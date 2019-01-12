@@ -89,10 +89,6 @@ void ShelfRfid::handleRfid() {
       // readBuffer will already contain \0 if the folder name is < 16 chars, but otherwise we need to add it
       readFolder[17] = '\0';
 
-      if (_playback.playbackState() != PLAYBACK_NO) {
-        _playback.stopPlayback();
-      }
-
       if (_playback.switchFolder(readFolder)) {
         uint8_t configBuffer[18];
         if (readRfidBlock(2, 0, configBuffer, sizeof(configBuffer)) && (configBuffer[0] == 137)) {

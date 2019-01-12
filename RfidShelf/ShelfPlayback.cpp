@@ -57,12 +57,13 @@ bool ShelfPlayback::switchFolder(const char *folder) {
   Serial.print(F("Switching folder to "));
   Serial.println(folder);
 
-  if (!SD.exists(folder)) {
+  if (!_SD.exists(folder)) {
     Serial.println(F("Folder does not exist"));
     return false;
   }
-  SD.chdir(folder);
-  SD.vwd()->rewind();
+  stopPlayback();
+  _SD.chdir(folder);
+  _SD.vwd()->rewind();
   _currentFile = "";
   return true;
 }
@@ -70,6 +71,11 @@ bool ShelfPlayback::switchFolder(const char *folder) {
 
 void ShelfPlayback::stopPlayback() {
   Serial.println(F("Stopping playback"));
+  if(_playing == PLAYBACK_NO) {
+    Serial.println(F("Already stopped"));
+    return;
+  }
+  
   if (AMP_POWER > 0) {
     digitalWrite(AMP_POWER, LOW);
   }
@@ -85,23 +91,22 @@ void ShelfPlayback::playFile() {
   // IO takes time, reset watchdog timer so it does not kill us
   ESP.wdtFeed();
   SdFile file;
-  SD.vwd()->rewind();
+  _SD.vwd()->rewind();
 
   char filenameChar[100];
-  SD.vwd()->getName(filenameChar, 100);
+  _SD.vwd()->getName(filenameChar, 100);
   String dirname = "/" + String(filenameChar) + "/";
 
   String nextFile = "";
 
-  while (file.openNext(SD.vwd(), O_READ))
+  while (file.openNext(_SD.vwd(), O_READ))
   {
 
     file.getName(filenameChar, 100);
     file.close();
 
     if (file.isDir() || !_musicPlayer.isMP3File(filenameChar)) {
-      Serial.print(F("Ignoring "));
-      Serial.println(filenameChar);
+      Serial.print(F("Ignoring ")); Serial.println(filenameChar);
       continue;
     }
 
@@ -120,27 +125,33 @@ void ShelfPlayback::playFile() {
 
   // No _currentFile && no nextFile => Nothing to play!
   if (nextFile == "") {
-    Serial.print(F("No mp3 files in "));
-    Serial.println(dirname);
+    Serial.print(F("No mp3 files in ")); Serial.println(dirname);
     stopPlayback();
     return;
   }
 
-  String fullpath = dirname + nextFile;
-  playFile((char *)nextFile.c_str());
+  playFile((char *)dirname.c_str(), (char *)nextFile.c_str());
 }
 
-void ShelfPlayback::playFile(const char* nextFile) {
-  Serial.print(F("Playing "));
-  Serial.println(nextFile);
+void ShelfPlayback::playFile(const char* folder, const char* nextFile) {
+  Serial.print(F("Playing ")); Serial.print(folder); Serial.println(nextFile);
 
   _playing = PLAYBACK_FILE;
   _currentFile = nextFile;
-  _musicPlayer.startPlayingFile(nextFile);
+  
+  char fullPath[116] = "";
+  strcat(fullPath, folder);
+  strcat(fullPath, nextFile);
+  _musicPlayer.startPlayingFile(fullPath);
 
   if (AMP_POWER > 0) {
     digitalWrite(AMP_POWER, HIGH);
   }
+}
+
+void ShelfPlayback::skipFile() {
+  _musicPlayer.stopPlaying();
+  playFile();
 }
 
 void ShelfPlayback::volume(uint8_t volume) {
@@ -240,7 +251,6 @@ void ShelfPlayback::feedPlaybackFromHttp() {
     }
   }
 }
-
 
 void ShelfPlayback::playHttp() {
   if(!currentStreamUrl) {

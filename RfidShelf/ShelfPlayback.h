@@ -34,8 +34,9 @@ class ShelfPlayback {
     bool switchFolder(const char *folder);
     void switchStreamUrl(const String);
     void playFile();
-    void playFile(const char* fullpath);
+    void playFile(const char* folder, const char* fullpath);
     void playHttp();
+    void skipFile();
     void stopPlayback();
     uint8_t volume() {return _volume;};
     void volume(uint8_t volume);
