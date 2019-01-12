@@ -274,8 +274,7 @@ void ShelfWeb::handleNotFound() {
       return;
     } else if (_server.hasArg("ota")) {
       Serial.println(F("Starting OTA"));
-      WiFiClient client;
-      t_httpUpdate_return ret = ESPhttpUpdate.update(client, "http://download.naeveke.de/board/latest.bin");
+      t_httpUpdate_return ret = ESPhttpUpdate.update("http://download.naeveke.de/board/latest.bin");
 
       switch (ret) {
         case HTTP_UPDATE_FAILED:

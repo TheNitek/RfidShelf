@@ -54,7 +54,6 @@ class ShelfPlayback {
     String _currentFile;
     uint8_t _reconnectCount = 0;
     HTTPClient _http;
-    WiFiClient _wifiClient;
     WiFiClient * _stream;
     bool patchVS1053();
     void feedPlaybackFromHttp();
