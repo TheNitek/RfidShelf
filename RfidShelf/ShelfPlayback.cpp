@@ -160,9 +160,10 @@ void ShelfPlayback::volume(uint8_t volume) {
 }
 
 void ShelfPlayback::volumeUp() {
-  _volume -= 5;
-  if(_volume < 0) {
+  if(_volume < 5) {
     _volume = 0;
+  } else {
+    _volume -= 5;
   }
   _musicPlayer.setVolume(_volume, _volume);
 }
