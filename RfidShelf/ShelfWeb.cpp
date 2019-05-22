@@ -276,7 +276,7 @@ void ShelfWeb::handleNotFound() {
       return;
     } else if (_server.hasArg("ota")) {
       Serial.println(F("Starting OTA"));
-      t_httpUpdate_return ret = ESPhttpUpdate.update("http://download.naeveke.de/board/latest.bin");
+      t_httpUpdate_return ret = ESPhttpUpdate.update(UPDATE_URL);
 
       switch (ret) {
         case HTTP_UPDATE_FAILED:

@@ -12,8 +12,6 @@
 #include "ShelfRfid.h"
 #include "ShelfVersion.h"
 
-//extern SdFat SD;
-
 class ShelfWeb {
   public:
     ShelfWeb(ShelfPlayback &playback, ShelfRfid &rfid, SdFat &sd);

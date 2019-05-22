@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "ShelfPins.h"
+#include "ShelfConfig.h"
 #include <ESP8266WiFi.h>
 #include <WiFiManager.h>
 #include <SdFat.h>
@@ -7,15 +8,25 @@
 #include "ShelfRfid.h"
 #include "ShelfWeb.h"
 
+#ifdef PUSHOVER_ENABLE
+#include "ShelfPushover.h"
+#endif
+
 WiFiManager wifiManager;
 
-unsigned long lastRfidCheck;
+unsigned long lastRfidCheck = 0L;
+#ifdef PUSHOVER_ENABLE
+unsigned long lastPoweredNotificationCheck = 0L;
+#endif
 
 SdFat SD;
 
 ShelfPlayback playback(SD);
 ShelfRfid rfid(playback);
 ShelfWeb webInterface(playback, rfid, SD);
+#ifdef PUSHOVER_ENABLE
+ShelfPushover pushover;
+#endif
 
 void setup() {
   // Seems to make flashing more reliable
@@ -68,6 +79,12 @@ void loop() {
     rfid.handleRfid();
     lastRfidCheck = millis();
   }
+
+#ifdef PUSHOVER_ENABLE
+  if (millis() - lastPoweredNotificationCheck > PUSHOVER_POWERED_NOTIFICATION_TIME) {
+    pushover.sendPoweredNotification();
+  }
+#endif
 
   webInterface.work();
 }
