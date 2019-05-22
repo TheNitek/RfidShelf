@@ -83,6 +83,7 @@ void loop() {
 #ifdef PUSHOVER_ENABLE
   if (millis() - lastPoweredNotificationCheck > PUSHOVER_POWERED_NOTIFICATION_TIME) {
     pushover.sendPoweredNotification();
+    lastPoweredNotificationCheck = millis();
   }
 #endif
 
