@@ -260,7 +260,8 @@ void ShelfPlayback::playHttp() {
     Serial.println(F("StreamUrl not set"));
     return;
   }
-  _http.begin(currentStreamUrl);
+  WiFiClient client;
+  _http.begin(client, currentStreamUrl);
   int httpCode = _http.GET();
   int len = _http.getSize();
   if ((httpCode != HTTP_CODE_OK) || !(len > 0 || len == -1)) {

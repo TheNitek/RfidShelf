@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include <ESP8266HTTPClient.h>
+#include <WiFiClientSecureBearSSL.h>
 
 #include "ShelfConfig.h"
 

@@ -276,8 +276,9 @@ void ShelfWeb::handleNotFound() {
       return;
     } else if (_server.hasArg("ota")) {
       Serial.println(F("Starting OTA"));
-      t_httpUpdate_return ret = ESPhttpUpdate.update(UPDATE_URL);
-
+      
+      WiFiClient client;
+      t_httpUpdate_return ret = ESPhttpUpdate.update(client, UPDATE_URL);
       switch (ret) {
         case HTTP_UPDATE_FAILED:
           Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s\n", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());

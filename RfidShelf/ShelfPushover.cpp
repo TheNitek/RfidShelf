@@ -15,7 +15,10 @@ unsigned int ShelfPushover::send(String message, int8_t priority, String sound) 
     data += "&priority=" + priority;
     data += "&sound=" + sound;
 
-    _httpClient.begin("http://api.pushover.net/1/messages.json");
+    std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
+    // do not validate certificate
+    client->setInsecure();
+    _httpClient.begin(*client, "https://api.pushover.net/1/messages.json");
     int httpCode = _httpClient.POST(data);
     // Serial.print(F("pushover result: "));
     // Serial.println(httpCode);
