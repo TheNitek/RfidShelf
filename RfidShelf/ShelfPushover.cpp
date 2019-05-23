@@ -1,5 +1,5 @@
-#ifdef PUSHOVER_ENABLE
 #include "ShelfPushover.h"
+#ifdef PUSHOVER_ENABLE
 
 ShelfPushover::ShelfPushover() {
 }
@@ -33,4 +33,5 @@ bool ShelfPushover::sendPoweredNotification() {
     message += " still powered up";
     return send(message, 1, PUSHOVER_POWERED_SOUND) == 200;
 }
+
 #endif
