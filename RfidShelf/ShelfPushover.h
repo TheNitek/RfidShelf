@@ -7,6 +7,7 @@
 
 #include "ShelfConfig.h"
 
+#ifdef PUSHOVER_ENABLE
 class ShelfPushover {
     public:
         ShelfPushover();
@@ -16,5 +17,5 @@ class ShelfPushover {
     private:
         HTTPClient _httpClient;
 };
-
+#endif
 #endif

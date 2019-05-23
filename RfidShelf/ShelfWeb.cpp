@@ -44,8 +44,8 @@ void ShelfWeb::renderDirectory(String &path) {
   _server.sendContent(
     F("<html><head><meta charset=\"utf-8\"/><script>"
       "function _(el) {return document.getElementById(el);}"
-      "function deleteUrl(url){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('DELETE', url); xhr.send();}\n"
-      "function upload(folder){ var fileInput = _('fileInput'); if(fileInput.files.length === 0){ alert('Choose a file first'); return; } xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }};\n"
+      "function deleteUrl(url){ if (confirm(\"Really delete?\")) { var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('DELETE', url); xhr.send(); }}\n"
+      "function upload(folder){ var fileInput = _('fileInput'); if(fileInput.files.length === 0){ alert('Choose a file first'); return; } var fileTooLong = false; Array.prototype.forEach.call(fileInput.files, function(file) { if (file.name.length > 100) { fileTooLong = true; }}); if (fileTooLong) { alert(\"File name too long. Files can be max. 100 characters long.\"); return; } xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }};\n"
       "var formData = new FormData(); for(var i = 0; i < fileInput.files.length; i++) { formData.append('data', fileInput.files[i], folder.concat(fileInput.files[i].name)); }; xhr.open('POST', '/');\n"
       "xhr.upload.addEventListener('progress', progressHandler, false); xhr.addEventListener('load', completeHandler, false); xhr.addEventListener('error', errorHandler, false); xhr.addEventListener('abort', abortHandler, false); _('ulDiv').style.display = 'block'; xhr.send(formData); }\n"
       "function progressHandler(event) { var percentage = Math.round((event.loaded / event.total) * 100); _('progressBar').value = percentage; _('ulStatus').innerHTML = percentage + '% (' + Math.ceil((event.loaded/(1024*1024)) * 10)/10 + '/' + Math.ceil((event.total/(1024*1024)) * 10)/10 + 'MB) uploaded'; }\n"
@@ -59,10 +59,10 @@ void ShelfWeb::renderDirectory(String &path) {
       "function rootAction(action){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append(action, 1); xhr.send(formData);}\n"
       "function mkdir() { var folder = _('folder'); if(folder != ''){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('newFolder', folder.value); xhr.send(formData);}}\n"
       "function ota() { var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { document.write('Please wait and do NOT turn off the power!'); location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('ota', 1); xhr.send(formData);}\n"
-      "function downloadpatch() { var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { document.write('Please wait while downloading patch!'); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('downloadpatch', 1); xhr.send(formData);}\n"
+      "function downloadpatch() { var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 1) { document.write('Please wait while downloading patch! When the download was successful the system is automatically restarting.'); } else if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('downloadpatch', 1); xhr.send(formData);}\n"
       "function formatNumbers() { var numbers = document.getElementsByClassName('number'); for (var i = 0; i < numbers.length; i++) { numbers[i].innerText = Number(numbers[i].innerText).toLocaleString(); }}\n"
       "function sortDivs(id) { var parent = _(id); var toSort = parent.childNodes; toSort = Array.prototype.slice.call(toSort, 0); toSort.sort(function (a, b) { return ('' + a.id).localeCompare(b.id); }); parent.innerHTML = ''; for(var i = 0, l = toSort.length; i < l; i++) { parent.appendChild(toSort[i]); }}\n"
-      "</script><link rel=\"icon\" href=\"data:;base64,iVBORw0KGgo=\"><style>body { font-family: Arial, Helvetica; }</style></head><body><h1>RfidShelf</h1>\n"));
+      "</script><link rel=\"icon\" href=\"data:;base64,iVBORw0KGgo=\"><style>body { font-family: Arial, Helvetica; } h3 { margin-bottom: 5px; } a { color: #0000EE; text-decoration: none; }</style></head><body><h1>RfidShelf</h1>\n"));
 
   String output;
 
@@ -77,23 +77,33 @@ void ShelfWeb::renderDirectory(String &path) {
 
   if (path == "/") {
     if(_playback.playbackState() != PLAYBACK_NO) {
-      output = F("<div>Currently playing: <strong>{currentFile}</strong> <a href=\"#\" onclick=\"rootAction('stop'); return false;\">&#x25a0;</a> <a href=\"#\" onclick=\"rootAction('skip'); return false;\">&#10097;&#10097;</a></div>");
+      output = F("<div>Currently playing: <strong>{currentFile}</strong> <a href=\"#\" onclick=\"rootAction('stop'); return false;\">&#x25a0;</a> <a href=\"#\" onclick=\"rootAction('skip'); return false;\">&raquo;</a></div>");
       output.replace("{currentFile}", _playback.currentFile());
       _server.sendContent(output);
     }
-    output = F("<div>Volume: {volume} <a href=\"#\" onclick=\"rootAction('volumeUp'); return false;\">+</a> / <a href=\"#\" onclick=\"rootAction('volumeDown'); return false;\">-</a></div>"
-      "<form onsubmit=\"playHttp(); return false;\"><input type=\"text\" name=\"streamUrl\" id=\"streamUrl\"><input type=\"button\" value=\"stream\" onclick=\"playHttp(); return false;\"></form>"
-      "<form onsubmit=\"mkdir(); return false;\"><input type=\"text\" name=\"folder\" id=\"folder\"><input type=\"button\" value=\"mkdir\" onclick=\"mkdir(); return false;\"></form>");
-    output.replace("{volume}", String(50-_playback.volume()));
+    output = F("<div>Volume: {volume} <a title=\"increase\" href=\"#\" onclick=\"rootAction('volumeUp'); return false;\"><b>&plus;</b></a> / <a title=\"decrease\" href=\"#\" onclick=\"rootAction('volumeDown'); return false;\"><b>&minus;</b></a></div>");
+    output.replace("{volume}", String(50 - _playback.volume()));
     output.replace("{folder}", path);
     _server.sendContent(output);
   } else {
-    output = F("<form><p><input type=\"file\" multiple=\"true\" name=\"data\" id=\"fileInput\"><input type=\"button\" value=\"upload\" onclick=\"upload('{folder}'); return false;\"></p>"
+    output = F("<form><p>Upload MP3 file: <input type=\"file\" multiple=\"true\" name=\"data\" accept=\".mp3\" id=\"fileInput\"><input type=\"button\" value=\"upload\" onclick=\"upload('{folder}'); return false;\"></p>"
       "<div id=\"ulDiv\" style=\"display:none;\"><progress id=\"progressBar\" value=\"0\" max=\"100\" style=\"width:300px;\"></progress>"
       "<p id=\"ulStatus\"></p></div></form>");
     output.replace("{folder}", path);
     _server.sendContent(output);
-    _server.sendContent(F("<div><a href=\"..\">..</a></div>"));
+    _server.sendContent(F("<div><a href=\"..\">Back to top</a></div><br />"));
+  }
+
+  // http stream options
+  if (path == "/") {
+    _server.sendContent(F("<h3>Stream</h3>\n"));
+    _server.sendContent(F("<form onsubmit=\"playHttp(); return false;\">Stream from HTTP: <input type=\"text\" name=\"streamUrl\" id=\"streamUrl\"><input type=\"button\" value=\"Stream\" onclick=\"playHttp(); return false;\"></form>"));
+  }
+
+  // show file system structure
+  if (path == "/") {
+    _server.sendContent(F("<h3>Files</h3>\n"));
+    _server.sendContent(F("<form onsubmit=\"mkdir(); return false;\">Create new folder: <input type=\"text\" name=\"folder\" id=\"folder\"><input type=\"button\" value=\"Create\" onclick=\"mkdir(); return false;\"></form>"));
   }
 
   SdFile entry;
@@ -104,7 +114,8 @@ void ShelfWeb::renderDirectory(String &path) {
       continue;
     }
 
-    char filenameChar[100];
+    // filename can be only 100 characters long
+    char filenameChar[101] = { 0 };
     entry.getName(filenameChar, 100);
     // TODO encode special characters
     String filename = String(filenameChar);
@@ -112,9 +123,11 @@ void ShelfWeb::renderDirectory(String &path) {
     output = F("<div id=\"{name}\">&#x1f4c2; <a href=\"{name}/\">{name}</a> <a href=\"#\" onclick=\"deleteUrl('{name}'); return false;\" title=\"delete\">&#x2718;</a>");
     // Currently only foldernames <= 16 characters can be written onto the rfid
     if (filename.length() <= 16) {
-      output += F("<a href=\"#\" onclick=\"writeRfid('{name}');\" title=\"write to card\">&#x1f4be;</a> "
-        "<a href=\"#\" onclick=\"play('{name}'); return false;\" title=\"play folder\">&#9654;</a>");
+      output += F("<a href=\"#\" onclick=\"writeRfid('{name}');\" title=\"write to card\">&#x1f4be;</a> ");
+    } else {
+      output += F("<span title=\"write to card (only able for folder names with <= 16 characters!)\" style=\"opacity: 0.5;\">&#x1f4be;</span> ");
     }
+    output += F("<a href=\"#\" onclick=\"play('{name}'); return false;\" title=\"play folder\">&#9654;</a>");
     output.replace("{name}", filename);
     _server.sendContent(output);
     _server.sendContent(F("</div>"));
@@ -134,6 +147,12 @@ void ShelfWeb::renderDirectory(String &path) {
     String fileName = String(fileNameChar);
     String fileSize = String(entry.fileSize());
 
+    // hide patch file
+    if (fileName == "patches.053") {
+      entry.close();
+      continue;
+    }
+
     output = F("<div id=\"{name}\">{icon}<a href=\"{name}\">{name}</a> (<span class=\"number\">{size}</span> bytes) <a href=\"#\" onclick=\"deleteUrl('{name}'); return false;\" title=\"delete\">&#x2718;</a>{playfilebutton}</div>");
     if (Adafruit_VS1053_FilePlayer::isMP3File(fileNameChar)) {
       output.replace("{icon}", F("&#x266b; "));
@@ -152,7 +171,7 @@ void ShelfWeb::renderDirectory(String &path) {
   }
   _server.sendContent(F("</div>"));
   if (path == "/") {
-    output = F("<br /><br /><div style=\"{patchavailable}\"><h2>VS1053 patch missing</h2>No VS1053 decoder patch installed.<br />It is recommended to install the patch (store as patches.053 in SD root folder) for improved performance and bug fixes (see <a target=\"_blank\" href=\"http://www.vlsi.fi/en/support/software/vs10xxpatches.html\">VLSI website</a>).<br />The patch can be downloaded automatically with the below button.<br /><input type=\"button\" value=\"Download VS1053 patch\" onclick=\"downloadpatch(); return false;\"></div><br /><br /><form>Version {major}.{minor} <input type=\"button\" value=\"Update Firmware\" onclick=\"ota(); return false;\"></form>");
+    output = F("<br /><br /><div style=\"{patchavailable}\"><h3>VS1053 patch missing</h3>\nNo VS1053 decoder patch installed.<br />It is recommended to install the patch (store as patches.053 in SD root folder) for improved performance and bug fixes (see <a target=\"_blank\" href=\"http://www.vlsi.fi/en/support/software/vs10xxpatches.html\">VLSI website</a>).<br />The patch can be downloaded automatically with the below button.<br /><input type=\"button\" value=\"Download VS1053 patch\" onclick=\"downloadpatch(); return false;\"></div><br /><br /><form><h3>Misc</h3>\nVersion {major}.{minor} <input type=\"button\" value=\"Update Firmware\" onclick=\"ota(); return false;\"></form>");
     output.replace("{major}", String(MAJOR_VERSION));
     output.replace("{minor}", String(MINOR_VERSION));
     
@@ -259,7 +278,7 @@ void ShelfWeb::handleNotFound() {
     if (loadFromSdCard(path)) return;
   } else if (_server.method() == HTTP_DELETE) {
     if (_server.uri() == "/" || !_SD.exists(path.c_str())) {
-      returnHttpStatus((uint8_t)500, "BAD PATH: " + _server.uri());
+      returnHttpStatus(500, "BAD PATH: " + _server.uri());
       return;
     }
 

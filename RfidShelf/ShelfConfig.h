@@ -14,6 +14,7 @@
 // enable differential output, if disabled mono output is used
 //#define USE_DIFFERENTIAL_OUTPUT
 
+// the default play volume (0-50)
 // lower value means louder!
 #define DEFAULT_VOLUME 10
 
@@ -27,16 +28,19 @@
 // the update url for the OTA update
 #define UPDATE_URL "http://download.naeveke.de/board/latest.bin"
 
+// the url for the patch download
+#define VS1053_PATCH_URL "https://raw.githubusercontent.com/madsci1016/Sparkfun-MP3-Player-Shield-Arduino-Library/master/plugins/patches.053"
+
 // -------------------------
 // NOTIFICTATION_SETTINGS
 // -------------------------
 // enable sending of notifications using pushover
-//#define PUSHOVER_ENABLE
+// #define PUSHOVER_ENABLE
 #ifdef PUSHOVER_ENABLE
     // your pushover user key
     #define PUSHOVER_USER "user"
     // your pushover application token
-    #define PUSHOVER_TOKEN "token"
+    #define PUSHOVER_TOKEN "key"
     // receiving device(s), leave empty to send notifications to all devices
     #define PUSHOVER_DEVICE ""
     // name of this RfidShelf (in case you have multiple)
