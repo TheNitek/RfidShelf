@@ -29,7 +29,7 @@ void ShelfWeb::returnOK() {
   _server.send(200, "text/plain", "");
 }
 
-void ShelfWeb::returnHttpStatus(uint8_t statusCode, String msg) {
+void ShelfWeb::returnHttpStatus(uint16_t statusCode, String msg) {
   _server.send(statusCode, "text/plain", msg);
 }
 
@@ -59,9 +59,10 @@ void ShelfWeb::renderDirectory(String &path) {
       "function rootAction(action){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append(action, 1); xhr.send(formData);}\n"
       "function mkdir() { var folder = _('folder'); if(folder != ''){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('newFolder', folder.value); xhr.send(formData);}}\n"
       "function ota() { var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { document.write('Please wait and do NOT turn off the power!'); location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('ota', 1); xhr.send(formData);}\n"
+      "function downloadpatch() { var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { document.write('Please wait while downloading patch!'); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('downloadpatch', 1); xhr.send(formData);}\n"
       "function formatNumbers() { var numbers = document.getElementsByClassName('number'); for (var i = 0; i < numbers.length; i++) { numbers[i].innerText = Number(numbers[i].innerText).toLocaleString(); }}\n"
       "function sortDivs(id) { var parent = _(id); var toSort = parent.childNodes; toSort = Array.prototype.slice.call(toSort, 0); toSort.sort(function (a, b) { return ('' + a.id).localeCompare(b.id); }); parent.innerHTML = ''; for(var i = 0, l = toSort.length; i < l; i++) { parent.appendChild(toSort[i]); }}\n"
-      "</script><link rel=\"icon\" href=\"data:;base64,iVBORw0KGgo=\"></head><body>\n"));
+      "</script><link rel=\"icon\" href=\"data:;base64,iVBORw0KGgo=\"><style>body { font-family: Arial, Helvetica; }</style></head><body><h1>RfidShelf</h1>\n"));
 
   String output;
 
@@ -151,9 +152,18 @@ void ShelfWeb::renderDirectory(String &path) {
   }
   _server.sendContent(F("</div>"));
   if (path == "/") {
-    output = F("<br><br><form>Version {major}.{minor} <input type=\"button\" value=\"Update Firmware\" onclick=\"ota(); return false;\"</form>");
+    output = F("<br /><br /><div style=\"{patchavailable}\"><h2>VS1053 patch missing</h2>No VS1053 decoder patch installed.<br />It is recommended to install the patch (store as patches.053 in SD root folder) for improved performance and bug fixes (see <a target=\"_blank\" href=\"http://www.vlsi.fi/en/support/software/vs10xxpatches.html\">VLSI website</a>).<br />The patch can be downloaded automatically with the below button.<br /><input type=\"button\" value=\"Download VS1053 patch\" onclick=\"downloadpatch(); return false;\"></div><br /><br /><form>Version {major}.{minor} <input type=\"button\" value=\"Update Firmware\" onclick=\"ota(); return false;\"></form>");
     output.replace("{major}", String(MAJOR_VERSION));
     output.replace("{minor}", String(MINOR_VERSION));
+    
+    // test if /patches.053 file is existing
+    if (_SD.exists("/patches.053")) {
+      // is existing -> hide download button
+      output.replace("{patchavailable}", "display: none;");
+    } else {
+      output.replace("{patchavailable}", "");
+    }
+
     _server.sendContent(output);
   }
 
@@ -276,7 +286,6 @@ void ShelfWeb::handleNotFound() {
       return;
     } else if (_server.hasArg("ota")) {
       Serial.println(F("Starting OTA"));
-      
       WiFiClient client;
       t_httpUpdate_return ret = ESPhttpUpdate.update(client, UPDATE_URL);
       switch (ret) {
@@ -294,6 +303,50 @@ void ShelfWeb::handleNotFound() {
       }
       returnOK();
       return;
+    } else if (_server.hasArg("downloadpatch")) {
+      Serial.println(F("Starting patch download"));
+      std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
+      // do not validate certificate
+      client->setInsecure();
+      HTTPClient httpClient;
+      httpClient.begin(*client, VS1053_PATCH_URL);
+      int httpCode = httpClient.GET();
+      if (httpCode < 0) {
+        returnHttpStatus(500, httpClient.errorToString(httpCode));
+        return;
+      }
+      if (httpCode != HTTP_CODE_OK) {
+        returnHttpStatus(500, String("http code not 200: ") + httpCode);
+        return;
+      }
+      int len = httpClient.getSize();
+      WiFiClient* stream = httpClient.getStreamPtr();
+      uint8_t buffer[128] = { 0 };
+      SdFile patchFile;
+      patchFile.open("/patches.053", O_WRITE | O_CREAT);
+      while (httpClient.connected() && (len > 0 || len == -1)) {
+        // get available data size
+        size_t size = stream->available();
+        if (size) {
+          // read til buffer is full
+          int c = stream->readBytes(buffer, ((size > sizeof(buffer)) ? sizeof(buffer) : size));
+          // write the buffer to our patch file
+          if (patchFile.isOpen()) {
+            patchFile.write(buffer, c);
+          }
+          // reduce len until we the end (= zero) if len not -1
+          if (len > 0) {
+            len -= c;
+          }
+        }
+        delay(1);
+      }
+      if (patchFile.isOpen()) {
+        patchFile.close();
+      }
+      returnHttpStatus(200, "done");
+      _server.client().flush();
+      ESP.restart();
     } else if (_server.hasArg("stop")) {
       _playback.stopPlayback();
       returnOK();

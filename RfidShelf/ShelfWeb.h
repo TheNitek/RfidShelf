@@ -29,7 +29,7 @@ class ShelfWeb {
     SdFile _uploadFile;
     uint32_t _uploadStart;
     void returnOK();
-    void returnHttpStatus(uint8_t statusCode, String msg);
+    void returnHttpStatus(uint16_t statusCode, String msg);
     void renderDirectory(String &path);
     bool loadFromSdCard(String &path);
     void handleWriteRfid(String &folder);
