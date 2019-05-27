@@ -28,14 +28,16 @@ void ShelfPlayback::begin() {
   Serial.println(F("VS1053 soft reset done"));
 
   if (patchVS1053()) {
+#ifdef USE_DIFFERENTIAL_OUTPUT
+    // Enable differential output
+    uint16_t mode = VS1053_MODE_SM_DIFF | VS1053_MODE_SM_SDINEW;
+    _musicPlayer.sciWrite(VS1053_REG_MODE, mode);
+#else
     // Enable Mono Output
     _musicPlayer.sciWrite(VS1053_REG_WRAMADDR, 0x1e09);
     _musicPlayer.sciWrite(VS1053_REG_WRAM, 0x0001);
-
-    // Enable differential output
-    /*uint16_t mode = VS1053_MODE_SM_DIFF | VS1053_MODE_SM_SDINEW;
-      _musicPlayer.sciWrite(VS1053_REG_MODE, mode); */
-      Serial.println(F("VS1053 patch installed"));
+#endif
+    Serial.println(F("VS1053 patch installed"));
   } else {
     Serial.println(F("Could not load patch"));
   }
@@ -258,7 +260,8 @@ void ShelfPlayback::playHttp() {
     Serial.println(F("StreamUrl not set"));
     return;
   }
-  _http.begin(currentStreamUrl);
+  WiFiClient client;
+  _http.begin(client, currentStreamUrl);
   int httpCode = _http.GET();
   int len = _http.getSize();
   if ((httpCode != HTTP_CODE_OK) || !(len > 0 || len == -1)) {

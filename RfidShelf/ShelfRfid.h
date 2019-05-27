@@ -1,6 +1,7 @@
 #ifndef ShelfRfid_h
 #define ShelfRfid_h
 
+#include "ShelfConfig.h"
 #include "ShelfPins.h"
 #include "ShelfPlayback.h"
 #include <SPI.h>
