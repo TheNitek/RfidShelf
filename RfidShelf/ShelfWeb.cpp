@@ -61,8 +61,8 @@ void ShelfWeb::renderDirectory(String &path) {
       "function ota() { var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { document.write('Please wait and do NOT turn off the power!'); location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('ota', 1); xhr.send(formData);}\n"
       "function downloadpatch() { var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 1) { document.write('Please wait while downloading patch! When the download was successful the system is automatically restarting.'); } else if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('downloadpatch', 1); xhr.send(formData);}\n"
       "function formatNumbers() { var numbers = document.getElementsByClassName('number'); for (var i = 0; i < numbers.length; i++) { numbers[i].innerText = Number(numbers[i].innerText).toLocaleString(); }}\n"
-      "function sortDivs(id) { var parent = _(id); var toSort = parent.childNodes; toSort = Array.prototype.slice.call(toSort, 0); toSort.sort(function (a, b) { return ('' + a.id).localeCompare(b.id); }); parent.innerHTML = ''; for(var i = 0, l = toSort.length; i < l; i++) { parent.appendChild(toSort[i]); }}\n"
-      "</script><link rel=\"icon\" href=\"data:;base64,iVBORw0KGgo=\"><style>body { font-family: Arial, Helvetica; } h3 { margin-bottom: 5px; } a { color: #0000EE; text-decoration: none; }</style></head><body><h1>RfidShelf</h1>\n"));
+      "function sortDivs(id) { var parent = _(id); var toSort = parent.childNodes; toSort = Array.prototype.slice.call(toSort, 0); toSort.sort(function (a, b) { if(a.className == b.className) return ('' + a.id).localeCompare(b.id); else if(a.className == 'folder') return -1; else return 1;}); parent.innerHTML = ''; for(var i = 0, l = toSort.length; i < l; i++) { parent.appendChild(toSort[i]); }}\n"
+      "</script><link rel=\"icon\" href=\"data:;base64,iVBORw0KGgo=\"><title>RfidShelf</title><style>body { font-family: Arial, Helvetica; } #fs div:nth-child(even) { background: LightGray; } a { color: #0000EE; text-decoration: none; }</style></head><body>\n"));
 
   String output;
 
@@ -75,17 +75,17 @@ void ShelfWeb::renderDirectory(String &path) {
     _server.sendContent(output);
   }
 
-  if (path == "/") {
-    if(_playback.playbackState() != PLAYBACK_NO) {
-      output = F("<div>Currently playing: <strong>{currentFile}</strong> <a href=\"#\" onclick=\"rootAction('stop'); return false;\">&#x25a0;</a> <a href=\"#\" onclick=\"rootAction('skip'); return false;\">&raquo;</a></div>");
-      output.replace("{currentFile}", _playback.currentFile());
-      _server.sendContent(output);
-    }
-    output = F("<div>Volume: {volume} <a title=\"increase\" href=\"#\" onclick=\"rootAction('volumeUp'); return false;\"><b>&plus;</b></a> / <a title=\"decrease\" href=\"#\" onclick=\"rootAction('volumeDown'); return false;\"><b>&minus;</b></a></div>");
-    output.replace("{volume}", String(50 - _playback.volume()));
-    output.replace("{folder}", path);
+  if(_playback.playbackState() != PLAYBACK_NO) {
+    output = F("<p>Currently playing: <strong>{currentFile}</strong> <a href=\"#\" onclick=\"rootAction('stop'); return false;\">&#x25a0;</a> <a href=\"#\" onclick=\"rootAction('skip'); return false;\">&raquo;</a></p>");
+    output.replace("{currentFile}", _playback.currentFile());
     _server.sendContent(output);
-  } else {
+  }
+  output = F("<p>Volume: <meter id=\"progressBar\" value=\"{volume}\" max=\"50\" style=\"width:300px;\">{volume}</meter> <a title=\"increase\" href=\"#\" onclick=\"rootAction('volumeUp'); return false;\"><b>&plus;</b></a> / <a title=\"decrease\" href=\"#\" onclick=\"rootAction('volumeDown'); return false;\"><b>&minus;</b></a></p>");
+  output.replace("{volume}", String(50 - _playback.volume()));
+  output.replace("{folder}", path);
+  _server.sendContent(output);
+    
+  if (path != "/") {
     output = F("<form><p>Upload MP3 file: <input type=\"file\" multiple=\"true\" name=\"data\" accept=\".mp3\" id=\"fileInput\"><input type=\"button\" value=\"upload\" onclick=\"upload('{folder}'); return false;\"></p>"
       "<div id=\"ulDiv\" style=\"display:none;\"><progress id=\"progressBar\" value=\"0\" max=\"100\" style=\"width:300px;\"></progress>"
       "<p id=\"ulStatus\"></p></div></form>");
@@ -96,101 +96,69 @@ void ShelfWeb::renderDirectory(String &path) {
 
   // http stream options
   if (path == "/") {
-    _server.sendContent(F("<h3>Stream</h3>\n"));
     _server.sendContent(F("<form onsubmit=\"playHttp(); return false;\">Stream from HTTP: <input type=\"text\" name=\"streamUrl\" id=\"streamUrl\"><input type=\"button\" value=\"Stream\" onclick=\"playHttp(); return false;\"></form>"));
   }
 
   // show file system structure
   if (path == "/") {
-    _server.sendContent(F("<h3>Files</h3>\n"));
     _server.sendContent(F("<form onsubmit=\"mkdir(); return false;\">Create new folder: <input type=\"text\" name=\"folder\" id=\"folder\"><input type=\"button\" value=\"Create\" onclick=\"mkdir(); return false;\"></form>"));
   }
 
   SdFile entry;
-  _server.sendContent(F("<div id=\"folders\">"));
-  while (entry.openNext(&dir, O_READ)) {
-    if (!entry.isDir()) {
-      entry.close();
-      continue;
-    }
+  _server.sendContent(F("<div id=\"fs\">"));
 
+  while (entry.openNext(&dir, O_READ)) {
     // filename can be only 100 characters long
     char filenameChar[101] = { 0 };
     entry.getName(filenameChar, 100);
     // TODO encode special characters
     String filename = String(filenameChar);
 
-    output = F("<div id=\"{name}\">&#x1f4c2; <a href=\"{name}/\">{name}</a> <a href=\"#\" onclick=\"deleteUrl('{name}'); return false;\" title=\"delete\">&#x2718;</a>");
-    // Currently only foldernames <= 16 characters can be written onto the rfid
-    if (filename.length() <= 16) {
-      output += F("<a href=\"#\" onclick=\"writeRfid('{name}');\" title=\"write to card\">&#x1f4be;</a> ");
-    } else {
-      output += F("<span title=\"write to card (only able for folder names with <= 16 characters!)\" style=\"opacity: 0.5;\">&#x1f4be;</span> ");
-    }
-    output += F("<a href=\"#\" onclick=\"play('{name}'); return false;\" title=\"play folder\">&#9654;</a>");
-    output.replace("{name}", filename);
-    _server.sendContent(output);
-    _server.sendContent(F("</div>"));
-    entry.close();
-  }
-  dir.rewind();
-  _server.sendContent(F("</div><div id=\"files\">"));
-  while (entry.openNext(&dir, O_READ)) {
     if (entry.isDir()) {
-      entry.close();
-      continue;
-    }
-    char fileNameChar[100];
-    entry.getName(fileNameChar, 100);
-    Serial.println(fileNameChar);
-    // TODO encode special characters
-    String fileName = String(fileNameChar);
-    String fileSize = String(entry.fileSize());
-
-    // hide patch file
-    if (fileName == "patches.053") {
-      entry.close();
-      continue;
-    }
-
-    output = F("<div id=\"{name}\">{icon}<a href=\"{name}\">{name}</a> (<span class=\"number\">{size}</span> bytes) <a href=\"#\" onclick=\"deleteUrl('{name}'); return false;\" title=\"delete\">&#x2718;</a>{playfilebutton}</div>");
-    if (Adafruit_VS1053_FilePlayer::isMP3File(fileNameChar)) {
-      output.replace("{icon}", F("&#x266b; "));
+      output = F("<div class=\"folder\" id=\"{name}\">&#x1f4c2; <a href=\"{name}/\">{name}</a> <a href=\"#\" onclick=\"deleteUrl('{name}'); return false;\" title=\"delete\">&#x2718;</a>");
+      // Currently only foldernames <= 16 characters can be written onto the rfid
+      if (filename.length() <= 16) {
+        output += F("<a href=\"#\" onclick=\"writeRfid('{name}');\" title=\"write to card\">&#x1f4be;</a> ");
+      } else {
+        output += F("<span title=\"write to card (only possible for folder names with <= 16 characters!)\" style=\"opacity: 0.5;\">&#x1f4be;</span> ");
+      }
+      output += F("<a href=\"#\" onclick=\"play('{name}'); return false;\" title=\"play folder\">&#9654;</a></div>");
+      output.replace("{name}", filename);
     } else {
-      output.replace("{icon}", "");
+      output = F("<div class=\"file\" id=\"{name}\">{icon}<a href=\"{name}\">{name}</a> (<span class=\"number\">{size}</span> bytes) <a href=\"#\" onclick=\"deleteUrl('{name}'); return false;\" title=\"delete\">&#x2718;</a>");
+      if(Adafruit_VS1053_FilePlayer::isMP3File(filenameChar) && (path != "/")) {
+        output += F("<a href=\"#\" onclick=\"playFile('{name}'); return false;\" title=\"play\">&#9654;</a>");
+      }
+      output += F("</div>");
+
+      if (Adafruit_VS1053_FilePlayer::isMP3File(filenameChar)) {
+        output.replace("{icon}", F("&#x266b; "));
+      } else {
+        output.replace("{icon}", "");
+      }
+      output.replace("{name}", filename);
+      output.replace("{size}", String(entry.fileSize()));
     }
-    if(Adafruit_VS1053_FilePlayer::isMP3File(fileNameChar) && (path != "/")) {
-      output.replace("{playfilebutton}", " <a href=\"#\" onclick=\"playFile('{name}'); return false;\" title=\"play\">&#9654;</a>");
-    } else {
-      output.replace("{playfilebutton}", "");
-    }
-    output.replace("{name}", fileName);
-    output.replace("{size}", fileSize);
     _server.sendContent(output);
     entry.close();
   }
   _server.sendContent(F("</div>"));
   if (path == "/") {
-    output = F("<br /><br /><div style=\"{patchavailable}\"><h3>VS1053 patch missing</h3>\nNo VS1053 decoder patch installed.<br />It is recommended to install the patch (store as patches.053 in SD root folder) for improved performance and bug fixes (see <a target=\"_blank\" href=\"http://www.vlsi.fi/en/support/software/vs10xxpatches.html\">VLSI website</a>).<br />The patch can be downloaded automatically with the below button.<br /><input type=\"button\" value=\"Download VS1053 patch\" onclick=\"downloadpatch(); return false;\"></div><br /><br /><form><h3>Misc</h3>\nVersion {major}.{minor} <input type=\"button\" value=\"Update Firmware\" onclick=\"ota(); return false;\"></form>");
+    if (!_SD.exists("/patches.053")) {
+      output = F("<form><p><b>MP3 decoder patch missing</b> (might reduce sound quality) <input type=\"button\" value=\"Download + Install VS1053 patch\" onclick=\"downloadpatch(); return false;\"></p><form>");
+      _server.sendContent(output);
+    }
+    
+    output = F("<form><p>Version {major}.{minor} <input type=\"button\" value=\"Update Firmware\" onclick=\"ota(); return false;\"></p></form>");
     output.replace("{major}", String(MAJOR_VERSION));
     output.replace("{minor}", String(MINOR_VERSION));
-    
-    // test if /patches.053 file is existing
-    if (_SD.exists("/patches.053")) {
-      // is existing -> hide download button
-      output.replace("{patchavailable}", "display: none;");
-    } else {
-      output.replace("{patchavailable}", "");
-    }
-
     _server.sendContent(output);
   }
 
   // Dirty client side UI stuff that's too complicated (for me) in C
   _server.sendContent(F("<script>"
+    "sortDivs('fs');"
     "formatNumbers();"
-    "sortDivs('folders');"
-    "sortDivs('files');"
     "</script></body></html>"));
 }
 
