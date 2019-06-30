@@ -80,7 +80,7 @@ void ShelfWeb::renderDirectory(String &path) {
     output.replace("{currentFile}", _playback.currentFile());
     _server.sendContent(output);
   }
-  output = F("<p>Volume: <meter id=\"progressBar\" value=\"{volume}\" max=\"50\" style=\"width:300px;\">{volume}</meter> <a title=\"increase\" href=\"#\" onclick=\"rootAction('volumeUp'); return false;\"><b>&plus;</b></a> / <a title=\"decrease\" href=\"#\" onclick=\"rootAction('volumeDown'); return false;\"><b>&minus;</b></a></p>");
+  output = F("<p>Volume: <meter id=\"volumeBar\" value=\"{volume}\" max=\"50\" style=\"width:300px;\">{volume}</meter> <a title=\"decrease\" href=\"#\" onclick=\"rootAction('volumeDown'); return false;\"><b>&minus;</b></a> / <a title=\"increase\" href=\"#\" onclick=\"rootAction('volumeUp'); return false;\"><b>&plus;</b></a></p>");
   output.replace("{volume}", String(50 - _playback.volume()));
   output.replace("{folder}", path);
   _server.sendContent(output);
