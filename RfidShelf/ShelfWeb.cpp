@@ -55,7 +55,6 @@ void ShelfWeb::renderDirectory(String &path) {
       "function writeRfid(url){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', url); var formData = new FormData(); formData.append('write', 1); xhr.send(formData);}\n"
       "function play(url){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', url); var formData = new FormData(); formData.append('play', 1); xhr.send(formData);}\n"
       "function playFile(url){ var xhr = new XMLHttpRequest(); xhr.open('POST', url); var formData = new FormData(); formData.append('playfile', 1); xhr.send(formData);}\n"
-      "function playHttp(){ var streamUrl = _('streamUrl'); if(streamUrl != ''){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('streamUrl', streamUrl.value); xhr.send(formData);}}\n"
       "function rootAction(action){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append(action, 1); xhr.send(formData);}\n"
       "function mkdir() { var folder = _('folder'); if(folder != ''){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('newFolder', folder.value); xhr.send(formData);}}\n"
       "function ota() { var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { document.write('Please wait and do NOT turn off the power!'); location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('ota', 1); xhr.send(formData);}\n"
@@ -75,16 +74,25 @@ void ShelfWeb::renderDirectory(String &path) {
     _server.sendContent(output);
   }
 
+  // Playback state
   if(_playback.playbackState() != PLAYBACK_NO) {
     output = F("<p>Currently playing: <strong>{currentFile}</strong> <a href=\"#\" onclick=\"rootAction('stop'); return false;\">&#x25a0;</a> <a href=\"#\" onclick=\"rootAction('skip'); return false;\">&raquo;</a></p>");
     output.replace("{currentFile}", _playback.currentFile());
     _server.sendContent(output);
   }
+
+  // Volume
   output = F("<p>Volume: <meter id=\"volumeBar\" value=\"{volume}\" max=\"50\" style=\"width:300px;\">{volume}</meter> <a title=\"decrease\" href=\"#\" onclick=\"rootAction('volumeDown'); return false;\"><b>&minus;</b></a> / <a title=\"increase\" href=\"#\" onclick=\"rootAction('volumeUp'); return false;\"><b>&plus;</b></a></p>");
   output.replace("{volume}", String(50 - _playback.volume()));
   output.replace("{folder}", path);
   _server.sendContent(output);
-    
+
+  // Night Mode
+  output = F("<form><p><input type=\"button\" value=\"{nightMode} night mode\" onclick=\"rootAction('toggleNight'); return false;\"></p></form>");
+  output.replace("{nightMode}", (_playback.isNight() ? F("deactivate") : F("activate")));
+  _server.sendContent(output);
+
+  // Upload
   if (path != "/") {
     output = F("<form><p>Upload MP3 file: <input type=\"file\" multiple=\"true\" name=\"data\" accept=\".mp3\" id=\"fileInput\"><input type=\"button\" value=\"upload\" onclick=\"upload('{folder}'); return false;\"></p>"
       "<div id=\"ulDiv\" style=\"display:none;\"><progress id=\"progressBar\" value=\"0\" max=\"100\" style=\"width:300px;\"></progress>"
@@ -92,11 +100,6 @@ void ShelfWeb::renderDirectory(String &path) {
     output.replace("{folder}", path);
     _server.sendContent(output);
     _server.sendContent(F("<div><a href=\"..\">Back to top</a></div><br />"));
-  }
-
-  // http stream options
-  if (path == "/") {
-    _server.sendContent(F("<form onsubmit=\"playHttp(); return false;\">Stream from HTTP: <input type=\"text\" name=\"streamUrl\" id=\"streamUrl\"><input type=\"button\" value=\"Stream\" onclick=\"playHttp(); return false;\"></form>"));
   }
 
   // show file system structure
@@ -350,11 +353,12 @@ void ShelfWeb::handleNotFound() {
       _playback.volumeDown();
       returnOK();
       return;
-    } else if (_server.hasArg("streamUrl")) {
-      _playback.stopPlayback();
-      _playback.currentStreamUrl = _server.arg("streamUrl");
-      _playback.playHttp();
-      _playback.playingByCard = false;
+    } else if (_server.hasArg("toggleNight")) {
+      if(_playback.isNight()) {
+        _playback.stopNight();
+      } else {
+        _playback.startNight();
+      }
       returnOK();
       return;
     } else if (_server.uri() == "/") {
@@ -367,7 +371,7 @@ void ShelfWeb::handleNotFound() {
         returnOK();
         return;
       } else if (_server.hasArg("play") && _playback.switchFolder((char *)path.c_str())) {
-        _playback.playFile();
+        _playback.startPlayback();
         _playback.playingByCard = false;
         returnOK();
         return;
@@ -383,7 +387,7 @@ void ShelfWeb::handleNotFound() {
           strcat(folder, "/");
           
           if(_playback.switchFolder(folder)) {
-            _playback.playFile(folder, file);
+            _playback.startFilePlayback(folder, file);
             _playback.playingByCard = false;
             returnOK();
             return;

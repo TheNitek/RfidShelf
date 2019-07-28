@@ -18,6 +18,9 @@
 // lower value means louder!
 #define DEFAULT_VOLUME 10
 
+#define NIGHT_FACTOR 0.25f
+#define NIGHT_TIMEOUT 300000
+
 
 // -------------------------
 // MISC SETTINGS
@@ -50,4 +53,3 @@
     // sound to play for powered notification
     #define PUSHOVER_POWERED_SOUND "climb"
 #endif
-

@@ -83,13 +83,14 @@ void ShelfPlayback::stopPlayback() {
   }
   if(_playing == PLAYBACK_FILE) {
     _musicPlayer.stopPlaying();
-  } else if (_playing == PLAYBACK_HTTP) {
-    _http.end();
   }
   _playing = PLAYBACK_NO;
+  if(isNight()) {
+    _lastNightActivity = millis();
+  }
 }
 
-void ShelfPlayback::playFile() {
+void ShelfPlayback::startPlayback() {
   // IO takes time, reset watchdog timer so it does not kill us
   ESP.wdtFeed();
   SdFile file;
@@ -121,7 +122,7 @@ void ShelfPlayback::playFile() {
   // Start folder from the beginning
   if (nextFile == "" && _currentFile != "") {
     _currentFile = "";
-    playFile();
+    startPlayback();
     return;
   }
 
@@ -132,10 +133,10 @@ void ShelfPlayback::playFile() {
     return;
   }
 
-  playFile((char *)dirname.c_str(), (char *)nextFile.c_str());
+  startFilePlayback((char *)dirname.c_str(), (char *)nextFile.c_str());
 }
 
-void ShelfPlayback::playFile(const char* folder, const char* nextFile) {
+void ShelfPlayback::startFilePlayback(const char* folder, const char* nextFile) {
   Serial.print(F("Playing ")); Serial.print(folder); Serial.println(nextFile);
 
   _playing = PLAYBACK_FILE;
@@ -153,29 +154,34 @@ void ShelfPlayback::playFile(const char* folder, const char* nextFile) {
 
 void ShelfPlayback::skipFile() {
   _musicPlayer.stopPlaying();
-  playFile();
+  startPlayback();
 }
 
 void ShelfPlayback::volume(uint8_t volume) {
-  _volume = volume;
-  _musicPlayer.setVolume(_volume, _volume);
+  if(volume > 50) {
+    _volume = 50;
+  } else {
+    _volume = volume;
+  }
+
+  uint8_t calcVolume = volume;
+  
+  if(isNight()) {
+    calcVolume = 50 - (NIGHT_FACTOR * (50 - _volume));
+  }
+  _musicPlayer.setVolume(calcVolume, calcVolume);
 }
 
 void ShelfPlayback::volumeUp() {
   if(_volume < 5) {
-    _volume = 0;
+    volume(0);
   } else {
-    _volume -= 5;
+    volume(_volume - 5);
   }
-  _musicPlayer.setVolume(_volume, _volume);
 }
 
 void ShelfPlayback::volumeDown() {
-  _volume += 5;
-  if(_volume > 50) {
-    _volume = 50;
-  }
-  _musicPlayer.setVolume(_volume, _volume);
+  volume(_volume + 5);
 }
 
 
@@ -228,63 +234,32 @@ bool ShelfPlayback::patchVS1053() {
   return true;
 }
 
-
-/* Since there isn't much RAM to use we don't use any buffering here.
- * Using a small ring buffer here made things worse
- */
-void ShelfPlayback::feedPlaybackFromHttp() {
-  if(_http.connected()) {
-    _reconnectCount = 0;
-    // get available data size
-    size_t available = _stream->available();
-
-    // VS1053 accepts at least 32 bytes when "ready" so we can batch the data transfer
-    while((available >= 32) && _musicPlayer.readyForData()) {
-      uint8_t buff[32] = { 0 };
-      int c = _stream->readBytes(buff, ((available > sizeof(buff)) ? sizeof(buff) : available));
-
-      _musicPlayer.playData(buff, c);
-    }
-  } else {
-    Serial.println(F("Reconnecting http"));
-    stopPlayback();
-    if(_reconnectCount < MAX_RECONNECTS) {
-      playHttp();
-      _reconnectCount++;
-    }
-  }
-}
-
-void ShelfPlayback::playHttp() {
-  if(!currentStreamUrl) {
-    Serial.println(F("StreamUrl not set"));
-    return;
-  }
-  WiFiClient client;
-  _http.begin(client, currentStreamUrl);
-  int httpCode = _http.GET();
-  int len = _http.getSize();
-  if ((httpCode != HTTP_CODE_OK) || !(len > 0 || len == -1)) {
-    Serial.println(F("Webradio request failed"));
-    return;
-  }
-
-  _stream = _http.getStreamPtr();
-
-  _playing = PLAYBACK_HTTP;
-  Serial.println(F("Initialized HTTP stream"));
-}
-
 void ShelfPlayback::work() {
   if (_playing == PLAYBACK_FILE) {
     if (_musicPlayer.playingMusic) {
       _musicPlayer.feedBuffer();
     } else {
-      playFile();
+      startPlayback();
     }
+    return;
   }
 
-  if (_playing == PLAYBACK_HTTP) {
-    feedPlaybackFromHttp();
+  if ((_playing == PLAYBACK_NO) && isNight() && (millis() - _lastNightActivity > NIGHT_TIMEOUT)) {
+    stopNight();
   }
+}
+
+void ShelfPlayback::startNight() {
+  _lastNightActivity = millis();
+  _nightMode = true;
+  volume(_volume);
+}
+
+bool ShelfPlayback::isNight() {
+  return _nightMode;
+}
+
+void ShelfPlayback::stopNight() {
+  _nightMode = false;
+  volume(_volume);
 }

@@ -58,19 +58,11 @@ void ShelfRfid::handleRfid() {
     return;
   }
 
-  uint8_t configLength = 3;
   if (pairing) {
     char writeFolder[17];
     SD.vwd()->getName(writeFolder, 17);
     writeRfidBlock(1, 0, (uint8_t*) writeFolder, 17);
-    // Store config (like volume)
-    uint8_t configBuffer[configLength];
-    // Magic number to mark config block and distinguish legacy cards without it
-    configBuffer[0] = 137;
-    // Length of config entry without header
-    configBuffer[1] = configLength-2;
-    configBuffer[2] = _playback.volume();
-    writeRfidBlock(2, 0, configBuffer, configLength);
+    writeConfigBlock();
     pairing = false;
   }
 
@@ -98,9 +90,11 @@ void ShelfRfid::handleRfid() {
           }
         } else {
           _playback.volume(DEFAULT_VOLUME);
+          // "Upgrade" card
+          writeConfigBlock();
         }
 
-        _playback.playFile();
+        _playback.startPlayback();
         _playback.playingByCard = true;
       }
     }
@@ -111,6 +105,19 @@ void ShelfRfid::handleRfid() {
   // Stop encryption on PCD
   _mfrc522.PCD_StopCrypto1();
 
+}
+
+void ShelfRfid::writeConfigBlock() {
+  uint8_t configLength = 3;
+
+  // Store config (like volume)
+  uint8_t configBuffer[configLength];
+  // Magic number to mark config block and distinguish legacy cards without it
+  configBuffer[0] = 137;
+  // Length of config entry without header
+  configBuffer[1] = configLength-2;
+  configBuffer[2] = _playback.volume();
+  writeRfidBlock(2, 0, configBuffer, configLength);
 }
 
 bool ShelfRfid::writeRfidBlock(uint8_t sector, uint8_t relativeBlock, const uint8_t *newContent, uint8_t contentSize) {

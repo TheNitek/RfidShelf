@@ -23,6 +23,7 @@ class ShelfRfid {
     MFRC522::MIFARE_Key _key;
     byte _lastCardUid[4]; // Init array that will store new card uid
     static void print_byte_array(const uint8_t *buffer, const uint8_t  bufferSize);
+    void writeConfigBlock();
     bool writeRfidBlock(uint8_t sector, uint8_t relativeBlock, const uint8_t *newContent, uint8_t contentSize) ;
     bool readRfidBlock(uint8_t sector, uint8_t relativeBlock, uint8_t *outputBuffer, uint8_t bufferSize);
 };

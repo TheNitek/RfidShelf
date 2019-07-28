@@ -7,7 +7,7 @@
 #include <ESP8266HTTPClient.h>
 #include <SdFat.h>
 
-enum PlaybackState {PLAYBACK_NO, PLAYBACK_FILE, PLAYBACK_HTTP};
+enum PlaybackState {PLAYBACK_NO, PLAYBACK_FILE};
 
 class ShelfPlayback {
   public:
@@ -18,20 +18,21 @@ class ShelfPlayback {
     void begin();
     bool switchFolder(const char *folder);
     void switchStreamUrl(const String);
-    void playFile();
-    void playFile(const char* folder, const char* fullpath);
-    void playHttp();
+    void startPlayback();
+    void startFilePlayback(const char* folder, const char* fullpath);
     void skipFile();
     void stopPlayback();
     uint8_t volume() {return _volume;};
     void volume(uint8_t volume);
     void volumeDown();
     void volumeUp();
+    void startNight();
+    bool isNight();
+    void stopNight();
     void setBassAndTreble(uint8_t trebleAmplitude, uint8_t trebleFreqLimit, uint8_t bassAmplitude, uint8_t bassFreqLimit);
     PlaybackState playbackState() {return _playing;};
     String currentFile() {return _currentFile;};
     void work();
-    String currentStreamUrl;
     bool playingByCard = true;
   private:
     uint8_t _volume = DEFAULT_VOLUME;
@@ -39,11 +40,10 @@ class ShelfPlayback {
     Adafruit_VS1053_FilePlayer _musicPlayer;
     SdFat &_SD;
     String _currentFile;
-    uint8_t _reconnectCount = 0;
-    HTTPClient _http;
-    WiFiClient * _stream;
     bool patchVS1053();
-    void feedPlaybackFromHttp();
+    bool _nightMode = false;
+    // Night mode timeouts NIGHT_TIMEOUT minutes after playback ends, so we need to keep count
+    unsigned long _lastNightActivity;
 };
 
 #endif // ShelfPlayback_h
