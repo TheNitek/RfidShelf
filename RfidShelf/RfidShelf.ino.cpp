@@ -1,3 +1,6 @@
+# 1 "c:\\users\\nitek\\appdata\\local\\temp\\tmphfgiel"
+#include <Arduino.h>
+# 1 "C:/Users/Nitek/Documents/Arduino/RfidShelf/RfidShelf/RfidShelf.ino"
 #include <Arduino.h>
 #include "ShelfPins.h"
 #include "ShelfConfig.h"
@@ -22,16 +25,18 @@ ShelfWeb webInterface(playback, rfid, SD);
 #ifdef PUSHOVER_ENABLE
 ShelfPushover pushover;
 #endif
-
+void setup();
+void loop();
+#line 26 "C:/Users/Nitek/Documents/Arduino/RfidShelf/RfidShelf/RfidShelf.ino"
 void setup() {
-  // Seems to make flashing more reliable
+
   delay(100);
 
   Serial.begin(115200);
   Serial.println();
   Serial.println("Starting ...");
 
-  // Init SPI SS pins
+
   pinMode(RC522_CS, OUTPUT);
   digitalWrite(RC522_CS, HIGH);
   pinMode(SD_CS, OUTPUT);
@@ -42,14 +47,14 @@ void setup() {
   digitalWrite(BREAKOUT_DCS, HIGH);
 
   rfid.begin();
-    
-  //Initialize the SdCard.
+
+
   if (!SD.begin(SD_CS)) {
     Serial.println(F("Could not initialize SD card"));
     SD.initErrorHalt();
   }
   Serial.println(F("SD initialized"));
-  
+
   playback.begin();
 
   wifiManager.setConfigPortalTimeout(3 * 60);

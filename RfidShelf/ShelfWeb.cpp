@@ -76,9 +76,16 @@ void ShelfWeb::renderDirectory(String &path) {
 
   // Playback state
   if(_playback.playbackState() != PLAYBACK_NO) {
-    output = F("<p>Currently playing: <strong>{currentFile}</strong> <a href=\"#\" onclick=\"rootAction('stop'); return false;\">&#x25a0;</a> <a href=\"#\" onclick=\"rootAction('skip'); return false;\">&raquo;</a></p>");
+    output = F("<p>Currently playing: <strong>{currentFile}</strong>");
     output.replace("{currentFile}", _playback.currentFile());
     _server.sendContent(output);
+    if(_playback.playbackState() == PLAYBACK_PAUSED) {
+      _server.sendContent(F(" <a href=\"#\" onclick=\"rootAction('resume'); return false;\">&#x25b6;</a>"));
+    } else {
+      _server.sendContent(F(" <a href=\"#\" onclick=\"rootAction('pause'); return false;\">&#x23f8;</a>"));
+    }
+    _server.sendContent(F(" <a href=\"#\" onclick=\"rootAction('stop'); return false;\">&#x23f9;</a>"));
+    _server.sendContent(F(" <a href=\"#\" onclick=\"rootAction('skip'); return false;\">&#x23ed;</a></p>"));
   }
 
   // Volume
@@ -125,12 +132,12 @@ void ShelfWeb::renderDirectory(String &path) {
       } else {
         output += F("<span title=\"write to card (only possible for folder names with <= 16 characters!)\" style=\"opacity: 0.5;\">&#x1f4be;</span> ");
       }
-      output += F("<a href=\"#\" onclick=\"play('{name}'); return false;\" title=\"play folder\">&#9654;</a></div>");
+      output += F("<a href=\"#\" onclick=\"play('{name}'); return false;\" title=\"play folder\">&#x25b6;</a></div>");
       output.replace("{name}", filename);
     } else {
       output = F("<div class=\"file\" id=\"{name}\">{icon}<a href=\"{name}\">{name}</a> (<span class=\"number\">{size}</span> bytes) <a href=\"#\" onclick=\"deleteUrl('{name}'); return false;\" title=\"delete\">&#x2718;</a>");
       if(Adafruit_VS1053_FilePlayer::isMP3File(filenameChar) && (path != "/")) {
-        output += F("<a href=\"#\" onclick=\"playFile('{name}'); return false;\" title=\"play\">&#9654;</a>");
+        output += F("<a href=\"#\" onclick=\"playFile('{name}'); return false;\" title=\"play\">&#x25b6;</a>");
       }
       output += F("</div>");
 
@@ -341,7 +348,17 @@ void ShelfWeb::handleNotFound() {
       _playback.stopPlayback();
       returnOK();
       return;
+    } else if (_server.hasArg("pause")) {
+      _playback.pausePlayback();
+      returnOK();
+      return;
+    } else if (_server.hasArg("resume")) {
+      _playback.playingByCard = false;
+      _playback.resumePlayback();
+      returnOK();
+      return;
     } else if (_server.hasArg("skip")) {
+      _playback.playingByCard = false;
       _playback.skipFile();
       returnOK();
       return;

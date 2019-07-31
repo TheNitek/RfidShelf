@@ -9,15 +9,17 @@ void ShelfRfid::begin() {
     _key.keyByte[i] = 0xFF;
   }
 
-  Serial.print(F("Using rfid key (for A and B): "));
-  print_byte_array(_key.keyByte, MFRC522::MF_KEY_SIZE);
-  Serial.println();
+  Serial.println(F("RFID initialized"));
 }
 
 void ShelfRfid::handleRfid() {
+  if ((_playback.playbackState() != PLAYBACK_NO) && (millis() - _lastRfidCheck < 500)) {
+    return;
+  }
+  _lastRfidCheck = millis();
 
   // While playing check if the tag is still present
-  if ((_playback.playbackState() != PLAYBACK_NO) && _playback.playingByCard) {
+  if ((_playback.playbackState() == PLAYBACK_FILE) && _playback.playingByCard) {
 
     // Since wireless communication is voodoo we'll give it a few retrys before killing the music
     for (int i = 0; i < 3; i++) {
@@ -37,7 +39,7 @@ void ShelfRfid::handleRfid() {
       }
     }
 
-    _playback.stopPlayback();
+    _playback.pausePlayback();
   }
 
   // Look for new cards and select one if it exists
@@ -51,6 +53,17 @@ void ShelfRfid::handleRfid() {
   Serial.print(F("PICC type: "));
   MFRC522::PICC_Type piccType = _mfrc522.PICC_GetType(_mfrc522.uid.sak);
   Serial.println(_mfrc522.PICC_GetTypeName(piccType));
+
+  if (_playback.playbackState() == PLAYBACK_PAUSED &&
+      _mfrc522.uid.uidByte[0] == _lastCardUid[0] &&
+      _mfrc522.uid.uidByte[1] == _lastCardUid[1] &&
+      _mfrc522.uid.uidByte[2] == _lastCardUid[2] &&
+      _mfrc522.uid.uidByte[3] == _lastCardUid[3] ) {
+  _playback.resumePlayback();
+  _mfrc522.PICC_HaltA();
+  return;
+}
+
 
   // Check for compatibility
   if (piccType != MFRC522::PICC_TYPE_MIFARE_1K ) {
@@ -67,7 +80,7 @@ void ShelfRfid::handleRfid() {
   }
 
   // Reset watchdog timer
-  yield();
+  ESP.wdtFeed();
   uint8_t readBuffer[18];
   if (readRfidBlock(1, 0, readBuffer, sizeof(readBuffer))) {
     // Store uid

@@ -70,6 +70,19 @@ bool ShelfPlayback::switchFolder(const char *folder) {
   return true;
 }
 
+void ShelfPlayback::resumePlayback() {
+  if(_playing == PLAYBACK_PAUSED) {
+    _musicPlayer.pausePlaying(false);
+    _playing = PLAYBACK_FILE;
+  }
+}
+
+void ShelfPlayback::pausePlayback() {
+  if(_playing == PLAYBACK_FILE) {
+    _musicPlayer.pausePlaying(false);
+    _playing = PLAYBACK_PAUSED;
+  }
+}
 
 void ShelfPlayback::stopPlayback() {
   Serial.println(F("Stopping playback"));

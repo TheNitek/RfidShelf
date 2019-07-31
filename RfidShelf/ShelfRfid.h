@@ -26,6 +26,7 @@ class ShelfRfid {
     void writeConfigBlock();
     bool writeRfidBlock(uint8_t sector, uint8_t relativeBlock, const uint8_t *newContent, uint8_t contentSize) ;
     bool readRfidBlock(uint8_t sector, uint8_t relativeBlock, uint8_t *outputBuffer, uint8_t bufferSize);
+    unsigned long _lastRfidCheck = 0L;
 };
 
 #endif // ShelfRfid_h

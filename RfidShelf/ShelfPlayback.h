@@ -7,7 +7,7 @@
 #include <ESP8266HTTPClient.h>
 #include <SdFat.h>
 
-enum PlaybackState {PLAYBACK_NO, PLAYBACK_FILE};
+enum PlaybackState {PLAYBACK_NO, PLAYBACK_FILE, PLAYBACK_PAUSED};
 
 class ShelfPlayback {
   public:
@@ -21,6 +21,8 @@ class ShelfPlayback {
     void startPlayback();
     void startFilePlayback(const char* folder, const char* fullpath);
     void skipFile();
+    void pausePlayback();
+    void resumePlayback();
     void stopPlayback();
     uint8_t volume() {return _volume;};
     void volume(uint8_t volume);

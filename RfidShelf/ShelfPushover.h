@@ -16,6 +16,7 @@ class ShelfPushover {
         
     private:
         HTTPClient _httpClient;
+        unsigned long lastPoweredNotificationCheck = 0L;
 };
 #endif
 #endif
