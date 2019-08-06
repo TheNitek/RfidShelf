@@ -257,7 +257,7 @@ void ShelfPlayback::work() {
     return;
   }
 
-  if ((_playing == PLAYBACK_NO) && isNight() && (millis() - _lastNightActivity > NIGHT_TIMEOUT)) {
+  if ((_playing == PLAYBACK_NO || _playing == PLAYBACK_PAUSED) && isNight() && (millis() - _lastNightActivity > NIGHT_TIMEOUT)) {
     stopNight();
   }
 }
