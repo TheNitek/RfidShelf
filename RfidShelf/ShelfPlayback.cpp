@@ -79,8 +79,11 @@ void ShelfPlayback::resumePlayback() {
 
 void ShelfPlayback::pausePlayback() {
   if(_playing == PLAYBACK_FILE) {
-    _musicPlayer.pausePlaying(false);
+    _musicPlayer.pausePlaying(true);
     _playing = PLAYBACK_PAUSED;
+    if(isNight()) {
+      _lastNightActivity = millis();
+    }
   }
 }
 
