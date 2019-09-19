@@ -2,6 +2,6 @@
 #define ShelfVersion_h
 
 #define MAJOR_VERSION 1
-#define MINOR_VERSION 10
+#define MINOR_VERSION 11
 
 #endif // ShelfVersion_h
