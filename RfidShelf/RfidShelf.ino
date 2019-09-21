@@ -4,6 +4,8 @@
 #include <ESP8266WiFi.h>
 #include <WiFiManager.h>
 #include <SdFat.h>
+#include <WiFiUdp.h>
+#include <NTPClient.h>
 #include "ShelfPlayback.h"
 #include "ShelfRfid.h"
 #include "ShelfWeb.h"
@@ -16,9 +18,12 @@ WiFiManager wifiManager;
 
 SdFat SD;
 
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP, NTP_SERVER, NTP_OFFSET, NTP_UPDATE_TIME);
+
 ShelfPlayback playback(SD);
 ShelfRfid rfid(playback);
-ShelfWeb webInterface(playback, rfid, SD);
+ShelfWeb webInterface(playback, rfid, SD, timeClient);
 #ifdef PUSHOVER_ENABLE
 ShelfPushover pushover;
 #endif
@@ -29,7 +34,7 @@ void setup() {
 
   Serial.begin(115200);
   Serial.println();
-  Serial.println("Starting ...");
+  Serial.println(F("Starting ..."));
 
   // Init SPI SS pins
   pinMode(RC522_CS, OUTPUT);
@@ -48,7 +53,7 @@ void setup() {
     Serial.println(F("Could not initialize SD card"));
     SD.initErrorHalt();
   }
-  Serial.println(F("SD initialized"));
+  Serial.println(F("SD ready"));
   
   playback.begin();
 
@@ -61,6 +66,10 @@ void setup() {
 
   Serial.print(F("Connected! IP address: "));
   Serial.println(WiFi.localIP());
+
+  if(NTP_ENABLE == 1) {
+    timeClient.begin();
+  }
 
   webInterface.begin();
 
@@ -75,6 +84,10 @@ void loop() {
 #ifdef PUSHOVER_ENABLE
   pushover.sendPoweredNotification();
 #endif
+
+  if(NTP_ENABLE == 1) {
+    timeClient.update();
+  }
 
   webInterface.work();
 }

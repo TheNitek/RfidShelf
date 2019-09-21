@@ -21,18 +21,26 @@
 #define NIGHT_FACTOR 0.25f
 #define NIGHT_TIMEOUT 300000
 
-
 // -------------------------
 // MISC SETTINGS
 // -------------------------
-// number off consecutive http reconnects before giving up stream
-#define MAX_RECONNECTS 10
+
+// DNS name the shelf try to register itself with your local DNS server
+#define DNS_NAME "rfidshelf"
 
 // the update url for the OTA update
-#define UPDATE_URL "http://download.naeveke.de/board/latest.bin"
+#define UPDATE_URL "https://download.naeveke.de/board/latest.bin"
 
 // the url for the patch download
 #define VS1053_PATCH_URL "https://raw.githubusercontent.com/madsci1016/Sparkfun-MP3-Player-Shield-Arduino-Library/master/plugins/patches.053"
+
+#define NTP_ENABLE 0
+// Adress of the NTP server
+#define NTP_SERVER "pool.ntp.org"
+// Time offset to UTC in seconds
+#define NTP_OFFSET 2*60*60
+// NTP update interval in ms
+#define NTP_UPDATE_TIME 24*60*60*1000
 
 // -------------------------
 // NOTIFICTATION_SETTINGS
