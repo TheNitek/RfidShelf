@@ -6,15 +6,15 @@ void ShelfPlayback::begin() {
     // Disable amp
     pinMode(AMP_POWER, OUTPUT);
     digitalWrite(AMP_POWER, LOW);
-    Serial.println(F("Amp powered down"));
+    Sprintln(F("Amp powered down"));
   }
 
   // initialise the music player
   if (!_musicPlayer.begin()) { // initialise the music player
-    Serial.println(F("Couldn't find VS1053, do you have the right pins defined?"));
+    Sprintln(F("Couldn't find VS1053, do you have the right pins defined?"));
     while (1) delay(500);
   }
-  Serial.println(F("VS1053 found"));
+  Sprintln(F("VS1053 found"));
 
   /* Fix for the design fuckup of the cheap LC Technology MP3 shield
     see http://www.bajdi.com/lcsoft-vs1053-mp3-module/#comment-33773
@@ -25,7 +25,7 @@ void ShelfPlayback::begin() {
   _musicPlayer.GPIO_digitalWrite(0x0000);
   _musicPlayer.softReset();
 
-  Serial.println(F("VS1053 soft reset done"));
+  Sprintln(F("VS1053 soft reset done"));
 
   if (patchVS1053()) {
 #ifdef USE_DIFFERENTIAL_OUTPUT
@@ -37,13 +37,13 @@ void ShelfPlayback::begin() {
     _musicPlayer.sciWrite(VS1053_REG_WRAMADDR, 0x1e09);
     _musicPlayer.sciWrite(VS1053_REG_WRAM, 0x0001);
 #endif
-    Serial.println(F("VS1053 patch installed"));
+    Sprintln(F("VS1053 patch installed"));
   } else {
-    Serial.println(F("Could not load patch"));
+    Sprintln(F("Could not load patch"));
   }
 
-  Serial.print(F("SampleRate "));
-  Serial.println(_musicPlayer.sciRead(VS1053_REG_AUDATA));
+  Sprint(F("SampleRate "));
+  Sprintln(_musicPlayer.sciRead(VS1053_REG_AUDATA));
 
   _musicPlayer.setVolume(_volume, _volume);
 
@@ -51,16 +51,16 @@ void ShelfPlayback::begin() {
 
   _musicPlayer.dumpRegs();
 
-  Serial.println(F("VS1053 found"));
+  Sprintln(F("VS1053 found"));
 }
 
 
 bool ShelfPlayback::switchFolder(const char *folder) {
-  Serial.print(F("Switching folder to "));
-  Serial.println(folder);
+  Sprint(F("Switching folder to "));
+  Sprintln(folder);
 
   if (!_SD.exists(folder)) {
-    Serial.println(F("Folder does not exist"));
+    Sprintln(F("Folder does not exist"));
     return false;
   }
   stopPlayback();
@@ -88,9 +88,9 @@ void ShelfPlayback::pausePlayback() {
 }
 
 void ShelfPlayback::stopPlayback() {
-  Serial.println(F("Stopping playback"));
+  Sprintln(F("Stopping playback"));
   if(_playing == PLAYBACK_NO) {
-    Serial.println(F("Already stopped"));
+    Sprintln(F("Already stopped"));
     return;
   }
   
@@ -125,7 +125,7 @@ void ShelfPlayback::startPlayback() {
     file.close();
 
     if (file.isDir() || !_musicPlayer.isMP3File(filenameChar)) {
-      Serial.print(F("Ignoring ")); Serial.println(filenameChar);
+      Sprint(F("Ignoring ")); Sprintln(filenameChar);
       continue;
     }
 
@@ -144,7 +144,7 @@ void ShelfPlayback::startPlayback() {
 
   // No _currentFile && no nextFile => Nothing to play!
   if (nextFile == "") {
-    Serial.print(F("No mp3 files in ")); Serial.println(dirname);
+    Sprint(F("No mp3 files in ")); Sprintln(dirname);
     stopPlayback();
     return;
   }
@@ -153,7 +153,7 @@ void ShelfPlayback::startPlayback() {
 }
 
 void ShelfPlayback::startFilePlayback(const char* folder, const char* nextFile) {
-  Serial.print(F("Playing ")); Serial.print(folder); Serial.println(nextFile);
+  Sprint(F("Playing ")); Sprint(folder); Sprintln(nextFile);
 
   _playing = PLAYBACK_FILE;
   _currentFile = nextFile;
@@ -210,12 +210,12 @@ void ShelfPlayback::setBassAndTreble(uint8_t trebleAmplitude, uint8_t trebleFreq
   bassReg |= bassAmplitude;
   bassReg <<= 4;
   bassReg |= bassFreqLimit;
-  Serial.printf(F("bass value: %04x\n"), bassReg);
+  Sprintf(F("bass value: %04x\n"), bassReg);
   _musicPlayer.sciWrite(VS1053_REG_BASS, bassReg);
 }
 
 bool ShelfPlayback::patchVS1053() {
-  Serial.println(F("Installing patch to VS1053"));
+  Sprintln(F("Installing patch to VS1053"));
 
   SdFile file;
   if (!file.open("patches.053", O_READ)) return false;
@@ -246,7 +246,7 @@ bool ShelfPlayback::patchVS1053() {
   }
   file.close();
 
-  Serial.print(F("Number of bytes: ")); Serial.println(i);
+  Sprint(F("Number of bytes: ")); Sprintln(i);
   return true;
 }
 

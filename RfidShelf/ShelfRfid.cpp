@@ -9,7 +9,7 @@ void ShelfRfid::begin() {
     _key.keyByte[i] = 0xFF;
   }
 
-  Serial.println(F("RFID initialized"));
+  Sprintln(F("RFID initialized"));
 }
 
 void ShelfRfid::handleRfid() {
@@ -48,11 +48,11 @@ void ShelfRfid::handleRfid() {
   }
 
   // Show some details of the PICC (that is: the tag/card)
-  Serial.print(F("Card UID:"));
+  Sprint(F("Card UID:"));
   print_byte_array(_mfrc522.uid.uidByte, _mfrc522.uid.size);
-  Serial.print(F("PICC type: "));
+  Sprint(F("PICC type: "));
   MFRC522::PICC_Type piccType = _mfrc522.PICC_GetType(_mfrc522.uid.sak);
-  Serial.println(_mfrc522.PICC_GetTypeName(piccType));
+  Sprintln(_mfrc522.PICC_GetTypeName(piccType));
 
   if (_playback.playbackState() == PLAYBACK_PAUSED &&
       _mfrc522.uid.uidByte[0] == _lastCardUid[0] &&
@@ -67,7 +67,7 @@ void ShelfRfid::handleRfid() {
 
   // Check for compatibility
   if (piccType != MFRC522::PICC_TYPE_MIFARE_1K ) {
-    Serial.println(F("Unsupported card."));
+    Sprintln(F("Unsupported card."));
     return;
   }
 
@@ -98,7 +98,7 @@ void ShelfRfid::handleRfid() {
         uint8_t configBuffer[18];
         if (readRfidBlock(2, 0, configBuffer, sizeof(configBuffer)) && (configBuffer[0] == 137)) {
           if(configBuffer[1] > 0) {
-            Serial.print(F("Setting volume: ")); Serial.println(configBuffer[2]);
+            Sprint(F("Setting volume: ")); Sprintln(configBuffer[2]);
             _playback.volume(configBuffer[2]);
           }
         } else {
@@ -137,11 +137,11 @@ bool ShelfRfid::writeRfidBlock(uint8_t sector, uint8_t relativeBlock, const uint
   uint8_t absoluteBlock = (sector * 4) + relativeBlock;
 
   // Authenticate using key A
-  Serial.println(F("Authenticating using key A..."));
+  Sprintln(F("Authenticating using key A..."));
   MFRC522::StatusCode status = _mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, absoluteBlock, &_key, &(_mfrc522.uid));
   if (status != MFRC522::STATUS_OK) {
-    Serial.print(F("PCD_Authenticate() failed: "));
-    Serial.println(_mfrc522.GetStatusCodeName(status));
+    Sprint(F("PCD_Authenticate() failed: "));
+    Sprintln(_mfrc522.GetStatusCodeName(status));
     return false;
   }
 
@@ -153,11 +153,11 @@ bool ShelfRfid::writeRfidBlock(uint8_t sector, uint8_t relativeBlock, const uint
   memcpy(buffer, newContent, bufferSize * sizeof(byte) );
 
   // Write block
-  Serial.print(F("Writing data to block: ")); print_byte_array(newContent, contentSize);
+  Sprint(F("Writing data to block: ")); print_byte_array(newContent, contentSize);
   status = _mfrc522.MIFARE_Write(absoluteBlock, buffer, 16);
   if (status != MFRC522::STATUS_OK) {
-    Serial.print(F("MIFARE_Write() failed: "));
-    Serial.println(_mfrc522.GetStatusCodeName(status));
+    Sprint(F("MIFARE_Write() failed: "));
+    Sprintln(_mfrc522.GetStatusCodeName(status));
     return false;
   }
   return true;
@@ -168,42 +168,45 @@ bool ShelfRfid::writeRfidBlock(uint8_t sector, uint8_t relativeBlock, const uint
 */
 bool ShelfRfid::readRfidBlock(uint8_t sector, uint8_t relativeBlock, uint8_t *outputBuffer, uint8_t bufferSize) {
   if (relativeBlock > 3) {
-    Serial.println(F("Invalid block number"));
+    Sprintln(F("Invalid block number"));
     return false;
   }
 
   uint8_t absoluteBlock = (sector * 4) + relativeBlock;
 
   // Authenticate using key A
-  Serial.println(F("Authenticating using key A..."));
+  Sprintln(F("Authenticating using key A..."));
   MFRC522::StatusCode status = (MFRC522::StatusCode) _mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, absoluteBlock, &_key, &(_mfrc522.uid));
   if (status != MFRC522::STATUS_OK) {
-    Serial.print(F("PCD_Authenticate() failed: "));
-    Serial.println(_mfrc522.GetStatusCodeName(status));
+    Sprint(F("PCD_Authenticate() failed: "));
+    Sprintln(_mfrc522.GetStatusCodeName(status));
     return false;
   }
 
-  Serial.print(F("Reading block "));
-  Serial.println(absoluteBlock);
+  Sprint(F("Reading block "));
+  Sprintln(absoluteBlock);
   status = _mfrc522.MIFARE_Read(absoluteBlock, outputBuffer, &bufferSize);
   if (status != MFRC522::STATUS_OK) {
-    Serial.print(F("MIFARE_Read() failed: "));
-    Serial.println(_mfrc522.GetStatusCodeName(status));
+    Sprint(F("MIFARE_Read() failed: "));
+    Sprintln(_mfrc522.GetStatusCodeName(status));
     return false;
   }
-  Serial.print(F("Data in block ")); Serial.print(absoluteBlock); Serial.println(F(":"));
+  Sprint(F("Data in block ")); Sprint(absoluteBlock); Sprintln(F(":"));
   print_byte_array(outputBuffer, 16);
-  Serial.println();
-  Serial.println();
+  Sprintln();
+  Sprintln();
 
   return true;
 }
 
 
 void ShelfRfid::print_byte_array(const uint8_t *buffer, const uint8_t  bufferSize) {
+#ifdef DEBUG_OUTPUT
   for (uint8_t i = 0; i < bufferSize; i++) {
-    Serial.print(buffer[i] < 0x10 ? " 0" : " ");
+    Sprint(buffer[i] < 0x10 ? " 0" : " ");
+    // Use Serial.print here because of HEX parameter and ifdef around this
     Serial.print(buffer[i], HEX);
   }
-  Serial.println();
+  Sprintln();
+#endif
 }

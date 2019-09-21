@@ -1,3 +1,6 @@
+#ifndef ShelfConfig_h
+#define ShelfConfig_h
+
 // -------------------------
 // AUDIO SETTINGS
 // -------------------------
@@ -43,7 +46,21 @@
 #define NTP_UPDATE_TIME 24*60*60*1000
 
 // -------------------------
-// NOTIFICTATION_SETTINGS
+// DEBUG OUTPUT
+// -------------------------
+#define DEBUG_OUTPUT 1
+#ifdef DEBUG_OUTPUT
+    #define Sprintln(a) (Serial.println(a))
+    #define Sprint(a) (Serial.print(a))
+    #define Sprintf(a, b) (Serial.printf(a, b))
+#else
+    #define Sprintln(a)
+    #define Sprint(a)
+    #define Sprintf(a, b)
+#endif
+
+// -------------------------
+// NOTIFICTATION SETTINGS
 // -------------------------
 // enable sending of notifications using pushover
 // #define PUSHOVER_ENABLE
@@ -60,4 +77,6 @@
     #define PUSHOVER_POWERED_NOTIFICATION_TIME 30 * 60 * 1000
     // sound to play for powered notification
     #define PUSHOVER_POWERED_SOUND "climb"
+#endif
+
 #endif

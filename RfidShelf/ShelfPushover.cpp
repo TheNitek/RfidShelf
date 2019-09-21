@@ -21,9 +21,9 @@ unsigned int ShelfPushover::send(String message, int8_t priority, String sound) 
     client->setInsecure();
     _httpClient.begin(*client, "https://api.pushover.net/1/messages.json");
     int httpCode = _httpClient.POST(data);
-    // Serial.print(F("pushover result: "));
-    // Serial.println(httpCode);
-    // Serial.println(_httpClient.getString());
+    // Sprint(F("pushover result: "));
+    // Sprintln(httpCode);
+    // Sprintln(_httpClient.getString());
     _httpClient.end();
     return httpCode;
 }

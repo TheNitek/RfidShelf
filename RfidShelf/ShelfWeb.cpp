@@ -218,7 +218,7 @@ bool ShelfWeb::loadFromSdCard(String path, bool fs) {
   File dataFile = _SD.open(path.c_str());
 
   if (!dataFile) {
-    Serial.println(F("File not open"));
+    Sprintln(F("File not open"));
     returnHttpStatus(404, "Not found");
     return false;
   }
@@ -238,7 +238,7 @@ bool ShelfWeb::loadFromSdCard(String path, bool fs) {
     else if (path.endsWith(".JS")) dataType = "application/javascript";
 
     if (_server.streamFile(dataFile, dataType) != dataFile.size()) {
-      Serial.println(F("Sent less data than expected!"));
+      Sprintln(F("Sent less data than expected!"));
     }
   }
   dataFile.close();
@@ -248,7 +248,7 @@ bool ShelfWeb::loadFromSdCard(String path, bool fs) {
 void ShelfWeb::handleFileUpload() {
   // Upload always happens on /
   if (_server.uri() != "/") {
-    Serial.println(F("Invalid upload URI"));
+    Sprintln(F("Invalid upload URI"));
     return;
   }
 
@@ -258,47 +258,47 @@ void ShelfWeb::handleFileUpload() {
     String filename = upload.filename;
 
     if (!Adafruit_VS1053_FilePlayer::isMP3File((char *)filename.c_str())) {
-      Serial.print(F("Not a MP3: "));
-      Serial.println(filename);
+      Sprint(F("Not a MP3: "));
+      Sprintln(filename);
       return;
     }
 
     if (!filename.startsWith("/")) {
-      Serial.println(F("Invalid upload target"));
+      Sprintln(F("Invalid upload target"));
       return;
     }
 
     if (_SD.exists((char *)filename.c_str())) {
-      Serial.println("File " + filename + " already exists. Skipping");
+      Sprintln("File " + filename + " already exists. Skipping");
       return;
     }
 
     _uploadFile.open((char *)filename.c_str(), O_WRITE | O_CREAT);
     _uploadStart = millis();
-    Serial.print(F("UPLOAD_FILE_START: "));
-    Serial.println(filename);
+    Sprint(F("UPLOAD_FILE_START: "));
+    Sprintln(filename);
   } else if (upload.status == UPLOAD_FILE_WRITE) {
     if (_uploadFile.isOpen()) {
       _uploadFile.write(upload.buf, upload.currentSize);
 #ifdef SHELFDEBUG
-      Serial.print(F("UPLOAD_FILE_WRITE: "));
-      Serial.println(upload.currentSize);
+      Sprint(F("UPLOAD_FILE_WRITE: "));
+      Sprintln(upload.currentSize);
 #endif
     }
   } else if (upload.status == UPLOAD_FILE_END) {
     if (_uploadFile.isOpen()) {
       _uploadFile.close();
-      Serial.print(F("UPLOAD_FILE_END: "));
-      Serial.println(upload.totalSize);
-      Serial.print(F("Took: "));
-      Serial.println(((millis()-_uploadStart)/1000));
+      Sprint(F("UPLOAD_FILE_END: "));
+      Sprintln(upload.totalSize);
+      Sprint(F("Took: "));
+      Sprintln(((millis()-_uploadStart)/1000));
     }
   }
 }
 
 void ShelfWeb::handleDefault() {
   String path = _server.urlDecode(_server.uri());
-  Serial.printf(F("Request to: %s\n"), path.c_str());
+  Sprintf(F("Request to: %s\n"), path.c_str());
   if (_server.method() == HTTP_GET) {
     loadFromSdCard(path, _server.hasArg("fs"));
   } else if (_server.method() == HTTP_DELETE) {
@@ -311,45 +311,46 @@ void ShelfWeb::handleDefault() {
     file.open(path.c_str());
     if (file.isDir()) {
       if(!file.rmRfStar()) {
-        Serial.println(F("Could not delete folder"));
+        Sprintln(F("Could not delete folder"));
       }
     } else {
       if(!_SD.remove(path.c_str())) {
-        Serial.println(F("Could not delete file"));
+        Sprintln(F("Could not delete file"));
       }
     }
     returnOK();
     return;
   } else if (_server.method() == HTTP_POST) {
     if (_server.hasArg("newFolder")) {
-      Serial.print(F("Creating folder "));
-      Serial.println(_server.arg("newFolder"));
+      Sprint(F("Creating folder "));
+      Sprintln(_server.arg("newFolder"));
       _playback.switchFolder("/");
       _SD.mkdir((char *)_server.arg("newFolder").c_str());
       returnOK();
       return;
     } else if (_server.hasArg("ota")) {
-      Serial.println(F("Starting OTA"));
+      Sprintln(F("Starting OTA"));
       std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
       // do not validate certificate
       client->setInsecure();
       t_httpUpdate_return ret = ESPhttpUpdate.update(*client, UPDATE_URL);
       switch (ret) {
         case HTTP_UPDATE_FAILED:
-          Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s\n", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
+          Sprintf("HTTP_UPDATE_FAILD Error (%d): ", ESPhttpUpdate.getLastError());
+          Sprintln(ESPhttpUpdate.getLastErrorString().c_str());
           returnHttpStatus((uint8_t)500, "Update failed, please try again");
           return;
         case HTTP_UPDATE_NO_UPDATES:
-          Serial.println(F("HTTP_UPDATE_NO_UPDATES"));
+          Sprintln(F("HTTP_UPDATE_NO_UPDATES"));
           break;
         case HTTP_UPDATE_OK:
-          Serial.println(F("HTTP_UPDATE_OK"));
+          Sprintln(F("HTTP_UPDATE_OK"));
           break;
       }
       returnOK();
       return;
     } else if (_server.hasArg("downloadpatch")) {
-      Serial.println(F("Starting patch download"));
+      Sprintln(F("Starting patch download"));
       std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
       // do not validate certificate
       client->setInsecure();
@@ -429,7 +430,7 @@ void ShelfWeb::handleDefault() {
       returnOK();
       return;
     } else if (_server.uri() == "/") {
-      Serial.println(F("Probably got an upload request"));
+      Sprintln(F("Probably got an upload request"));
       returnOK();
       return;
     } else if (_SD.exists((char *)path.c_str())) {
@@ -466,7 +467,7 @@ void ShelfWeb::handleDefault() {
 
   // 404 otherwise
   returnHttpStatus(404, "Not found");
-  Serial.println("404: " + path);
+  Sprintln("404: " + path);
 }
 
 void ShelfWeb::handleWriteRfid(String folder) {

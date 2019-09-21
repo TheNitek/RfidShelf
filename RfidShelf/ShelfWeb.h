@@ -9,6 +9,7 @@
 #include <Adafruit_VS1053.h>
 #include <SdFat.h>
 #include <NTPClient.h>
+#include "ShelfConfig.h"
 #include "ShelfPlayback.h"
 #include "ShelfRfid.h"
 #include "ShelfVersion.h"

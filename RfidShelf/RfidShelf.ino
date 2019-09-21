@@ -32,9 +32,11 @@ void setup() {
   // Seems to make flashing more reliable
   delay(100);
 
+#ifdef DEBUG_OUTPUT
   Serial.begin(115200);
-  Serial.println();
-  Serial.println(F("Starting ..."));
+#endif
+  Sprintln();
+  Sprintln(F("Starting ..."));
 
   // Init SPI SS pins
   pinMode(RC522_CS, OUTPUT);
@@ -50,22 +52,22 @@ void setup() {
     
   //Initialize the SdCard.
   if (!SD.begin(SD_CS)) {
-    Serial.println(F("Could not initialize SD card"));
+    Sprintln(F("Could not initialize SD card"));
     SD.initErrorHalt();
   }
-  Serial.println(F("SD ready"));
+  Sprintln(F("SD ready"));
   
   playback.begin();
 
   wifiManager.setConfigPortalTimeout(3 * 60);
   if (!wifiManager.autoConnect("MP3-SHELF-SETUP", "lacklack")) {
-    Serial.println(F("Setup timed out, starting AP"));
+    Sprintln(F("Setup timed out, starting AP"));
     WiFi.mode(WIFI_AP);
     WiFi.softAP("MP3-SHELF", "lacklack");
   }
 
-  Serial.print(F("Connected! IP address: "));
-  Serial.println(WiFi.localIP());
+  Sprint(F("Connected! IP address: "));
+  Sprintln(WiFi.localIP());
 
   if(NTP_ENABLE == 1) {
     timeClient.begin();
@@ -73,7 +75,7 @@ void setup() {
 
   webInterface.begin();
 
-  Serial.println(F("Init done"));
+  Sprintln(F("Init done"));
 }
 
 void loop() {
