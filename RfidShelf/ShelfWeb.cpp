@@ -37,7 +37,7 @@ void ShelfWeb::renderDirectory(String path) {
   _server.setContentLength(CONTENT_LENGTH_UNKNOWN);
   _server.send(200, "text/html", "");
 
-  _server.sendContent(
+  _server.sendContent_P(
     F("<html><head><meta charset=\"utf-8\"><script>"
       "function _(el) {return document.getElementById(el);}\n"
       "function b(c) { document.body.innerHTML=c}\n"
@@ -152,20 +152,18 @@ void ShelfWeb::renderDirectory(String path) {
   }
 
   // Dirty client side UI stuff that's too complicated (for me) in C
-  _server.sendContent(F("<script>"
+  _server.sendContent_P(F("<script>"
     "sortDivs('fs');"
     "formatNumbers();"
     "</script></body></html>"));
 
-  _server.sendContent("");
-  _server.client().stop();
+  _server.sendContent_P("");
 }
 
 void ShelfWeb::renderFS(String path) {
   _server.setContentLength(CONTENT_LENGTH_UNKNOWN);
-  _server.send(200, "text/html", "");
+  _server.send_P(200, "text/html", "");
 
-  String output;
   SdFile entry;
 
   SdFile dir;
@@ -173,45 +171,52 @@ void ShelfWeb::renderFS(String path) {
 
   dir.rewind();
 
+  // filename can be only 100 characters long
+  // TODO encode special characters
+  char filename[101] = { 0 };
+
+  char output[512];
+
   while (entry.openNext(&dir, O_READ)) {
-    // filename can be only 100 characters long
-    char filenameChar[101] = { 0 };
-    entry.getName(filenameChar, 100);
-    // TODO encode special characters
-    String filename = String(filenameChar);
+    entry.getName(filename, 100);
 
     if (entry.isDir()) {
-      output = F("<div class=\"folder\" id=\"{name}\">&#x1f4c2; <a href=\"{name}/\">{name}</a> <a href=\"#\" onclick=\"deleteUrl('{name}'); return false;\" title=\"delete\">&#x2718;</a>");
+      snprintf(output, sizeof(output), "<div class=\"folder\" id=\"%s\">&#x1f4c2; ", filename);
+      _server.sendContent_P(output);
+      snprintf(output, sizeof(output), "<a href=\"%s/\">%s</a> ", filename, filename);
+      _server.sendContent_P(output);
+      snprintf(output, sizeof(output), "<a href=\"#\" onclick=\"deleteUrl('%s'); return false;\" title=\"delete\">&#x2718;</a>", filename);
+      _server.sendContent_P(output);
       // Currently only foldernames <= 16 characters can be written onto the rfid
-      if (filename.length() <= 16) {
-        output += F("<a href=\"#\" onclick=\"writeRfid('{name}');\" title=\"write to card\">&#x1f4be;</a> ");
+      if (strlen(filename) <= 16) {
+        sprintf(output, "<a href=\"#\" onclick=\"writeRfid('%s');\" title=\"write to card\">&#x1f4be;</a> ", filename);
+        _server.sendContent_P(output);
       } else {
-        output += F("<span title=\"write to card (only possible for folder names with <= 16 characters!)\" style=\"opacity: 0.5;\">&#x1f4be;</span> ");
+        _server.sendContent_P("<span title=\"write to card (only possible for folder names with <= 16 characters!)\" style=\"opacity: 0.5;\">&#x1f4be;</span> ");
       }
-      output += F("<a href=\"#\" onclick=\"play('{name}'); return false;\" title=\"play folder\">&#x25b6;</a></div>");
-      output.replace("{name}", filename);
+      sprintf(output, "<a href=\"#\" onclick=\"play('%s'); return false;\" title=\"play folder\">&#x25b6;</a></div>", filename);
+      _server.sendContent_P(output);
     } else {
-      output = F("<div class=\"file\" id=\"{name}\">{icon}<a href=\"{name}\">{name}</a> (<span class=\"number\">{size}</span> bytes) <a href=\"#\" onclick=\"deleteUrl('{name}'); return false;\" title=\"delete\">&#x2718;</a>");
-      if(Adafruit_VS1053_FilePlayer::isMP3File(filenameChar) && (path != "/")) {
-        output += F("<a href=\"#\" onclick=\"playFile('{name}'); return false;\" title=\"play\">&#x25b6;</a>");
+      char icon[] = "&#x266b; ";
+      if (!Adafruit_VS1053_FilePlayer::isMP3File(filename)) {
+        icon[0] = '\0';
       }
-      output += F("</div>");
 
-      if (Adafruit_VS1053_FilePlayer::isMP3File(filenameChar)) {
-        output.replace("{icon}", F("&#x266b; "));
-      } else {
-        output.replace("{icon}", "");
+      snprintf(output, sizeof(output), "<div class=\"file\" id=\"%s\">%s<a href=\"%s\">%s</a> (<span class=\"number\">%d</span> bytes) ", filename, icon, filename, filename, entry.fileSize());
+      _server.sendContent_P(output);
+      snprintf(output, sizeof(output), "<a href=\"#\" onclick=\"deleteUrl('%s'); return false;\" title=\"delete\">&#x2718;</a>", filename);
+      _server.sendContent_P(output);
+      if(Adafruit_VS1053_FilePlayer::isMP3File(filename) && (path != "/")) {
+        sprintf(output, "<a href=\"#\" onclick=\"playFile('%s'); return false;\" title=\"play\">&#x25b6;</a>", filename);
+        _server.sendContent_P(output);
       }
-      output.replace("{name}", filename);
-      output.replace("{size}", String(entry.fileSize()));
+      _server.sendContent_P("</div>");
     }
-    _server.sendContent(output);
 
     entry.close();
   }
 
-  _server.sendContent("");
-  _server.client().stop();
+  _server.sendContent_P("");
 }
 
 bool ShelfWeb::loadFromSdCard(String path, bool fs) {
