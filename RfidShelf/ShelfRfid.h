@@ -17,12 +17,11 @@ class ShelfRfid {
     void begin();
     void handleRfid();
     bool startPairing(const char *folder);
-    char pairingFolder[17];
+    char pairingFolder[17] = {'\0'};
   private:
     ShelfPlayback &_playback;
     MFRC522 _mfrc522; // Create MFRC522 instance.
     MFRC522::MIFARE_Key _key;
-    char _pairingFolder[17];
     byte _lastCardUid[4]; // Init array that will store new card uid
     unsigned long _lastRfidCheck = 0L;
     static void print_byte_array(const uint8_t *buffer, const uint8_t  bufferSize);

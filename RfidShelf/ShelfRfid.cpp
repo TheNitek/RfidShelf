@@ -71,10 +71,10 @@ void ShelfRfid::handleRfid() {
     return;
   }
 
-  if (_pairingFolder[0] != '\0') {
-    writeRfidBlock(1, 0, (uint8_t*) _pairingFolder, 17);
+  if (pairingFolder[0] != '\0') {
+    writeRfidBlock(1, 0, (uint8_t*) pairingFolder, 17);
     writeConfigBlock();
-    _pairingFolder[0] = '\0';
+    pairingFolder[0] = '\0';
   }
 
   // Reset watchdog timer
@@ -121,7 +121,7 @@ bool ShelfRfid::startPairing(const char *folder) {
   if(strlen(folder) > 16)
     return false;
   
-  strcpy(_pairingFolder, folder);
+  strcpy(pairingFolder, folder);
   return true;
 }
 

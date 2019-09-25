@@ -26,11 +26,11 @@ void ShelfWeb::begin() {
 }
 
 void ShelfWeb::returnOK() {
-  _server.send(200, "text/plain", "");
+  _server.send_P(200, "text/plain", "");
 }
 
-void ShelfWeb::returnHttpStatus(uint16_t statusCode, String msg) {
-  _server.send(statusCode, "text/plain", msg);
+void ShelfWeb::returnHttpStatus(uint16_t statusCode, const char *msg) {
+  _server.send_P(statusCode, "text/plain", msg);
 }
 
 void ShelfWeb::renderDirectory(const char *path) {
@@ -42,7 +42,7 @@ void ShelfWeb::renderDirectory(const char *path) {
       "function _(el) {return document.getElementById(el);}\n"
       "function b(c) { document.body.innerHTML=c}\n"
       "function ajax(m, url, cb, p) {var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState == 4) { cb(xhr.responseText); }}; xhr.open(m, url, true); xhr.send(p);}\n"
-      "function deleteUrl(url){ if(confirm(\"Really delete?\"))ajax('DELETE', url, reload);}\n"
+      "function deleteUrl(url){ if(confirm(\"Delete?\"))ajax('DELETE', url, reload);}\n"
       "function upload(folder){ var fileInput = _('fileInput'); if(fileInput.files.length === 0){ alert('Choose a file first'); return; } var fileTooLong = false; Array.prototype.forEach.call(fileInput.files, function(file) { if (file.name.length > 100) { fileTooLong = true; }}); if (fileTooLong) { alert(\"File name too long. Files can be max. 100 characters long.\"); return; } xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { location.reload(); }};\n"
       "var d = new FormData(); for(var i = 0; i < fileInput.files.length; i++) { d.append('data', fileInput.files[i], folder.concat(fileInput.files[i].name)); }; xhr.open('POST', '/');\n"
       "xhr.upload.addEventListener('progress', progressHandler, false); xhr.addEventListener('load', completeHandler, false); xhr.addEventListener('error', errorHandler, false); xhr.addEventListener('abort', abortHandler, false); _('ulDiv').style.display = 'block'; xhr.send(d); }\n"
@@ -67,7 +67,7 @@ void ShelfWeb::renderDirectory(const char *path) {
   char output[512];
 
 
-  if(_rfid.pairingFolder != '\0') {
+  if(_rfid.pairingFolder[0] != '\0') {
     snprintf(output, sizeof(output), "<p style=\"font-weight: bold\">Pairing mode active. Place card on shelf to write current configuration for <span style=\"color:red\">/%s</span> onto it</p>", _rfid.pairingFolder);
     _server.sendContent_P(output);
   }
@@ -102,7 +102,7 @@ void ShelfWeb::renderDirectory(const char *path) {
   _server.sendContent_P("</p>");
 
 
-  if (strcmp(path, "/")) {
+  if (strcmp(path, "/") == 0) {
     // Create folder
     _server.sendContent_P(
       "<form onsubmit=\"mkdir(); return false;\">Create new folder: "
@@ -128,7 +128,7 @@ void ShelfWeb::renderDirectory(const char *path) {
     path);
   _server.sendContent_P(output);
 
-  if (strcmp(path, "/")) {
+  if (strcmp(path, "/") == 0) {
     if (!_SD.exists("/patches.053")) {
       _server.sendContent_P("<form><p><b>MP3 decoder patch missing</b> (might reduce sound quality) <input type=\"button\" value=\"Download + Install VS1053 patch\" onclick=\"downloadpatch(); return false;\"></p><form>");
     }
@@ -205,7 +205,7 @@ void ShelfWeb::renderFS(const char *path) {
       _server.sendContent_P(output);
       snprintf(output, sizeof(output), "<a href=\"#\" onclick=\"deleteUrl('%s'); return false;\" title=\"delete\">&#x2718;</a>", filename);
       _server.sendContent_P(output);
-      if(Adafruit_VS1053_FilePlayer::isMP3File(filename) && !strcmp(path, "/")) {
+      if(Adafruit_VS1053_FilePlayer::isMP3File(filename) && (strcmp(path, "/") != 0)) {
         snprintf(output, sizeof(output), "<a href=\"#\" onclick=\"playFile('%s'); return false;\" title=\"play\">&#x25b6;</a>", filename);
         _server.sendContent_P(output);
       }
@@ -302,7 +302,7 @@ void ShelfWeb::handleDefault() {
     loadFromSdCard(path, _server.hasArg("fs"));
   } else if (_server.method() == HTTP_DELETE) {
     if (_server.uri() == "/" || !_SD.exists(path.c_str())) {
-      returnHttpStatus(400, "Bad path: " + _server.uri());
+      returnHttpStatus(400, "Bad path");
       return;
     }
 
@@ -317,6 +317,7 @@ void ShelfWeb::handleDefault() {
         Sprintln(F("Could not delete file"));
       }
     }
+    file.close();
     returnOK();
     return;
   } else if (_server.method() == HTTP_POST) {
@@ -335,7 +336,7 @@ void ShelfWeb::handleDefault() {
         case HTTP_UPDATE_FAILED:
           Sprintf("HTTP_UPDATE_FAILD Error (%d): ", ESPhttpUpdate.getLastError());
           Sprintln(ESPhttpUpdate.getLastErrorString().c_str());
-          returnHttpStatus((uint8_t)500, "Update failed, please try again");
+          returnHttpStatus(500, "Update failed, please try again");
           return;
         case HTTP_UPDATE_NO_UPDATES:
           Sprintln(F("HTTP_UPDATE_NO_UPDATES"));
@@ -355,11 +356,13 @@ void ShelfWeb::handleDefault() {
       httpClient.begin(*client, VS1053_PATCH_URL);
       int httpCode = httpClient.GET();
       if (httpCode < 0) {
-        returnHttpStatus(500, httpClient.errorToString(httpCode));
+        returnHttpStatus(500, httpClient.errorToString(httpCode).c_str());
         return;
       }
       if (httpCode != HTTP_CODE_OK) {
-        returnHttpStatus(500, String("http code not 200: ") + httpCode);
+        char buffer[32];
+        snprintf(buffer, sizeof(buffer), "invalid response code: %d", httpCode);
+        returnHttpStatus(500, buffer);
         return;
       }
       int len = httpClient.getSize();
@@ -410,11 +413,15 @@ void ShelfWeb::handleDefault() {
       return;
     } else if (_server.hasArg("volumeUp")) {
       _playback.volumeUp();
-      returnHttpStatus(200, String(50 - _playback.volume()));
+      char volumeBuffer[4];
+      snprintf(volumeBuffer, sizeof(volumeBuffer), "%d", (50 - _playback.volume()));
+      returnHttpStatus(200, volumeBuffer);
       return;
     } else if (_server.hasArg("volumeDown")) {
       _playback.volumeDown();
-      returnHttpStatus(200, String(50 - _playback.volume()));
+      char volumeBuffer[4];
+      snprintf(volumeBuffer, sizeof(volumeBuffer), "%d", (50 - _playback.volume()));
+      returnHttpStatus(200, volumeBuffer);
       return;
     } else if (_server.hasArg("toggleNight")) {
       if(_playback.isNight()) {
@@ -430,9 +437,13 @@ void ShelfWeb::handleDefault() {
       Sprintln(F("Probably got an upload request"));
       returnOK();
       return;
-    } else if (_SD.exists((char *)path.c_str())) {
-      if (_server.hasArg("write") && path.length() <= 16) {
-        if (_rfid.startPairing(path.c_str())) {
+    } else if (_SD.exists(path.c_str())) {
+      // <= 17 here because leading / is included
+      if (_server.hasArg("write") && path.length() <= 17) {
+        const char *target = path.c_str();
+        // Remove leading /
+        target++;
+        if (_rfid.startPairing(target)) {
           returnOK();
           return;
         }
