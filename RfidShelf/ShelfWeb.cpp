@@ -33,7 +33,7 @@ void ShelfWeb::returnHttpStatus(uint16_t statusCode, String msg) {
   _server.send(statusCode, "text/plain", msg);
 }
 
-void ShelfWeb::renderDirectory(String path) {
+void ShelfWeb::renderDirectory(const char *path) {
   _server.setContentLength(CONTENT_LENGTH_UNKNOWN);
   _server.send(200, "text/html", "");
 
@@ -64,121 +64,120 @@ void ShelfWeb::renderDirectory(String path) {
       "function sortDivs(id) { var parent = _(id); var toSort = parent.childNodes; toSort = Array.prototype.slice.call(toSort, 0); toSort.sort(function (a, b) { if(a.className == b.className) return ('' + a.id).localeCompare(b.id); else if(a.className == 'folder') return -1; else return 1;}); parent.innerHTML = ''; for(var i = 0, l = toSort.length; i < l; i++) { parent.appendChild(toSort[i]); }}\n"
       "</script><link rel=\"icon\" href=\"data:;base64,iVBORw0KGgo=\"><title>RfidShelf</title><style>body { font-family: Arial, Helvetica; font-size: 150%} #fs {vertical-align: middle;} #fs div:nth-child(even) { background: LightGray; } a { color: #0000EE; text-decoration: none; }</style></head><body>\n"));
 
-  String output;
+  char output[512];
 
-  if(_rfid.pairing) {
-    char currentFolder[50];
-    _SD.vwd()->getName(currentFolder, sizeof(currentFolder));
 
-    output = F("<p style=\"font-weight: bold\">Pairing mode active. Place card on shelf to write current configuration for <span style=\"color:red\">/{currentFolder}</span> onto it</p>");
-    output.replace("{currentFolder}", currentFolder);
-    _server.sendContent(output);
+  if(_rfid.pairingFolder != '\0') {
+    snprintf(output, sizeof(output), "<p style=\"font-weight: bold\">Pairing mode active. Place card on shelf to write current configuration for <span style=\"color:red\">/%s</span> onto it</p>", _rfid.pairingFolder);
+    _server.sendContent_P(output);
   }
 
   // Playback state
   if(_playback.playbackState() != PLAYBACK_NO) {
-    output = F("<p>Currently playing: <strong>{currentFile}</strong>");
-    output.replace("{currentFile}", _playback.currentFile());
-    _server.sendContent(output);
+    snprintf(output, sizeof(output), "<p>Currently playing: <strong>%s</strong>", _playback.currentFile().c_str());
+    _server.sendContent_P(output);
     if(_playback.playbackState() == PLAYBACK_PAUSED) {
-      _server.sendContent(F(" <a href=\"#\" onclick=\"rootAction('resume'); return false;\">&#x25b6;</a>"));
+      _server.sendContent_P(" <a href=\"#\" onclick=\"rootAction('resume'); return false;\">&#x25b6;</a>");
     } else {
-      _server.sendContent(F(" <a href=\"#\" onclick=\"rootAction('pause'); return false;\">&#x23f8;</a>"));
+      _server.sendContent_P(" <a href=\"#\" onclick=\"rootAction('pause'); return false;\">&#x23f8;</a>");
     }
-    _server.sendContent(F(" <a href=\"#\" onclick=\"rootAction('stop'); return false;\">&#x23f9;</a>"));
-    _server.sendContent(F(" <a href=\"#\" onclick=\"rootAction('skip'); return false;\">&#x23ed;</a></p>"));
+    _server.sendContent_P(" <a href=\"#\" onclick=\"rootAction('stop'); return false;\">&#x23f9;</a>");
+    _server.sendContent_P(" <a href=\"#\" onclick=\"rootAction('skip'); return false;\">&#x23ed;</a></p>");
   }
 
-  _server.sendContent(F("<p>"));
+  _server.sendContent_P("<p>");
   // Volume
-  output = F("Volume:&nbsp;<meter id=\"volumeBar\" value=\"{volume}\" max=\"50\" style=\"width:300px;\">{volume}</meter><br>");
-  output.replace("{volume}", String(50 - _playback.volume()));
-  _server.sendContent(output);
+  uint8_t volume = 50 - _playback.volume();
+  snprintf(output, sizeof(output), "Volume:&nbsp;<meter id=\"volumeBar\" value=\"%d\" max=\"50\" style=\"width:300px;\">%d</meter><br>", volume, volume);
+  _server.sendContent_P(output);
   // Night Mode
-  output = F(
+  _server.sendContent_P(
     "<a title=\"decrease\" href=\"#\" onclick=\"volume('volumeDown'); return false;\">&#x1f509;</a> / "
-    "<a title=\"increase\" href=\"#\" onclick=\"volume('volumeUp'); return false;\">&#x1f50a;</a> "
-    "<a href=\"#\" title=\"{action} night mode\" onclick=\"rootAction('toggleNight'); return false;\">{symbol}</a>"
-    );
-  output.replace("{action}", (_playback.isNight() ? F("deactivate") : F("activate")));
-  output.replace("{symbol}", (_playback.isNight() ? F("&#x1f31b;") : F("&#x1f31e;")));
-  _server.sendContent(output);
-  _server.sendContent(F("</p>"));
+    "<a title=\"increase\" href=\"#\" onclick=\"volume('volumeUp'); return false;\">&#x1f50a;</a> ");
+  snprintf(output, sizeof(output), 
+    "<a href=\"#\" title=\"%s night mode\" onclick=\"rootAction('toggleNight'); return false;\">%s</a>",
+    (_playback.isNight() ? F("deactivate") : F("activate")),
+    (_playback.isNight() ? F("&#x1f31b;") : F("&#x1f31e;")));
+  _server.sendContent_P(output);
+  _server.sendContent_P("</p>");
 
-  // Upload
-  if (path != "/") {
-    output = F("<form><p>Upload MP3 file: <input type=\"file\" multiple=\"true\" name=\"data\" accept=\".mp3\" id=\"fileInput\"><input type=\"button\" value=\"upload\" onclick=\"upload('{folder}'); return false;\"></p>"
+
+  if (strcmp(path, "/")) {
+    // Create folder
+    _server.sendContent_P(
+      "<form onsubmit=\"mkdir(); return false;\">Create new folder: "
+      "<input type=\"text\" name=\"folder\" id=\"folder\">"
+      "<input type=\"button\" value=\"Create\" onclick=\"mkdir(); return false;\"></form>");
+  } else {
+    // Upload
+    _server.sendContent_P("<form><p>Upload MP3 file: <input type=\"file\" multiple=\"true\" name=\"data\" accept=\".mp3\" id=\"fileInput\">");
+    snprintf(output, sizeof(output), 
+      "<input type=\"button\" value=\"upload\" onclick=\"upload('%s'); return false;\"></p>",
+      path);
+    _server.sendContent_P(output);
+    _server.sendContent_P(
       "<div id=\"ulDiv\" style=\"display:none;\"><progress id=\"progressBar\" value=\"0\" max=\"100\" style=\"width:300px;\"></progress>"
-      "<p id=\"ulStatus\"></p></div></form>");
-    output.replace("{folder}", path);
-    _server.sendContent(output);
-    _server.sendContent(F("<div><a href=\"..\">Back to top</a></div><br />"));
-  }
-
-  // create folder
-  if (path == "/") {
-    _server.sendContent(F("<form onsubmit=\"mkdir(); return false;\">Create new folder: <input type=\"text\" name=\"folder\" id=\"folder\"><input type=\"button\" value=\"Create\" onclick=\"mkdir(); return false;\"></form>"));
+      "<p id=\"ulStatus\"></p></div></form>"
+      "<div><a href=\"..\">Back to top</a></div><br />");
   }
 
   // Load file system entries
-  output = F("<div id=\"fs\"><a title=\"Show file system\" href=\"#\" onclick=\"loadFS('{folder}'); return false;\"><span style=\"font-size: 300%\">&#x1f5d8;</span> Show file system</a></div>");
-  output.replace("{folder}", path);
-  _server.sendContent(output);
+  snprintf(output, sizeof(output), 
+    "<div id=\"fs\"><a title=\"Show file system\" href=\"#\" onclick=\"loadFS('%s'); return false;\">"
+    "<span style=\"font-size: 300%%\">&#x1f5d8;</span> Show file system</a></div>",
+    path);
+  _server.sendContent_P(output);
 
-  if (path == "/") {
+  if (strcmp(path, "/")) {
     if (!_SD.exists("/patches.053")) {
-      output = F("<form><p><b>MP3 decoder patch missing</b> (might reduce sound quality) <input type=\"button\" value=\"Download + Install VS1053 patch\" onclick=\"downloadpatch(); return false;\"></p><form>");
-      _server.sendContent(output);
+      _server.sendContent_P("<form><p><b>MP3 decoder patch missing</b> (might reduce sound quality) <input type=\"button\" value=\"Download + Install VS1053 patch\" onclick=\"downloadpatch(); return false;\"></p><form>");
     }
     
-    output = F("<form><p>Version {major}.{minor} <input type=\"button\" value=\"Update Firmware\" onclick=\"ota(); return false;\"></p></form>");
-    output.replace("{major}", String(MAJOR_VERSION));
-    output.replace("{minor}", String(MINOR_VERSION));
-    _server.sendContent(output);
+    snprintf(output, sizeof(output), 
+      "<form><p>Version %d.%d <input type=\"button\" value=\"Update Firmware\" onclick=\"ota(); return false;\"></p></form>",
+      MAJOR_VERSION,
+      MINOR_VERSION);
+    _server.sendContent_P(output);
 
     int hours = _timeClient.getHours();
     int minutes = _timeClient.getMinutes();
     int seconds = _timeClient.getSeconds();
-    char buffer[9];
-    sprintf(buffer, "%02d:%02d:%02d", hours, minutes, seconds);
-
-    output = F("<p>Time: {time}</p>");
-    output.replace("{time}", buffer);
-    _server.sendContent(output);
+    snprintf(output, sizeof(output), "<p>Time: %02d:%02d:%02d</p>", hours, minutes, seconds);
+    _server.sendContent_P(output);
   } else {
-    output = F("<script>loadFS('{folder}')</script>");
-    output.replace("{folder}", path);
-    _server.sendContent(output);
+    snprintf(output, sizeof(output),     
+      "<script>loadFS('%s')</script>",
+      path);
+    _server.sendContent_P(output);
   }
 
   // Dirty client side UI stuff that's too complicated (for me) in C
-  _server.sendContent_P(F("<script>"
+  _server.sendContent_P("<script>"
     "sortDivs('fs');"
     "formatNumbers();"
-    "</script></body></html>"));
+    "</script></body></html>");
 
   _server.sendContent_P("");
 }
 
-void ShelfWeb::renderFS(String path) {
+void ShelfWeb::renderFS(const char *path) {
   _server.setContentLength(CONTENT_LENGTH_UNKNOWN);
   _server.send_P(200, "text/html", "");
 
-  SdFile entry;
-
   SdFile dir;
-  dir.open(path.c_str(), O_READ);
-
+  dir.open(path, O_READ);
   dir.rewind();
+
+  SdFile entry;
 
   // filename can be only 100 characters long
   // TODO encode special characters
-  char filename[101] = { 0 };
+  char filename[101];
 
   char output[512];
 
   while (entry.openNext(&dir, O_READ)) {
-    entry.getName(filename, 100);
+    entry.getName(filename, sizeof(filename));
 
     if (entry.isDir()) {
       snprintf(output, sizeof(output), "<div class=\"folder\" id=\"%s\">&#x1f4c2; ", filename);
@@ -189,12 +188,12 @@ void ShelfWeb::renderFS(String path) {
       _server.sendContent_P(output);
       // Currently only foldernames <= 16 characters can be written onto the rfid
       if (strlen(filename) <= 16) {
-        sprintf(output, "<a href=\"#\" onclick=\"writeRfid('%s');\" title=\"write to card\">&#x1f4be;</a> ", filename);
+        snprintf(output, sizeof(output), "<a href=\"#\" onclick=\"writeRfid('%s');\" title=\"write to card\">&#x1f4be;</a> ", filename);
         _server.sendContent_P(output);
       } else {
         _server.sendContent_P("<span title=\"write to card (only possible for folder names with <= 16 characters!)\" style=\"opacity: 0.5;\">&#x1f4be;</span> ");
       }
-      sprintf(output, "<a href=\"#\" onclick=\"play('%s'); return false;\" title=\"play folder\">&#x25b6;</a></div>", filename);
+      snprintf(output, sizeof(output), "<a href=\"#\" onclick=\"play('%s'); return false;\" title=\"play folder\">&#x25b6;</a></div>", filename);
       _server.sendContent_P(output);
     } else {
       char icon[] = "&#x266b; ";
@@ -206,8 +205,8 @@ void ShelfWeb::renderFS(String path) {
       _server.sendContent_P(output);
       snprintf(output, sizeof(output), "<a href=\"#\" onclick=\"deleteUrl('%s'); return false;\" title=\"delete\">&#x2718;</a>", filename);
       _server.sendContent_P(output);
-      if(Adafruit_VS1053_FilePlayer::isMP3File(filename) && (path != "/")) {
-        sprintf(output, "<a href=\"#\" onclick=\"playFile('%s'); return false;\" title=\"play\">&#x25b6;</a>", filename);
+      if(Adafruit_VS1053_FilePlayer::isMP3File(filename) && !strcmp(path, "/")) {
+        snprintf(output, sizeof(output), "<a href=\"#\" onclick=\"playFile('%s'); return false;\" title=\"play\">&#x25b6;</a>", filename);
         _server.sendContent_P(output);
       }
       _server.sendContent_P("</div>");
@@ -230,10 +229,10 @@ bool ShelfWeb::loadFromSdCard(String path, bool fs) {
 
   if (dataFile.isDir()) {
     if(fs) {
-      renderFS(path);
+      renderFS(path.c_str());
     } else {
       // dataFile.name() will always be "/" for directorys, so we cannot know if we are in the root directory without handing it over
-      renderDirectory(path);
+      renderDirectory(path.c_str());
     }
   } else {
     String dataType = "application/octet-stream";
@@ -263,8 +262,7 @@ void ShelfWeb::handleFileUpload() {
     String filename = upload.filename;
 
     if (!Adafruit_VS1053_FilePlayer::isMP3File((char *)filename.c_str())) {
-      Sprint(F("Not a MP3: "));
-      Sprintln(filename);
+      Sprint(F("Not a MP3: ")); Sprintln(filename);
       return;
     }
 
@@ -273,30 +271,26 @@ void ShelfWeb::handleFileUpload() {
       return;
     }
 
-    if (_SD.exists((char *)filename.c_str())) {
+    if (_SD.exists(filename.c_str())) {
       Sprintln("File " + filename + " already exists. Skipping");
       return;
     }
 
-    _uploadFile.open((char *)filename.c_str(), O_WRITE | O_CREAT);
+    _uploadFile.open(filename.c_str(), O_WRITE | O_CREAT);
     _uploadStart = millis();
     Sprint(F("UPLOAD_FILE_START: "));
     Sprintln(filename);
   } else if (upload.status == UPLOAD_FILE_WRITE) {
     if (_uploadFile.isOpen()) {
       _uploadFile.write(upload.buf, upload.currentSize);
-#ifdef SHELFDEBUG
       Sprint(F("UPLOAD_FILE_WRITE: "));
       Sprintln(upload.currentSize);
-#endif
     }
   } else if (upload.status == UPLOAD_FILE_END) {
     if (_uploadFile.isOpen()) {
       _uploadFile.close();
-      Sprint(F("UPLOAD_FILE_END: "));
-      Sprintln(upload.totalSize);
-      Sprint(F("Took: "));
-      Sprintln(((millis()-_uploadStart)/1000));
+      Sprint(F("UPLOAD_FILE_END: ")); Sprintln(upload.totalSize);
+      Sprint(F("Took: ")); Sprintln(((millis()-_uploadStart)/1000));
     }
   }
 }
@@ -327,10 +321,8 @@ void ShelfWeb::handleDefault() {
     return;
   } else if (_server.method() == HTTP_POST) {
     if (_server.hasArg("newFolder")) {
-      Sprint(F("Creating folder "));
-      Sprintln(_server.arg("newFolder"));
-      _playback.switchFolder("/");
-      _SD.mkdir((char *)_server.arg("newFolder").c_str());
+      Sprint(F("Creating folder ")); Sprintln(_server.arg("newFolder"));
+      _SD.mkdir(_server.arg("newFolder").c_str());
       returnOK();
       return;
     } else if (_server.hasArg("ota")) {
@@ -440,10 +432,11 @@ void ShelfWeb::handleDefault() {
       return;
     } else if (_SD.exists((char *)path.c_str())) {
       if (_server.hasArg("write") && path.length() <= 16) {
-        handleWriteRfid(path);
-        returnOK();
-        return;
-      } else if (_server.hasArg("play") && _playback.switchFolder((char *)path.c_str())) {
+        if (_rfid.startPairing(path.c_str())) {
+          returnOK();
+          return;
+        }
+      } else if (_server.hasArg("play") && _playback.switchFolder(path.c_str())) {
         _playback.startPlayback();
         _playback.playingByCard = false;
         returnOK();
@@ -460,7 +453,7 @@ void ShelfWeb::handleDefault() {
           strcat(folder, "/");
           
           if(_playback.switchFolder(folder)) {
-            _playback.startFilePlayback(folder, file);
+            _playback.startFilePlayback(folderRaw, file);
             _playback.playingByCard = false;
             returnOK();
             return;
@@ -473,15 +466,6 @@ void ShelfWeb::handleDefault() {
   // 404 otherwise
   returnHttpStatus(404, "Not found");
   Sprintln("404: " + path);
-}
-
-void ShelfWeb::handleWriteRfid(String folder) {
-  if (_playback.switchFolder((char *)folder.c_str())) {
-    _rfid.pairing = true;
-    returnOK();
-  } else {
-    returnHttpStatus(404, "Not found");
-  }
 }
 
 void ShelfWeb::work() {

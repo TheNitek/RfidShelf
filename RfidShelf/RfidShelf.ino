@@ -51,7 +51,7 @@ void setup() {
   rfid.begin();
     
   //Initialize the SdCard.
-  if (!SD.begin(SD_CS)) {
+  if (!SD.begin(SD_CS) || !SD.chdir("/")) {
     Sprintln(F("Could not initialize SD card"));
     SD.initErrorHalt();
   }
@@ -66,8 +66,7 @@ void setup() {
     WiFi.softAP("MP3-SHELF", "lacklack");
   }
 
-  Sprint(F("Connected! IP address: "));
-  Sprintln(WiFi.localIP());
+  Sprint(F("Connected! IP address: ")); Sprintln(WiFi.localIP());
 
   if(NTP_ENABLE == 1) {
     timeClient.begin();

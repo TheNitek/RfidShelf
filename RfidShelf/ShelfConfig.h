@@ -79,4 +79,4 @@
     #define PUSHOVER_POWERED_SOUND "climb"
 #endif
 
-#endif
+#endif // ShelfConfig_h

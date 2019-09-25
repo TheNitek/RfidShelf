@@ -17,9 +17,8 @@ class ShelfPlayback {
       {};
     void begin();
     bool switchFolder(const char *folder);
-    void switchStreamUrl(const String);
     void startPlayback();
-    void startFilePlayback(const char* folder, const char* fullpath);
+    void startFilePlayback(const char* folder, const char* file);
     void skipFile();
     void pausePlayback();
     void resumePlayback();
@@ -34,6 +33,7 @@ class ShelfPlayback {
     void setBassAndTreble(uint8_t trebleAmplitude, uint8_t trebleFreqLimit, uint8_t bassAmplitude, uint8_t bassFreqLimit);
     PlaybackState playbackState() {return _playing;};
     String currentFile() {return _currentFile;};
+    SdFile currentFolder() {return _currentFolder;};
     void work();
     bool playingByCard = true;
   private:
@@ -41,6 +41,7 @@ class ShelfPlayback {
     PlaybackState _playing = PLAYBACK_NO;
     Adafruit_VS1053_FilePlayer _musicPlayer;
     SdFat &_SD;
+    SdFile _currentFolder;
     String _currentFile;
     bool patchVS1053();
     bool _nightMode = false;

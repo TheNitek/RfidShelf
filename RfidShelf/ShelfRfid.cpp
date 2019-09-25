@@ -71,12 +71,10 @@ void ShelfRfid::handleRfid() {
     return;
   }
 
-  if (pairing) {
-    char writeFolder[17];
-    SD.vwd()->getName(writeFolder, 17);
-    writeRfidBlock(1, 0, (uint8_t*) writeFolder, 17);
+  if (_pairingFolder[0] != '\0') {
+    writeRfidBlock(1, 0, (uint8_t*) _pairingFolder, 17);
     writeConfigBlock();
-    pairing = false;
+    _pairingFolder[0] = '\0';
   }
 
   // Reset watchdog timer
@@ -117,7 +115,14 @@ void ShelfRfid::handleRfid() {
   _mfrc522.PICC_HaltA();
   // Stop encryption on PCD
   _mfrc522.PCD_StopCrypto1();
+}
 
+bool ShelfRfid::startPairing(const char *folder) {
+  if(strlen(folder) > 16)
+    return false;
+  
+  strcpy(_pairingFolder, folder);
+  return true;
 }
 
 void ShelfRfid::writeConfigBlock() {

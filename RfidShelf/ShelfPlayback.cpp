@@ -56,16 +56,16 @@ void ShelfPlayback::begin() {
 
 
 bool ShelfPlayback::switchFolder(const char *folder) {
-  Sprint(F("Switching folder to "));
-  Sprintln(folder);
+  Sprint(F("Switching folder to ")); Sprintln(folder);
 
   if (!_SD.exists(folder)) {
     Sprintln(F("Folder does not exist"));
     return false;
   }
   stopPlayback();
-  _SD.chdir(folder);
-  _SD.vwd()->rewind();
+  _currentFolder.close();
+  _currentFolder.open(folder);
+  _currentFolder.rewind();
   _currentFile = "";
   return true;
 }
@@ -110,20 +110,17 @@ void ShelfPlayback::startPlayback() {
   // IO takes time, reset watchdog timer so it does not kill us
   ESP.wdtFeed();
   SdFile file;
-  _SD.vwd()->rewind();
-
-  char filenameChar[100];
-  _SD.vwd()->getName(filenameChar, 100);
-  String dirname = "/" + String(filenameChar) + "/";
+  _currentFolder.rewind();
 
   String nextFile = "";
+  char filenameChar[100];
 
-  while (file.openNext(_SD.vwd(), O_READ))
+  while (file.openNext(&_currentFolder, O_READ))
   {
 
-    file.getName(filenameChar, 100);
+    file.getName(filenameChar, sizeof(filenameChar));
     file.close();
-
+  
     if (file.isDir() || !_musicPlayer.isMP3File(filenameChar)) {
       Sprint(F("Ignoring ")); Sprintln(filenameChar);
       continue;
@@ -141,26 +138,29 @@ void ShelfPlayback::startPlayback() {
     startPlayback();
     return;
   }
+ 
+  char folder[100];
+  _currentFolder.getName(folder, sizeof(folder));
 
-  // No _currentFile && no nextFile => Nothing to play!
+   // No _currentFile && no nextFile => Nothing to play!
   if (nextFile == "") {
-    Sprint(F("No mp3 files in ")); Sprintln(dirname);
+    Sprint(F("No mp3 files in ")); Sprintln(folder);
     stopPlayback();
     return;
   }
 
-  startFilePlayback((char *)dirname.c_str(), (char *)nextFile.c_str());
+  startFilePlayback(folder, nextFile.c_str());
 }
 
-void ShelfPlayback::startFilePlayback(const char* folder, const char* nextFile) {
-  Sprint(F("Playing ")); Sprint(folder); Sprintln(nextFile);
+void ShelfPlayback::startFilePlayback(const char *folder, const char *file) {
+  char fullPath[200];
+  snprintf(fullPath, sizeof(fullPath), "/%s/%s", folder, file);
+
+  Sprint(F("Playing ")); Sprintln(fullPath);
 
   _playing = PLAYBACK_FILE;
-  _currentFile = nextFile;
+  _currentFile = file;
   
-  char fullPath[116] = "";
-  strcat(fullPath, folder);
-  strcat(fullPath, nextFile);
   _musicPlayer.startPlayingFile(fullPath);
 
   if (AMP_POWER > 0) {
