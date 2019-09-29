@@ -35,9 +35,7 @@ void ShelfWeb::returnHttpStatus(uint16_t statusCode, const char *msg) {
 
 void ShelfWeb::renderDirectory(const char *path) {
   _server.setContentLength(CONTENT_LENGTH_UNKNOWN);
-  _server.send(200, "text/html", "");
-
-  _server.sendContent_P(
+  _server.send(200, "text/html", 
     F("<html><head><meta charset=\"utf-8\"><script>"
       "function _(el) {return document.getElementById(el);}\n"
       "function b(c) { document.body.innerHTML=c}\n"
@@ -51,8 +49,8 @@ void ShelfWeb::renderDirectory(const char *path) {
       "function errorHandler(event) { _('ulStatus').innerHTML = 'Upload Failed'; }\n"
       "function abortHandler(event) { _('ulStatus').innerHTML = 'Upload Aborted'; }\n"
       "function reload(){ location.reload(); }\n"
-      "function loadFS(url){ajax('GET', url+'?fs=1', function(r){ _('fs').innerHTML=r; sortDivs('fs');});}\n"
-      "function writeRfid(url){var d = new FormData(); d.append('write', 1); ajax('POST', url, reload, d);}\n"
+      "function loadFS(url){ajax('GET', url+'?fs=1', function(r){ renderFS(JSON.parse(r));});}\n"
+      "function writeRfid(url){ if(url.length > 16) {alert('Folder name cannot have more than 16 characters'); return;} var d = new FormData(); d.append('write', 1); ajax('POST', url, reload, d);}\n"
       "function play(url){var d = new FormData(); d.append('play', 1); ajax('POST', url, reload, d);}\n"
       "function playFile(url){var d = new FormData(); d.append('playfile', 1); ajax('POST', url, reload, d);}\n"
       "function rootAction(action){var d = new FormData(); d.append(action, 1); ajax('POST', '/', reload, d);}\n"
@@ -60,9 +58,39 @@ void ShelfWeb::renderDirectory(const char *path) {
       "function mkdir(){var f = _('folder').value; if(f != ''){var d = new FormData(); d.append('newFolder', f); ajax('POST', '/', reload, d);}}\n"
       "function ota(){var d = new FormData(); d.append('ota', 1); ajax('POST', '/', function(){ b('Please wait and do NOT turn off the power!'); location.reload();}, d);}\n"
       "function downloadpatch(){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 1) { document.write('Please wait while downloading patch! When the download was successful the system is automatically restarting.'); } else if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('downloadpatch', 1); xhr.send(formData);}\n"
-      "function formatNumbers(){ var numbers = document.getElementsByClassName('number'); for (var i = 0; i < numbers.length; i++) { numbers[i].innerText = Number(numbers[i].innerText).toLocaleString(); }}\n"
-      "function sortDivs(id) { var parent = _(id); var toSort = parent.childNodes; toSort = Array.prototype.slice.call(toSort, 0); toSort.sort(function (a, b) { if(a.className == b.className) return ('' + a.id).localeCompare(b.id); else if(a.className == 'folder') return -1; else return 1;}); parent.innerHTML = ''; for(var i = 0, l = toSort.length; i < l; i++) { parent.appendChild(toSort[i]); }}\n"
-      "</script><link rel=\"icon\" href=\"data:;base64,iVBORw0KGgo=\"><title>RfidShelf</title><style>body { font-family: Arial, Helvetica; font-size: 150%} #fs {vertical-align: middle;} #fs div:nth-child(even) { background: LightGray; } a { color: #0000EE; text-decoration: none; }</style></head><body>\n"));
+      "function formatBytes(a){if(0==a)return\"0 Bytes\";var c=1024,e=[\"Bytes\",\"KB\",\"MB\",\"GB\"],f=Math.floor(Math.log(a)/Math.log(c));return parseFloat((a/Math.pow(c,f)).toFixed(2))+\" \"+e[f]}\n"
+      "function formatNumbers(){ [].forEach.call(document.getElementsByClassName('number'), function(n){n.innerText = formatBytes(n.innerText); })}\n"
+      "function renderFS(p){ _('fs').innerHTML = ''; p.fs.sort(function (a, b) { if(('size' in a) == ('size' in b)) return ('' + a.name).localeCompare(b.name); else if(!('size' in a)) return -1; else return 1;}); p.fs.forEach(renderFSentry); formatNumbers();}\n"
+      "function renderFSentry(e) { "
+        "if('size' in e){ t = document.importNode(_('fileT').content.querySelector('div'), true); t.innerHTML = t.innerHTML.replace(/\\{filename\\}/g, e.name).replace(/\\{filesize\\}/g, e.size); if(e.name.endsWith('.mp3')){t.classList.add('mp3')} _('fs').appendChild(t);}"
+        "else{ t = document.importNode(_('folderT').content.querySelector('div'), true); t.innerHTML = t.innerHTML.replace(/\\{foldername\\}/g, e.name); _('fs').appendChild(t);}"
+      " }\n"
+      "</script>"
+      "<link rel=\"icon\" href=\"data:;base64,iVBORw0KGgo=\">"
+      "<title>RfidShelf</title>"
+      "<style>"
+      "body { font-family: Arial, Helvetica; font-size: 150%} "
+      "#fs {vertical-align: middle;} #fs div:nth-child(even) { background: LightGray;} "
+      "a { color: #0000EE; text-decoration: none;} "
+      "a.del { color: red;}"
+      ".mp3only { display: none;}"
+      ".mp3 .mp3only { display: inline;}"
+      "</style>"
+      "</head><body>\n"
+      "<template id=\"folderT\">"
+      "<div class=\"folder\">&#x1f4c2; <a href=\"{foldername}/\">{foldername}</a> "
+      "<a href=\"#\" class=\"del\" onclick=\"deleteUrl('{foldername}'); return false;\" title=\"delete\">&#x2718;</a> "
+      "<a href=\"#\" onclick=\"writeRfid('{foldername}');\" title=\"write to card\">&#x1f4be;</a> "
+      "<a href=\"#\" onclick=\"play('{foldername}'); return false;\" title=\"play folder\">&#x25b6;</a></div>"
+      "</template>"
+      "<template id=\"fileT\">"
+      "<div class=\"file\">"
+      "<span class=\"mp3only\">&#x266b; </span>"
+      "<a href=\"{filename}\">{filename}</a> (<span class=\"number\">{filesize}</span>) "
+      "<a href=\"#\" class=\"del\" onclick=\"deleteUrl('{filename}'); return false;\" title=\"delete\">&#x2718;</a> "
+      "<a href=\"#\" class=\"mp3only\" onclick=\"playFile('{filename}'); return false;\" title=\"play\">&#x25b6;</a>"
+      "</template>"
+      ));
 
   char output[512];
 
@@ -81,8 +109,9 @@ void ShelfWeb::renderDirectory(const char *path) {
     } else {
       _server.sendContent_P(" <a href=\"#\" onclick=\"rootAction('pause'); return false;\">&#x23f8;</a>");
     }
-    _server.sendContent_P(" <a href=\"#\" onclick=\"rootAction('stop'); return false;\">&#x23f9;</a>");
-    _server.sendContent_P(" <a href=\"#\" onclick=\"rootAction('skip'); return false;\">&#x23ed;</a></p>");
+    _server.sendContent_P(
+      " <a href=\"#\" onclick=\"rootAction('stop'); return false;\">&#x23f9;</a>"
+      " <a href=\"#\" onclick=\"rootAction('skip'); return false;\">&#x23ed;</a></p>");
   }
 
   _server.sendContent_P("<p>");
@@ -124,7 +153,7 @@ void ShelfWeb::renderDirectory(const char *path) {
   // Load file system entries
   snprintf(output, sizeof(output), 
     "<div id=\"fs\"><a title=\"Show file system\" href=\"#\" onclick=\"loadFS('%s'); return false;\">"
-    "<span style=\"font-size: 300%%\">&#x1f5d8;</span> Show file system</a></div>",
+    "<span style=\"font-size: 300%%\">&#8635;</span> Show file system</a></div>",
     path);
   _server.sendContent_P(output);
 
@@ -144,25 +173,16 @@ void ShelfWeb::renderDirectory(const char *path) {
     int seconds = _timeClient.getSeconds();
     snprintf(output, sizeof(output), "<p>Time: %02d:%02d:%02d</p>", hours, minutes, seconds);
     _server.sendContent_P(output);
-  } else {
-    snprintf(output, sizeof(output),     
-      "<script>loadFS('%s')</script>",
-      path);
-    _server.sendContent_P(output);
   }
-
-  // Dirty client side UI stuff that's too complicated (for me) in C
-  _server.sendContent_P("<script>"
-    "sortDivs('fs');"
-    "formatNumbers();"
-    "</script></body></html>");
-
+  _server.sendContent_P(
+    "<script>loadFS('.')</script>"
+    "</body></html>");
   _server.sendContent_P("");
 }
 
 void ShelfWeb::renderFS(const char *path) {
   _server.setContentLength(CONTENT_LENGTH_UNKNOWN);
-  _server.send_P(200, "text/html", "");
+  _server.send_P(200, "application/json", "{\"fs\":[");
 
   SdFile dir;
   dir.open(path, O_READ);
@@ -170,52 +190,35 @@ void ShelfWeb::renderFS(const char *path) {
 
   SdFile entry;
 
-  // filename can be only 100 characters long
-  // TODO encode special characters
-  char filename[101];
+  char buffer[101];
+  char output[256];
 
-  char output[512];
+  bool first = true;
 
   while (entry.openNext(&dir, O_READ)) {
-    entry.getName(filename, sizeof(filename));
-
-    if (entry.isDir()) {
-      snprintf(output, sizeof(output), "<div class=\"folder\" id=\"%s\">&#x1f4c2; ", filename);
-      _server.sendContent_P(output);
-      snprintf(output, sizeof(output), "<a href=\"%s/\">%s</a> ", filename, filename);
-      _server.sendContent_P(output);
-      snprintf(output, sizeof(output), "<a href=\"#\" onclick=\"deleteUrl('%s'); return false;\" title=\"delete\">&#x2718;</a>", filename);
-      _server.sendContent_P(output);
-      // Currently only foldernames <= 16 characters can be written onto the rfid
-      if (strlen(filename) <= 16) {
-        snprintf(output, sizeof(output), "<a href=\"#\" onclick=\"writeRfid('%s');\" title=\"write to card\">&#x1f4be;</a> ", filename);
-        _server.sendContent_P(output);
-      } else {
-        _server.sendContent_P("<span title=\"write to card (only possible for folder names with <= 16 characters!)\" style=\"opacity: 0.5;\">&#x1f4be;</span> ");
-      }
-      snprintf(output, sizeof(output), "<a href=\"#\" onclick=\"play('%s'); return false;\" title=\"play folder\">&#x25b6;</a></div>", filename);
-      _server.sendContent_P(output);
+    if(first) {
+      first = false;
+      strcpy(output, "{\"name\":\"");
     } else {
-      char icon[] = "&#x266b; ";
-      if (!Adafruit_VS1053_FilePlayer::isMP3File(filename)) {
-        icon[0] = '\0';
-      }
-
-      snprintf(output, sizeof(output), "<div class=\"file\" id=\"%s\">%s<a href=\"%s\">%s</a> (<span class=\"number\">%d</span> bytes) ", filename, icon, filename, filename, entry.fileSize());
-      _server.sendContent_P(output);
-      snprintf(output, sizeof(output), "<a href=\"#\" onclick=\"deleteUrl('%s'); return false;\" title=\"delete\">&#x2718;</a>", filename);
-      _server.sendContent_P(output);
-      if(Adafruit_VS1053_FilePlayer::isMP3File(filename) && (strcmp(path, "/") != 0)) {
-        snprintf(output, sizeof(output), "<a href=\"#\" onclick=\"playFile('%s'); return false;\" title=\"play\">&#x25b6;</a>", filename);
-        _server.sendContent_P(output);
-      }
-      _server.sendContent_P("</div>");
+      strcpy(output, ",{\"name\":\"");
     }
-
+    entry.getName(buffer, sizeof(buffer));
+    // TODO encode special characters
+    strcat(output, buffer);
+    if (entry.isDir()) {
+      strcat(output, "\"");
+    } else {
+      strcat(output, "\",\"size\":");
+      snprintf(buffer, sizeof(buffer), "%lu", (unsigned long) entry.fileSize());
+      strcat(output, buffer);
+    }
     entry.close();
+    strcat(output, "}");
+    _server.sendContent_P(output);
   }
-
+  _server.sendContent_P("]}");
   _server.sendContent_P("");
+
 }
 
 bool ShelfWeb::loadFromSdCard(String path, bool fs) {
@@ -438,10 +441,10 @@ void ShelfWeb::handleDefault() {
       returnOK();
       return;
     } else if (_SD.exists(path.c_str())) {
-      // <= 17 here because leading / is included
+      // <= 17 here because leading "/"" is included
       if (_server.hasArg("write") && path.length() <= 17) {
         const char *target = path.c_str();
-        // Remove leading /
+        // Remove leading "/""
         target++;
         if (_rfid.startPairing(target)) {
           returnOK();
