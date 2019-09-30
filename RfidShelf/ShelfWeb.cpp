@@ -60,11 +60,22 @@ void ShelfWeb::renderDirectory(const char *path) {
       "function downloadpatch(){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 1) { document.write('Please wait while downloading patch! When the download was successful the system is automatically restarting.'); } else if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('downloadpatch', 1); xhr.send(formData);}\n"
       "function formatBytes(a){if(0==a)return\"0 Bytes\";var c=1024,e=[\"Bytes\",\"KB\",\"MB\",\"GB\"],f=Math.floor(Math.log(a)/Math.log(c));return parseFloat((a/Math.pow(c,f)).toFixed(2))+\" \"+e[f]}\n"
       "function formatNumbers(){ [].forEach.call(document.getElementsByClassName('number'), function(n){n.innerText = formatBytes(n.innerText); })}\n"
-      "function renderFS(p){ _('fs').innerHTML = ''; p.fs.sort(function (a, b) { if(('size' in a) == ('size' in b)) return ('' + a.name).localeCompare(b.name); else if(!('size' in a)) return -1; else return 1;}); p.fs.forEach(renderFSentry); formatNumbers();}\n"
-      "function renderFSentry(e) { "
+      "function renderFS(p){ _('fs').innerHTML = ''; if(p.path == '/'){[].forEach.call(document.getElementsByClassName('hiddenNoRoot'),function(e){e.style.display='initial'});} p.fs.sort(sortFS); p.fs.forEach(renderFSentry); formatNumbers();}\n"
+      "function sortFS(a, b){ if(('size' in a) == ('size' in b)) return ('' + a.name).localeCompare(b.name); else if(!('size' in a)) return -1; else return 1;}"
+      "function renderFSentry(e){ "
         "if('size' in e){ t = document.importNode(_('fileT').content.querySelector('div'), true); t.innerHTML = t.innerHTML.replace(/\\{filename\\}/g, e.name).replace(/\\{filesize\\}/g, e.size); if(e.name.endsWith('.mp3')){t.classList.add('mp3')} _('fs').appendChild(t);}"
         "else{ t = document.importNode(_('folderT').content.querySelector('div'), true); t.innerHTML = t.innerHTML.replace(/\\{foldername\\}/g, e.name); _('fs').appendChild(t);}"
       " }\n"
+      "function renderStatus(s){ "
+        "if('pairing' in s){var p=_('pairing'); p.innerHTML=p.innerHTML.replace(/\\{pairingFolder\\}/g, s.pairing); p.style.display='initial';}"
+        "var pb=_('playback');"
+        "if('currentFile' in s){pb.innerHTML = pb.innerHTML.replace(/\\{filename\\}/g, s.currentFile)}"
+        "if(s.playback == 'FILE'){pb.className='playing';}"
+        "if(s.playback == 'PAUSED'){pb.className='paused';}"
+        "var v=_('volume');"
+        "if(s.night){v.className='night';}"
+        "else{v.className='noNight';}"
+      "}"
       "</script>"
       "<link rel=\"icon\" href=\"data:;base64,iVBORw0KGgo=\">"
       "<title>RfidShelf</title>"
@@ -73,8 +84,8 @@ void ShelfWeb::renderDirectory(const char *path) {
       "#fs {vertical-align: middle;} #fs div:nth-child(even) { background: LightGray;} "
       "a { color: #0000EE; text-decoration: none;} "
       "a.del { color: red;}"
-      ".mp3only { display: none;}"
-      ".mp3 .mp3only { display: inline;}"
+      ".mp3only, .hiddenPlaying, .hiddenPaused, .hidden, .hiddenNight, .hiddenNoNight, .hiddenNoRoot, .hiddenRoot { display: none;}"
+      ".mp3 .mp3only, .playing .hiddenPaused, .paused .hiddenPlaying, .night .hiddenNoNight, .noNight .hiddenNight { display: initial;}"
       "</style>"
       "</head><body>\n"
       "<template id=\"folderT\">"
@@ -90,54 +101,78 @@ void ShelfWeb::renderDirectory(const char *path) {
       "<a href=\"#\" class=\"del\" onclick=\"deleteUrl('{filename}'); return false;\" title=\"delete\">&#x2718;</a> "
       "<a href=\"#\" class=\"mp3only\" onclick=\"playFile('{filename}'); return false;\" title=\"play\">&#x25b6;</a>"
       "</template>"
+      "<p style=\"font-weight: bold; display: none;\" id=\"pairing\">Pairing mode active. Place card on shelf to write current configuration for <span style=\"color:red\">/{pairingFolder}</span> onto it</p>"
+      "<p id=\"playback\" class=\"hidden\">Currently playing: <strong>{filename}</strong>"
+      " <a class=\"hiddenPlaying\" href=\"#\" onclick=\"rootAction('resume'); return false;\">&#x25b6;</a>"
+      " <a class=\"hiddenPaused\" href=\"#\" onclick=\"rootAction('pause'); return false;\">&#x23f8;</a>"
+      " <a href=\"#\" onclick=\"rootAction('stop'); return false;\">&#x23f9;</a>"
+      " <a href=\"#\" onclick=\"rootAction('skip'); return false;\">&#x23ed;</a></p>"
+      "<p id=\"volume\">"
+      "Volume:&nbsp;<meter id=\"volumeBar\" value=\"{volume}\" max=\"50\" style=\"width:300px;\">{volume}</meter><br>"
+      "<a title=\"decrease\" href=\"#\" onclick=\"volume('volumeDown'); return false;\">&#x1f509;</a> / "
+      "<a title=\"increase\" href=\"#\" onclick=\"volume('volumeUp'); return false;\">&#x1f50a;</a> "
+      "<a class=\"hiddenNoNight\" href=\"#\" title=\"deactivate night mode\" onclick=\"rootAction('toggleNight'); return false;\">&#x1f31b;</a>"
+      "<a class=\"hiddenNight\" href=\"#\" title=\"activate night mode\" onclick=\"rootAction('toggleNight'); return false;\">&#x1f31e;</a>"
+      "</p>"
+      "<form class=\"hiddenNoRoot\" onsubmit=\"mkdir(); return false;\">Create new folder: "
+      "<input type=\"text\" name=\"folder\" id=\"folder\">"
+      "<input type=\"button\" value=\"Create\" onclick=\"mkdir(); return false;\"></form>"
+      "<script>var status='"
       ));
 
-  char output[512];
+  char output[512] = "{\"playback\":\"";
+  char buffer[16];
 
+  if(_playback.playbackState() == PLAYBACK_FILE) {
+    strcat(output, "FILE\"");
+  } else if(_playback.playbackState() == PLAYBACK_PAUSED) {
+    strcat(output, "PAUSED\"");
+  } else {
+    strcat(output, "NO\"");
+  }
 
   if(_rfid.pairingFolder[0] != '\0') {
-    snprintf(output, sizeof(output), "<p style=\"font-weight: bold\">Pairing mode active. Place card on shelf to write current configuration for <span style=\"color:red\">/%s</span> onto it</p>", _rfid.pairingFolder);
-    _server.sendContent_P(output);
+    strcat(output, ",\"pairing\":\"");
+    strcat(output, _rfid.pairingFolder);
+    strcat(output, "\"");
   }
 
-  // Playback state
   if(_playback.playbackState() != PLAYBACK_NO) {
-    snprintf(output, sizeof(output), "<p>Currently playing: <strong>%s</strong>", _playback.currentFile().c_str());
-    _server.sendContent_P(output);
-    if(_playback.playbackState() == PLAYBACK_PAUSED) {
-      _server.sendContent_P(" <a href=\"#\" onclick=\"rootAction('resume'); return false;\">&#x25b6;</a>");
-    } else {
-      _server.sendContent_P(" <a href=\"#\" onclick=\"rootAction('pause'); return false;\">&#x23f8;</a>");
-    }
-    _server.sendContent_P(
-      " <a href=\"#\" onclick=\"rootAction('stop'); return false;\">&#x23f9;</a>"
-      " <a href=\"#\" onclick=\"rootAction('skip'); return false;\">&#x23ed;</a></p>");
+    strcat(output, ",\"currentFile\":\"");
+    strcat(output, _playback.currentFile().c_str());
+    strcat(output, "\"");
   }
 
-  _server.sendContent_P("<p>");
-  // Volume
-  uint8_t volume = 50 - _playback.volume();
-  snprintf(output, sizeof(output), "Volume:&nbsp;<meter id=\"volumeBar\" value=\"%d\" max=\"50\" style=\"width:300px;\">%d</meter><br>", volume, volume);
-  _server.sendContent_P(output);
-  // Night Mode
-  _server.sendContent_P(
-    "<a title=\"decrease\" href=\"#\" onclick=\"volume('volumeDown'); return false;\">&#x1f509;</a> / "
-    "<a title=\"increase\" href=\"#\" onclick=\"volume('volumeUp'); return false;\">&#x1f50a;</a> ");
-  snprintf(output, sizeof(output), 
-    "<a href=\"#\" title=\"%s night mode\" onclick=\"rootAction('toggleNight'); return false;\">%s</a>",
-    (_playback.isNight() ? F("deactivate") : F("activate")),
-    (_playback.isNight() ? F("&#x1f31b;") : F("&#x1f31e;")));
-  _server.sendContent_P(output);
-  _server.sendContent_P("</p>");
+  strcat(output, ",\"volume\":");
+  snprintf(buffer, sizeof(buffer), "%d", 50 - _playback.volume());
+  strcat(output, buffer);
 
-
-  if (strcmp(path, "/") == 0) {
-    // Create folder
-    _server.sendContent_P(
-      "<form onsubmit=\"mkdir(); return false;\">Create new folder: "
-      "<input type=\"text\" name=\"folder\" id=\"folder\">"
-      "<input type=\"button\" value=\"Create\" onclick=\"mkdir(); return false;\"></form>");
+  if (_SD.exists("/patches.053")) {
+    strcat(output, ",\"patch\":true");
   } else {
+    strcat(output, ",\"patch\":false");
+  }
+
+  if(_playback.isNight()) {
+    strcat(output, ",\"night\":true");
+  } else {
+    strcat(output, ",\"night\":false");
+  }
+
+  strcat(output, ",\"time\":");
+  snprintf(buffer, sizeof(buffer), "%lu", _timeClient.getEpochTime());
+  strcat(output, buffer);
+
+  strcat(output, ",\"version\":");
+  snprintf(buffer, sizeof(buffer), "\"%d.%d\"", MAJOR_VERSION, MINOR_VERSION);
+  strcat(output, buffer);
+
+  _server.sendContent_P(output);
+  _server.sendContent_P(
+    "}'; renderStatus(JSON.parse(status));</script>"
+  );
+
+  if (strcmp(path, "/") != 0) {
     // Upload
     _server.sendContent_P("<form><p>Upload MP3 file: <input type=\"file\" multiple=\"true\" name=\"data\" accept=\".mp3\" id=\"fileInput\">");
     snprintf(output, sizeof(output), 
@@ -150,12 +185,7 @@ void ShelfWeb::renderDirectory(const char *path) {
       "<div><a href=\"..\">Back to top</a></div><br />");
   }
 
-  // Load file system entries
-  snprintf(output, sizeof(output), 
-    "<div id=\"fs\"><a title=\"Show file system\" href=\"#\" onclick=\"loadFS('%s'); return false;\">"
-    "<span style=\"font-size: 300%%\">&#8635;</span> Show file system</a></div>",
-    path);
-  _server.sendContent_P(output);
+  _server.sendContent_P("<div id=\"fs\">Loading ...</div>");
 
   if (strcmp(path, "/") == 0) {
     if (!_SD.exists("/patches.053")) {
@@ -216,7 +246,10 @@ void ShelfWeb::renderFS(const char *path) {
     strcat(output, "}");
     _server.sendContent_P(output);
   }
-  _server.sendContent_P("]}");
+  _server.sendContent_P("],");
+  snprintf(output, sizeof(output), "\"path\":\"%s\"", path);
+  _server.sendContent_P(output);
+  _server.sendContent_P("}");
   _server.sendContent_P("");
 
 }
