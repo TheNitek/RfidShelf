@@ -33,11 +33,12 @@ void ShelfWeb::returnHttpStatus(uint16_t statusCode, const char *msg) {
   _server.send_P(statusCode, "text/plain", msg);
 }
 
-void ShelfWeb::renderDirectory(const char *path) {
-  _server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+void ShelfWeb::renderDirectory() {
   _server.send(200, "text/html", 
-    F("<html><head><meta charset=\"utf-8\"><script>"
-      "function _(el) {return document.getElementById(el);}\n"
+    F("<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\" \"http://www.w3.org/TR/html4/loose.dtd\">"
+      "<html><head><meta charset=\"utf-8\"><script>"
+      "function _(e){return document.getElementById(e);}\n"
+      "function $(q){return Array.from(document.querySelectorAll(q))}\n"
       "function b(c) { document.body.innerHTML=c}\n"
       "function ajax(m, url, cb, p) {var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState == 4) { cb(xhr.responseText); }}; xhr.open(m, url, true); xhr.send(p);}\n"
       "function deleteUrl(url){ if(confirm(\"Delete?\"))ajax('DELETE', url, reload);}\n"
@@ -49,24 +50,32 @@ void ShelfWeb::renderDirectory(const char *path) {
       "function errorHandler(event) { _('ulStatus').innerHTML = 'Upload Failed'; }\n"
       "function abortHandler(event) { _('ulStatus').innerHTML = 'Upload Aborted'; }\n"
       "function reload(){ location.reload(); }\n"
+      "function loadStatus(){ajax('GET', '/?status=1', function(r){ renderStatus(JSON.parse(r));});}\n"
       "function loadFS(url){ajax('GET', url+'?fs=1', function(r){ renderFS(JSON.parse(r));});}\n"
       "function writeRfid(url){ if(url.length > 16) {alert('Folder name cannot have more than 16 characters'); return;} var d = new FormData(); d.append('write', 1); ajax('POST', url, reload, d);}\n"
       "function play(url){var d = new FormData(); d.append('play', 1); ajax('POST', url, reload, d);}\n"
       "function playFile(url){var d = new FormData(); d.append('playfile', 1); ajax('POST', url, reload, d);}\n"
       "function rootAction(action){var d = new FormData(); d.append(action, 1); ajax('POST', '/', reload, d);}\n"
-      "function volume(action){var d = new FormData(); d.append(action, 1); ajax('POST', '/', function(v){_('volumeBar').value=v;}, d);}\n"
+      "function volume(action){var d = new FormData(); d.append(action, 1); ajax('POST', '/', renderVolume, d);}\n"
+      "function renderVolume(v){_('volumeBar').value=v; _('volumeBar').innerHTML=v;}"
       "function mkdir(){var f = _('folder').value; if(f != ''){var d = new FormData(); d.append('newFolder', f); ajax('POST', '/', reload, d);}}\n"
       "function ota(){var d = new FormData(); d.append('ota', 1); ajax('POST', '/', function(){ b('Please wait and do NOT turn off the power!'); location.reload();}, d);}\n"
       "function downloadpatch(){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 1) { document.write('Please wait while downloading patch! When the download was successful the system is automatically restarting.'); } else if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('downloadpatch', 1); xhr.send(formData);}\n"
       "function formatBytes(a){if(0==a)return\"0 Bytes\";var c=1024,e=[\"Bytes\",\"KB\",\"MB\",\"GB\"],f=Math.floor(Math.log(a)/Math.log(c));return parseFloat((a/Math.pow(c,f)).toFixed(2))+\" \"+e[f]}\n"
-      "function formatNumbers(){ [].forEach.call(document.getElementsByClassName('number'), function(n){n.innerText = formatBytes(n.innerText); })}\n"
-      "function renderFS(p){ _('fs').innerHTML = ''; if(p.path == '/'){[].forEach.call(document.getElementsByClassName('hiddenNoRoot'),function(e){e.style.display='initial'});} p.fs.sort(sortFS); p.fs.forEach(renderFSentry); formatNumbers();}\n"
+      "function formatNumbers(){ $('.number').forEach(function(n){n.innerText = formatBytes(n.innerText); })}\n"
+      "function renderFS(p){"
+        "_('fs').innerHTML = '';"
+        "_('uploadForm').innerHTML=_('uploadForm').innerHTML.replace(/{path}/g, p.path);"
+        "if(p.path == '/'){$('.hiddenNoRoot').forEach(function(e){e.style.display='initial'}); $('.hiddenRoot').forEach(function(e){e.style.display='none'});}"
+        "else{$('.hiddenRoot').forEach(function(e){e.style.display='initial'}); $('.hiddenNoRoot').forEach(function(e){e.style.display='none'});}"
+        "p.fs.sort(sortFS); p.fs.forEach(renderFSentry); formatNumbers();}\n"
       "function sortFS(a, b){ if(('size' in a) == ('size' in b)) return ('' + a.name).localeCompare(b.name); else if(!('size' in a)) return -1; else return 1;}"
       "function renderFSentry(e){ "
         "if('size' in e){ t = document.importNode(_('fileT').content.querySelector('div'), true); t.innerHTML = t.innerHTML.replace(/\\{filename\\}/g, e.name).replace(/\\{filesize\\}/g, e.size); if(e.name.endsWith('.mp3')){t.classList.add('mp3')} _('fs').appendChild(t);}"
         "else{ t = document.importNode(_('folderT').content.querySelector('div'), true); t.innerHTML = t.innerHTML.replace(/\\{foldername\\}/g, e.name); _('fs').appendChild(t);}"
       " }\n"
       "function renderStatus(s){ "
+        "renderVolume(s.volume);"
         "if('pairing' in s){var p=_('pairing'); p.innerHTML=p.innerHTML.replace(/\\{pairingFolder\\}/g, s.pairing); p.style.display='initial';}"
         "var pb=_('playback');"
         "if('currentFile' in s){pb.innerHTML = pb.innerHTML.replace(/\\{filename\\}/g, s.currentFile)}"
@@ -75,7 +84,10 @@ void ShelfWeb::renderDirectory(const char *path) {
         "var v=_('volume');"
         "if(s.night){v.className='night';}"
         "else{v.className='noNight';}"
-      "}"
+        "if(s.patch){_('patchForm').style.display='initial'}"
+        "_('firmwareForm').innerHTML = _('firmwareForm').innerHTML.replace(/\\{version\\}/g, s.version);"
+        "_('time').innerHTML=_('time').innerHTML.replace(/\\{time\\}/g, (new Date(s.time * 1000)).toUTCString());"
+      "}\n"
       "</script>"
       "<link rel=\"icon\" href=\"data:;base64,iVBORw0KGgo=\">"
       "<title>RfidShelf</title>"
@@ -99,7 +111,7 @@ void ShelfWeb::renderDirectory(const char *path) {
       "<span class=\"mp3only\">&#x266b; </span>"
       "<a href=\"{filename}\">{filename}</a> (<span class=\"number\">{filesize}</span>) "
       "<a href=\"#\" class=\"del\" onclick=\"deleteUrl('{filename}'); return false;\" title=\"delete\">&#x2718;</a> "
-      "<a href=\"#\" class=\"mp3only\" onclick=\"playFile('{filename}'); return false;\" title=\"play\">&#x25b6;</a>"
+      "<a href=\"#\" class=\"mp3only\" onclick=\"playFile('{filename}'); return false;\" title=\"play\">&#x25b6;</a></div>"
       "</template>"
       "<p style=\"font-weight: bold; display: none;\" id=\"pairing\">Pairing mode active. Place card on shelf to write current configuration for <span style=\"color:red\">/{pairingFolder}</span> onto it</p>"
       "<p id=\"playback\" class=\"hidden\">Currently playing: <strong>{filename}</strong>"
@@ -108,18 +120,31 @@ void ShelfWeb::renderDirectory(const char *path) {
       " <a href=\"#\" onclick=\"rootAction('stop'); return false;\">&#x23f9;</a>"
       " <a href=\"#\" onclick=\"rootAction('skip'); return false;\">&#x23ed;</a></p>"
       "<p id=\"volume\">"
-      "Volume:&nbsp;<meter id=\"volumeBar\" value=\"{volume}\" max=\"50\" style=\"width:300px;\">{volume}</meter><br>"
-      "<a title=\"decrease\" href=\"#\" onclick=\"volume('volumeDown'); return false;\">&#x1f509;</a> / "
-      "<a title=\"increase\" href=\"#\" onclick=\"volume('volumeUp'); return false;\">&#x1f50a;</a> "
-      "<a class=\"hiddenNoNight\" href=\"#\" title=\"deactivate night mode\" onclick=\"rootAction('toggleNight'); return false;\">&#x1f31b;</a>"
-      "<a class=\"hiddenNight\" href=\"#\" title=\"activate night mode\" onclick=\"rootAction('toggleNight'); return false;\">&#x1f31e;</a>"
+        "Volume:&nbsp;<meter id=\"volumeBar\" value=\"0\" max=\"50\" style=\"width:300px;\">0</meter><br>"
+        "<a title=\"decrease\" href=\"#\" onclick=\"volume('volumeDown'); return false;\">&#x1f509;</a> / "
+        "<a title=\"increase\" href=\"#\" onclick=\"volume('volumeUp'); return false;\">&#x1f50a;</a> "
+        "<a class=\"hiddenNoNight\" href=\"#\" title=\"deactivate night mode\" onclick=\"rootAction('toggleNight'); return false;\">&#x1f31b;</a>"
+        "<a class=\"hiddenNight\" href=\"#\" title=\"activate night mode\" onclick=\"rootAction('toggleNight'); return false;\">&#x1f31e;</a>"
       "</p>"
       "<form class=\"hiddenNoRoot\" onsubmit=\"mkdir(); return false;\">Create new folder: "
-      "<input type=\"text\" name=\"folder\" id=\"folder\">"
-      "<input type=\"button\" value=\"Create\" onclick=\"mkdir(); return false;\"></form>"
-      "<script>var status='"
+        "<input type=\"text\" name=\"folder\" id=\"folder\">"
+        "<input type=\"button\" value=\"Create\" onclick=\"mkdir(); return false;\"></form>"
+      "<form class=\"hiddenRoot\" id=\"uploadForm\"><p>Upload MP3 file: <input type=\"file\" multiple=\"true\" name=\"data\" accept=\".mp3\" id=\"fileInput\">"   // Upload
+        "<input type=\"button\" value=\"upload\" onclick=\"upload('{path}'); return false;\"></p>"
+        "<div id=\"ulDiv\" style=\"display:none;\"><progress id=\"progressBar\" value=\"0\" max=\"100\" style=\"width:300px;\"></progress>"
+        "<p id=\"ulStatus\"></p></div></form>"
+      "<p class=\"hiddenRoot\"><a href=\"..\">Back to top</a></p>"
+      "<div id=\"fs\">Loading ...</div>"
+      "<form id=\"patchForm\" class=\"hidden\"><p><b>MP3 decoder patch missing</b> (might reduce sound quality) <input type=\"button\" value=\"Download + Install VS1053 patch\" onclick=\"downloadpatch(); return false;\"></p></form>"
+      "<form id=\"firmwareForm\"><p>Version {version} <input type=\"button\" value=\"Update Firmware\" onclick=\"ota(); return false;\"></p></form>"
+      "<p id=\"time\">Shelf Time: {time}</p>"
+      "<script>loadStatus(); loadFS('.')</script>"
+      "</body></html>"
       ));
+}
 
+
+void ShelfWeb::renderStatus() {
   char output[512] = "{\"playback\":\"";
   char buffer[16];
 
@@ -166,48 +191,9 @@ void ShelfWeb::renderDirectory(const char *path) {
   strcat(output, ",\"version\":");
   snprintf(buffer, sizeof(buffer), "\"%d.%d\"", MAJOR_VERSION, MINOR_VERSION);
   strcat(output, buffer);
+  strcat(output, "}");
 
-  _server.sendContent_P(output);
-  _server.sendContent_P(
-    "}'; renderStatus(JSON.parse(status));</script>"
-  );
-
-  if (strcmp(path, "/") != 0) {
-    // Upload
-    _server.sendContent_P("<form><p>Upload MP3 file: <input type=\"file\" multiple=\"true\" name=\"data\" accept=\".mp3\" id=\"fileInput\">");
-    snprintf(output, sizeof(output), 
-      "<input type=\"button\" value=\"upload\" onclick=\"upload('%s'); return false;\"></p>",
-      path);
-    _server.sendContent_P(output);
-    _server.sendContent_P(
-      "<div id=\"ulDiv\" style=\"display:none;\"><progress id=\"progressBar\" value=\"0\" max=\"100\" style=\"width:300px;\"></progress>"
-      "<p id=\"ulStatus\"></p></div></form>"
-      "<div><a href=\"..\">Back to top</a></div><br />");
-  }
-
-  _server.sendContent_P("<div id=\"fs\">Loading ...</div>");
-
-  if (strcmp(path, "/") == 0) {
-    if (!_SD.exists("/patches.053")) {
-      _server.sendContent_P("<form><p><b>MP3 decoder patch missing</b> (might reduce sound quality) <input type=\"button\" value=\"Download + Install VS1053 patch\" onclick=\"downloadpatch(); return false;\"></p><form>");
-    }
-    
-    snprintf(output, sizeof(output), 
-      "<form><p>Version %d.%d <input type=\"button\" value=\"Update Firmware\" onclick=\"ota(); return false;\"></p></form>",
-      MAJOR_VERSION,
-      MINOR_VERSION);
-    _server.sendContent_P(output);
-
-    int hours = _timeClient.getHours();
-    int minutes = _timeClient.getMinutes();
-    int seconds = _timeClient.getSeconds();
-    snprintf(output, sizeof(output), "<p>Time: %02d:%02d:%02d</p>", hours, minutes, seconds);
-    _server.sendContent_P(output);
-  }
-  _server.sendContent_P(
-    "<script>loadFS('.')</script>"
-    "</body></html>");
-  _server.sendContent_P("");
+  _server.send_P(200, "application/json", output);
 }
 
 void ShelfWeb::renderFS(const char *path) {
@@ -254,8 +240,8 @@ void ShelfWeb::renderFS(const char *path) {
 
 }
 
-bool ShelfWeb::loadFromSdCard(String path, bool fs) {
-  File dataFile = _SD.open(path.c_str());
+bool ShelfWeb::loadFromSdCard(const char *path, bool fs) {
+  File dataFile = _SD.open(path);
 
   if (!dataFile) {
     Sprintln(F("File not open"));
@@ -265,18 +251,12 @@ bool ShelfWeb::loadFromSdCard(String path, bool fs) {
 
   if (dataFile.isDir()) {
     if(fs) {
-      renderFS(path.c_str());
+      renderFS(path);
     } else {
-      // dataFile.name() will always be "/" for directorys, so we cannot know if we are in the root directory without handing it over
-      renderDirectory(path.c_str());
+      renderDirectory();
     }
   } else {
     String dataType = "application/octet-stream";
-
-    if (path.endsWith(".HTM")) dataType = "text/html";
-    else if (path.endsWith(".CSS")) dataType = "text/css";
-    else if (path.endsWith(".JS")) dataType = "application/javascript";
-
     if (_server.streamFile(dataFile, dataType) != dataFile.size()) {
       Sprintln(F("Sent less data than expected!"));
     }
@@ -335,9 +315,13 @@ void ShelfWeb::handleDefault() {
   String path = _server.urlDecode(_server.uri());
   Sprintf(F("Request to: %s\n"), path.c_str());
   if (_server.method() == HTTP_GET) {
-    loadFromSdCard(path, _server.hasArg("fs"));
+    if(_server.hasArg("status")){
+      renderStatus();
+    }else{
+      loadFromSdCard(path.c_str(), _server.hasArg("fs"));
+    }
   } else if (_server.method() == HTTP_DELETE) {
-    if (_server.uri() == "/" || !_SD.exists(path.c_str())) {
+    if (path == "/" || !_SD.exists(path.c_str())) {
       returnHttpStatus(400, "Bad path");
       return;
     }
