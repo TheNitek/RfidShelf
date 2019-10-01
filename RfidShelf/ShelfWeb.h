@@ -33,13 +33,14 @@ class ShelfWeb {
     uint32_t _uploadStart;
     void returnOK();
     void returnHttpStatus(uint16_t statusCode, const char *msg);
-    void renderDirectory();
-    void renderStatus();
-    void renderFS(const char *path);
+    void sendHTML();
+    void sendJsonStatus();
+    void sendJsonFS(const char *path);
     bool loadFromSdCard(const char *path, bool fs);
     void handleWriteRfid(const char *folder);
     void handleFileUpload();
     void handleDefault();
+    void downloadPatch();
 };
 
 #endif // ShelfWeb_h
