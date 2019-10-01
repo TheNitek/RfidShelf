@@ -26,7 +26,7 @@ void ShelfWeb::begin() {
 }
 
 void ShelfWeb::returnOK() {
-  _server.send_P(200, "text/plain", "");
+  _server.send_P(200, "text/plain", NULL);
 }
 
 void ShelfWeb::returnHttpStatus(uint16_t statusCode, const char *msg) {
@@ -66,10 +66,11 @@ void ShelfWeb::sendHTML() {
       "function renderFS(r){"
         "var p = JSON.parse(r);"
         "_('fs').innerHTML = '';"
-        "_('uploadForm').innerHTML=_('uploadForm').innerHTML.replace(/{path}/g, p.path);"
+        "_('uploadForm').innerHTML=_('uploadForm').innerHTML.replace(/\\{path\\}/g, p.path);"
         "if(p.path == '/'){$('.hiddenNoRoot').forEach(function(e){e.style.display='initial'}); $('.hiddenRoot').forEach(function(e){e.style.display='none'});}"
         "else{$('.hiddenRoot').forEach(function(e){e.style.display='initial'}); $('.hiddenNoRoot').forEach(function(e){e.style.display='none'});}"
-        "p.fs.sort(sortFS); p.fs.forEach(renderFSentry); formatNumbers();}\n"
+        "p.fs.sort(sortFS); p.fs.forEach(renderFSentry); formatNumbers();"
+        "$('.file').forEach(function(e){e.innerHTML=e.innerHTML.replace(/\\{path\\}/g, p.path)})}"
       "function sortFS(a, b){ if(('size' in a) == ('size' in b)) return ('' + a.name).localeCompare(b.name); else if(!('size' in a)) return -1; else return 1;}"
       "function renderFSentry(e){ "
         "if('size' in e){ let t = document.importNode(_('fileT').content.querySelector('div'), true); t.innerHTML = t.innerHTML.replace(/\\{filename\\}/g, e.name).replace(/\\{filesize\\}/g, e.size); if(e.name.endsWith('.mp3')){t.classList.add('mp3')} _('fs').appendChild(t);}"
@@ -81,11 +82,12 @@ void ShelfWeb::sendHTML() {
         "else{_('pairing').style.display='none'}"
         "var pb=_('playback');"
         "if('currentFile' in s){t('.currentFile', s.currentFile)}"
-        "if(s.playback == 'FILE'){pb.className='playing';}"
-        "if(s.playback == 'PAUSED'){pb.className='paused';}"
+        "if(s.playback == 'FILE'){pb.className='playing'}"
+        "else if(s.playback == 'PAUSED'){pb.className='paused'}"
+        "else{pb.className='hidden'}"
         "var v=_('volume');"
-        "if(s.night){v.className='night';}"
-        "else{v.className='noNight';}"
+        "if(s.night){v.className='night'}"
+        "else{v.className='noNight'}"
         "_('volumeBar').value=s.volume; _('volumeBar').innerHTML=s.volume;"
         "if(!s.patch){_('patchForm').style.display='initial'}"
         "t('.firmwareVersion', s.version);"
@@ -95,26 +97,26 @@ void ShelfWeb::sendHTML() {
       "<link rel=\"icon\" href=\"data:;base64,iVBORw0KGgo=\">"
       "<title>RfidShelf</title>"
       "<style>"
-      "body { font-family: Arial, Helvetica; font-size: 150%} "
-      "#fs {vertical-align: middle;} #fs div:nth-child(even) { background: LightGray;} "
-      "a { color: #0000EE; text-decoration: none;} "
-      "a.del { color: red;}"
-      ".mp3only, .hiddenPlaying, .hiddenPaused, .hidden, .hiddenNight, .hiddenNoNight, .hiddenNoRoot, .hiddenRoot { display: none;}"
-      ".mp3 .mp3only, .playing .hiddenPaused, .paused .hiddenPlaying, .night .hiddenNoNight, .noNight .hiddenNight { display: initial;}"
+        "body { font-family: Arial, Helvetica;} "
+        "#fs {vertical-align: middle;} #fs div:nth-child(even) { background: LightGray;} "
+        "a { color: #0000EE; text-decoration: none;} "
+        "a.del { color: red;}"
+        ".mp3only, .hiddenPlaying, .hiddenPaused, .hidden, .hiddenNight, .hiddenNoNight, .hiddenNoRoot, .hiddenRoot { display: none;}"
+        ".mp3 .mp3only, .playing .hiddenPaused, .paused .hiddenPlaying, .night .hiddenNoNight, .noNight .hiddenNight { display: initial;}"
       "</style>"
       "</head><body>\n"
       "<template id=\"folderT\">"
-      "<div class=\"folder\">&#x1f4c2; <a href=\"{foldername}/\">{foldername}</a> "
-      "<a href=\"#\" class=\"del\" onclick=\"deleteUrl('{foldername}'); return false;\" title=\"delete\">&#x2718;</a> "
-      "<a href=\"#\" onclick=\"writeRfid('{foldername}');\" title=\"write to card\">&#x1f4be;</a> "
-      "<a href=\"#\" onclick=\"play('{foldername}'); return false;\" title=\"play folder\">&#x25b6;</a></div>"
+        "<div class=\"folder\">&#x1f4c2; <a href=\"#/\" onclick=\"loadFS('{foldername}'); return false;\">{foldername}</a> "
+        "<a href=\"#\" class=\"del\" onclick=\"deleteUrl('{foldername}'); return false;\" title=\"delete\">&#x2718;</a> "
+        "<a href=\"#\" onclick=\"writeRfid('{foldername}');\" title=\"write to card\">&#x1f4be;</a> "
+        "<a href=\"#\" onclick=\"play('{foldername}'); return false;\" title=\"play folder\">&#x25b6;</a></div>"
       "</template>"
       "<template id=\"fileT\">"
-      "<div class=\"file\">"
-      "<span class=\"mp3only\">&#x266b; </span>"
-      "<a href=\"{filename}\">{filename}</a> (<span class=\"number\">{filesize}</span>) "
-      "<a href=\"#\" class=\"del\" onclick=\"deleteUrl('{filename}'); return false;\" title=\"delete\">&#x2718;</a> "
-      "<a href=\"#\" class=\"mp3only\" onclick=\"playFile('{filename}'); return false;\" title=\"play\">&#x25b6;</a></div>"
+        "<div class=\"file\">"
+        "<span class=\"mp3only\">&#x266b; </span>"
+        "<a href=\"{path}/{filename}\">{filename}</a> (<span class=\"number\">{filesize}</span>) "
+        "<a href=\"#\" class=\"del\" onclick=\"deleteUrl('{path}/{filename}'); return false;\" title=\"delete\">&#x2718;</a> "
+        "<a href=\"#\" class=\"mp3only\" onclick=\"playFile('{path}/{filename}'); return false;\" title=\"play\">&#x25b6;</a></div>"
       "</template>"
       "<p style=\"font-weight: bold; display: none;\" id=\"pairing\">Pairing mode active. Place card on shelf to write current configuration for <span class=\"pairingFile\" style=\"color:red\"> </span> onto it</p>"
       "<p id=\"playback\" class=\"hidden\">Currently playing: <strong class=\"currentFile\"> </strong><br>"
@@ -136,7 +138,7 @@ void ShelfWeb::sendHTML() {
         "<input type=\"button\" value=\"upload\" onclick=\"upload('{path}'); return false;\"></p>"
         "<div id=\"ulDiv\" style=\"display:none;\"><progress id=\"progressBar\" value=\"0\" max=\"100\" style=\"width:300px;\"></progress>"
         "<p id=\"ulStatus\"></p></div></form>"
-      "<p class=\"hiddenRoot\"><a href=\"..\">Back to top</a></p>"
+      "<p class=\"hiddenRoot\"><a href=\"#\" onclick=\"loadFS('/'); return false;\">Back to top</a></p>"
       "<div id=\"fs\">Loading ...</div>"
       "<form id=\"patchForm\" class=\"hidden\"><p><b>MP3 decoder patch missing</b> (might reduce sound quality) <input type=\"button\" value=\"Download + Install VS1053 patch\" onclick=\"downloadpatch(); return false;\"></p></form>"
       "<form id=\"firmwareForm\"><p>Version <span class=\"firmwareVersion\"> </span> <input type=\"button\" value=\"Update Firmware\" onclick=\"ota(); return false;\"></p></form>"
@@ -244,7 +246,7 @@ void ShelfWeb::sendJsonFS(const char *path) {
   dir.close();
 }
 
-bool ShelfWeb::loadFromSdCard(const char *path, bool fs) {
+bool ShelfWeb::loadFromSdCard(const char *path) {
   File dataFile = _SD.open(path);
 
   if (!dataFile) {
@@ -254,11 +256,7 @@ bool ShelfWeb::loadFromSdCard(const char *path, bool fs) {
   }
 
   if (dataFile.isDir()) {
-    if(fs) {
-      sendJsonFS(path);
-    } else {
-      sendHTML();
-    }
+    sendJsonFS(path);
   } else {
     String dataType = "application/octet-stream";
     if (_server.streamFile(dataFile, dataType) != dataFile.size()) {
@@ -367,10 +365,15 @@ void ShelfWeb::handleDefault() {
   String path = _server.urlDecode(_server.uri());
   Sprintf(F("Request to: %s\n"), path.c_str());
   if (_server.method() == HTTP_GET) {
-    if(_server.hasArg("status")){
+    if (_server.hasArg("status")) {
       sendJsonStatus();
-    }else{
-      loadFromSdCard(path.c_str(), _server.hasArg("fs"));
+      return;
+    } else if(path == "/" && !_server.hasArg("fs")) {
+      sendHTML();
+      return;
+    } else {
+      loadFromSdCard(path.c_str());
+      return;
     }
   } else if (_server.method() == HTTP_DELETE) {
     if (path == "/" || !_SD.exists(path.c_str())) {

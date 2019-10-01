@@ -36,7 +36,7 @@ class ShelfWeb {
     void sendHTML();
     void sendJsonStatus();
     void sendJsonFS(const char *path);
-    bool loadFromSdCard(const char *path, bool fs);
+    bool loadFromSdCard(const char *path);
     void handleWriteRfid(const char *folder);
     void handleFileUpload();
     void handleDefault();
