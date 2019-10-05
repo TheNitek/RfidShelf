@@ -13,6 +13,7 @@
 #include "ShelfPlayback.h"
 #include "ShelfRfid.h"
 #include "ShelfVersion.h"
+#include "ShelfHtml.h"
 
 class ShelfWeb {
   public:
