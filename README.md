@@ -91,6 +91,10 @@ See [firmware flashing](RfidShelf/installation.md)
 * Instead of cards you can also use those blue key fob Rfid tags, like the one included in most MFRC-522 kits. Maybe you can "implant" it into a teddy or something similar.
 * Neutrik NAUSB-W seems to be a great alternative for the USB port if manage to get it for a fair price at ebay. It fits a round whole and therefore is easier to mount into the shelf.
 
+## Similar Projects
+If the RfidShelf does not fit your needs you might want to have a look here:
+* [TonUINO](https://www.voss.earth/tonuino/) (german)
+
 
 ## Disclaimer
 Everything in this project I did up to my best knowledge. Nevertheless this comes without guarantee. Do not hold me responsible in case something unexpected/undesired happens.
