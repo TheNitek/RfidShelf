@@ -1,7 +1,7 @@
 #include "ShelfWeb.h"
 
 // This sucks - Maybe refactor ShelfWeb to singleton
-ShelfWeb* ShelfWeb::_instance;
+ShelfWeb *ShelfWeb::_instance;
 
 ShelfWeb::ShelfWeb(ShelfPlayback &playback, ShelfRfid &rfid, SdFat &sd, NTPClient &timeClient) : _playback(playback), _rfid(rfid), _SD(sd), _timeClient(timeClient) {
   _instance = this;
@@ -40,7 +40,7 @@ void ShelfWeb::sendHTML() {
 
 void ShelfWeb::sendJsonStatus() {
   char output[512] = "{\"playback\":\"";
-  char buffer[16];
+  char buffer[101];
 
   if(_playback.playbackState() == PLAYBACK_FILE) {
     strcat(output, "FILE\"");
@@ -57,8 +57,9 @@ void ShelfWeb::sendJsonStatus() {
   }
 
   if(_playback.playbackState() != PLAYBACK_NO) {
+    _playback.currentFile(buffer, sizeof(buffer));
     strcat(output, ",\"currentFile\":\"");
-    strcat(output, _playback.currentFile().c_str());
+    strcat(output, buffer);
     strcat(output, "\"");
   }
 

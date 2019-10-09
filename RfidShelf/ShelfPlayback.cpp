@@ -55,7 +55,7 @@ void ShelfPlayback::begin() {
 }
 
 
-bool ShelfPlayback::switchFolder(const char *folder) {
+const bool ShelfPlayback::switchFolder(const char *folder) {
   Sprint(F("Switching folder to ")); Sprintln(folder);
 
   if (!_SD.exists(folder)) {
@@ -66,40 +66,62 @@ bool ShelfPlayback::switchFolder(const char *folder) {
   _currentFolder.close();
   _currentFolder.open(folder);
   _currentFolder.rewind();
-  _currentFile = "";
+  _currentFile[0] = '\0';
   return true;
 }
 
+void ShelfPlayback::currentFolder(char *foldername, size_t size) {
+  _currentFolder.getName(foldername, size);
+}
+
+void ShelfPlayback::currentFile(char *filename, size_t size) {
+  strncpy(filename, _currentFile, size);
+}
+
 void ShelfPlayback::resumePlayback() {
-  if(_playing == PLAYBACK_PAUSED) {
-    _musicPlayer.pausePlaying(false);
-    _playing = PLAYBACK_FILE;
+  if(_playing != PLAYBACK_PAUSED) {
+    return;
   }
+  if (AMP_POWER > 0) {
+    digitalWrite(AMP_POWER, HIGH);
+  }
+  _musicPlayer.pausePlaying(false);
+  _playing = PLAYBACK_FILE;
 }
 
 void ShelfPlayback::pausePlayback() {
-  if(_playing == PLAYBACK_FILE) {
-    _musicPlayer.pausePlaying(true);
-    _playing = PLAYBACK_PAUSED;
-    if(isNight()) {
-      _lastNightActivity = millis();
-    }
+  if(_playing != PLAYBACK_FILE) {
+    return;
+  }
+  if (AMP_POWER > 0) {
+    digitalWrite(AMP_POWER, LOW);
+  }
+  _musicPlayer.pausePlaying(true);
+  _playing = PLAYBACK_PAUSED;
+  if(isNight()) {
+    _lastNightActivity = millis();
+  }
+}
+
+void ShelfPlayback::togglePause() {
+  if(_playing == PLAYBACK_PAUSED) {
+    playingByCard = false;
+    resumePlayback();
+  }else if(_playing != PLAYBACK_NO) {
+    pausePlayback();
   }
 }
 
 void ShelfPlayback::stopPlayback() {
   Sprintln(F("Stopping playback"));
   if(_playing == PLAYBACK_NO) {
-    Sprintln(F("Already stopped"));
     return;
   }
   
   if (AMP_POWER > 0) {
     digitalWrite(AMP_POWER, LOW);
   }
-  if(_playing == PLAYBACK_FILE) {
-    _musicPlayer.stopPlaying();
-  }
+  _musicPlayer.stopPlaying();
   _playing = PLAYBACK_NO;
   if(isNight()) {
     _lastNightActivity = millis();
@@ -112,7 +134,7 @@ void ShelfPlayback::startPlayback() {
   SdFile file;
   _currentFolder.rewind();
 
-  String nextFile = "";
+  char nextFile[100];
   char filenameChar[100];
 
   while (file.openNext(&_currentFolder, O_READ))
@@ -126,46 +148,45 @@ void ShelfPlayback::startPlayback() {
       continue;
     }
 
-    String tmpFile = String(filenameChar);
-    if (_currentFile < tmpFile && (tmpFile < nextFile || nextFile == "")) {
-      nextFile = tmpFile;
+    if (strcmp(_currentFile, filenameChar) < 0 && (strcmp(filenameChar, nextFile) < 0 || strlen(nextFile) == 0)) {
+      strncpy(nextFile, filenameChar, sizeof(nextFile));
     }
   }
 
   // Start folder from the beginning
-  if (nextFile == "" && _currentFile != "") {
-    _currentFile = "";
-    startPlayback();
-    return;
+  if (strlen(nextFile) == 0) {
+    if (strlen(_currentFile) == 0) {
+      // No _currentFile && no nextFile => Nothing to play!
+      Sprintln(F("No mp3 files found"));
+      stopPlayback();
+      return;
+    } else {
+      _currentFile[0] = '\0';
+      startPlayback();
+      return;
+    }
   }
  
   char folder[100];
   _currentFolder.getName(folder, sizeof(folder));
 
-   // No _currentFile && no nextFile => Nothing to play!
-  if (nextFile == "") {
-    Sprint(F("No mp3 files in ")); Sprintln(folder);
-    stopPlayback();
-    return;
-  }
-
-  startFilePlayback(folder, nextFile.c_str());
+  startFilePlayback(folder, nextFile);
 }
 
 void ShelfPlayback::startFilePlayback(const char *folder, const char *file) {
-  char fullPath[200];
+  char fullPath[201];
   snprintf(fullPath, sizeof(fullPath), "/%s/%s", folder, file);
 
   Sprint(F("Playing ")); Sprintln(fullPath);
 
   _playing = PLAYBACK_FILE;
-  _currentFile = file;
-  
-  _musicPlayer.startPlayingFile(fullPath);
+  strncpy(_currentFile, file, sizeof(_currentFile));
 
   if (AMP_POWER > 0) {
     digitalWrite(AMP_POWER, HIGH);
   }
+  
+  _musicPlayer.startPlayingFile(fullPath);
 }
 
 void ShelfPlayback::skipFile() {
@@ -200,7 +221,6 @@ void ShelfPlayback::volumeDown() {
   volume(_volume + 5);
 }
 
-
 void ShelfPlayback::setBassAndTreble(uint8_t trebleAmplitude, uint8_t trebleFreqLimit, uint8_t bassAmplitude, uint8_t bassFreqLimit) {
   uint16_t bassReg = 0;
   bassReg |= trebleAmplitude;
@@ -214,7 +234,7 @@ void ShelfPlayback::setBassAndTreble(uint8_t trebleAmplitude, uint8_t trebleFreq
   _musicPlayer.sciWrite(VS1053_REG_BASS, bassReg);
 }
 
-bool ShelfPlayback::patchVS1053() {
+const bool ShelfPlayback::patchVS1053() {
   Sprintln(F("Installing patch to VS1053"));
 
   SdFile file;
@@ -258,9 +278,8 @@ void ShelfPlayback::work() {
       startPlayback();
     }
     return;
-  }
-
-  if ((_playing == PLAYBACK_NO || _playing == PLAYBACK_PAUSED) && isNight() && (millis() - _lastNightActivity > NIGHT_TIMEOUT)) {
+  // if not playing and timeout => disable night mode
+  } else if (isNight() && (millis() - _lastNightActivity > NIGHT_TIMEOUT)) {
     stopNight();
   }
 }
@@ -271,7 +290,7 @@ void ShelfPlayback::startNight() {
   volume(_volume);
 }
 
-bool ShelfPlayback::isNight() {
+const bool ShelfPlayback::isNight() {
   return _nightMode;
 }
 

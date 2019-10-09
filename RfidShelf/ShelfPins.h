@@ -11,4 +11,8 @@
 
 #define AMP_POWER       D4
 
+#define PAUSE_BTN       D10   // GPIO1 = TX
+#define SKIP_BTN        D9    // GPIO3 = RX
+#define VOLUME          A0
+
 #endif // ShelfPins_h

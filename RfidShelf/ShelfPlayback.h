@@ -16,24 +16,25 @@ class ShelfPlayback {
       _SD(sd)
       {};
     void begin();
-    bool switchFolder(const char *folder);
+    const bool switchFolder(const char *folder);
     void startPlayback();
     void startFilePlayback(const char* folder, const char* file);
     void skipFile();
     void pausePlayback();
     void resumePlayback();
+    void togglePause();
     void stopPlayback();
-    uint8_t volume() {return _volume;};
+    const uint8_t volume() {return _volume;};
     void volume(uint8_t volume);
     void volumeDown();
     void volumeUp();
     void startNight();
-    bool isNight();
+    const bool isNight();
     void stopNight();
     void setBassAndTreble(uint8_t trebleAmplitude, uint8_t trebleFreqLimit, uint8_t bassAmplitude, uint8_t bassFreqLimit);
-    PlaybackState playbackState() {return _playing;};
-    String currentFile() {return _currentFile;};
-    SdFile currentFolder() {return _currentFolder;};
+    const PlaybackState playbackState() {return _playing;};
+    void currentFile(char *name, size_t size);
+    void currentFolder(char *name, size_t size);
     void work();
     bool playingByCard = true;
   private:
@@ -42,8 +43,8 @@ class ShelfPlayback {
     Adafruit_VS1053_FilePlayer _musicPlayer;
     SdFat &_SD;
     SdFile _currentFolder;
-    String _currentFile;
-    bool patchVS1053();
+    char _currentFile[100];
+    const bool patchVS1053();
     bool _nightMode = false;
     // Night mode timeouts NIGHT_TIMEOUT minutes after playback ends, so we need to keep count
     unsigned long _lastNightActivity;

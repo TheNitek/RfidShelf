@@ -23,7 +23,7 @@ class ShelfWeb {
     static void defaultCallback();
     static void fileUploadCallback();
   private:
-    static ShelfWeb* _instance;
+    static ShelfWeb *_instance;
     ShelfPlayback &_playback;
     ShelfRfid &_rfid;
     SdFat &_SD;

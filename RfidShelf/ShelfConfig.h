@@ -46,10 +46,19 @@
 #define NTP_UPDATE_TIME 24*60*60*1000
 
 // -------------------------
+// HARDWARE BUTTONS
+// -------------------------
+// Make sure to disable DEBUG_ENABLE if you enable this
+// Right now this enables volume control via A0 input.
+// Changing volume via cards or web interface will not work anymore!
+//#define BUTTONS_ENABLE
+
+
+// -------------------------
 // DEBUG OUTPUT
 // -------------------------
-#define DEBUG_OUTPUT 1
-#ifdef DEBUG_OUTPUT
+#define DEBUG_ENABLE
+#ifdef DEBUG_ENABLE
     #define Sprintln(a) (Serial.println(a))
     #define Sprint(a) (Serial.print(a))
     #define Sprintf(a, b) (Serial.printf(a, b))
@@ -77,6 +86,10 @@
     #define PUSHOVER_POWERED_NOTIFICATION_TIME 30 * 60 * 1000
     // sound to play for powered notification
     #define PUSHOVER_POWERED_SOUND "climb"
+#endif
+
+#if defined(BUTTONS_ENABLE) && defined(DEBUG_ENABLE)
+  #error "BUTTONS_ENABLE cannot be used with DEBUG_ENABLE"
 #endif
 
 #endif // ShelfConfig_h

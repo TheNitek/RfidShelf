@@ -10,6 +10,10 @@
 #include "ShelfRfid.h"
 #include "ShelfWeb.h"
 
+#ifdef BUTTONS_ENABLE
+#include "ShelfButtons.h"
+#endif
+
 #ifdef PUSHOVER_ENABLE
 #include "ShelfPushover.h"
 #endif
@@ -24,6 +28,9 @@ NTPClient timeClient(ntpUDP, NTP_SERVER, NTP_OFFSET, NTP_UPDATE_TIME);
 ShelfPlayback playback(SD);
 ShelfRfid rfid(playback);
 ShelfWeb webInterface(playback, rfid, SD, timeClient);
+#ifdef BUTTONS_ENABLE
+ShelfButtons buttons(playback);
+#endif
 #ifdef PUSHOVER_ENABLE
 ShelfPushover pushover;
 #endif
@@ -32,7 +39,7 @@ void setup() {
   // Seems to make flashing more reliable
   delay(100);
 
-#ifdef DEBUG_OUTPUT
+#ifdef DEBUG_ENABLE
   Serial.begin(115200);
 #endif
   Sprintln();
@@ -74,10 +81,18 @@ void setup() {
 
   webInterface.begin();
 
+#ifdef BUTTONS_ENABLE
+  buttons.begin();
+#endif
+
   Sprintln(F("Init done"));
 }
 
 void loop() {
+#ifdef BUTTONS_ENABLE
+  buttons.work();
+#endif
+
   playback.work();
 
   rfid.handleRfid();

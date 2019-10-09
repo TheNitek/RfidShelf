@@ -54,17 +54,6 @@ void ShelfRfid::handleRfid() {
   MFRC522::PICC_Type piccType = _mfrc522.PICC_GetType(_mfrc522.uid.sak);
   Sprintln(_mfrc522.PICC_GetTypeName(piccType));
 
-  if (_playback.playbackState() == PLAYBACK_PAUSED &&
-      _mfrc522.uid.uidByte[0] == _lastCardUid[0] &&
-      _mfrc522.uid.uidByte[1] == _lastCardUid[1] &&
-      _mfrc522.uid.uidByte[2] == _lastCardUid[2] &&
-      _mfrc522.uid.uidByte[3] == _lastCardUid[3] ) {
-  _playback.resumePlayback();
-  _mfrc522.PICC_HaltA();
-  return;
-}
-
-
   // Check for compatibility
   if (piccType != MFRC522::PICC_TYPE_MIFARE_1K ) {
     Sprintln(F("Unsupported card."));
@@ -92,7 +81,12 @@ void ShelfRfid::handleRfid() {
       // readBuffer will already contain \0 if the folder name is < 16 chars, but otherwise we need to add it
       readFolder[17] = '\0';
 
-      if (_playback.switchFolder(readFolder)) {
+      char currentFolder[100];
+      _playback.currentFolder(currentFolder, sizeof(currentFolder));
+      if (_playback.playbackState() == PLAYBACK_PAUSED && strcmp(readFolder, currentFolder) == 0) {
+        _playback.resumePlayback();
+        _playback.playingByCard = true;
+      } else if (_playback.switchFolder(readFolder)) {
         uint8_t configBuffer[18];
         if (readRfidBlock(2, 0, configBuffer, sizeof(configBuffer)) && (configBuffer[0] == 137)) {
           if(configBuffer[1] > 0) {
@@ -206,7 +200,7 @@ bool ShelfRfid::readRfidBlock(uint8_t sector, uint8_t relativeBlock, uint8_t *ou
 
 
 void ShelfRfid::print_byte_array(const uint8_t *buffer, const uint8_t  bufferSize) {
-#ifdef DEBUG_OUTPUT
+#ifdef DEBUG_ENABLE
   for (uint8_t i = 0; i < bufferSize; i++) {
     Sprint(buffer[i] < 0x10 ? " 0" : " ");
     // Use Serial.print here because of HEX parameter and ifdef around this
