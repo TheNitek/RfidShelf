@@ -34,7 +34,8 @@ void ShelfWeb::returnHttpStatus(uint16_t statusCode, const char *msg) {
 }
 
 void ShelfWeb::sendHTML() {
-  _server.send(200, "text/html", ShelfHtml::INDEX);
+  _server.sendHeader("Content-Encoding", "gzip");
+  _server.send_P(200, "text/html", ShelfHtml::INDEX, ShelfHtml::INDEX_SIZE);
 }
 
 
