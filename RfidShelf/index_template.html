@@ -2,21 +2,22 @@
 <html><head><meta charset="utf-8"><script>
 function _(e){return document.getElementById(e);}
 function $(q){return Array.from(document.querySelectorAll(q))}
-function b(c){ document.body.innerHTML=c}
+function b(c){document.body.innerHTML=c}
 function t(c,v){$(c).forEach(function(e){e.innerText = v})}
 function ajax(m, url, cb, p) {var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState == 4) { cb(xhr.responseText); }}; xhr.open(m, url, true); xhr.send(p);}
-function deleteUrl(url){ if(confirm("Delete?"))ajax('DELETE', url, reload);}
-function upload(folder){ var fileInput = _('fileInput'); if(fileInput.files.length === 0){ alert('Choose a file first'); return; } var fileTooLong = false; Array.prototype.forEach.call(fileInput.files, function(file) { if (file.name.length > 100) { fileTooLong = true; }}); if (fileTooLong) { alert("File name too long. Files can be max. 100 characters long."); return; } xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 4) { reload(); }};
-var d = new FormData(); for(var i = 0; i < fileInput.files.length; i++) { d.append('data', fileInput.files[i], folder.concat(fileInput.files[i].name)); }; xhr.open('POST', '/');
+function deleteUrl(url){ if(confirm("Delete?"))ajax('DELETE', url, reloadFS);}
+function upload(){ var fileInput = _('fileInput'); if(fileInput.files.length === 0){ alert('Choose a file first'); return; } var fileTooLong = false; Array.prototype.forEach.call(fileInput.files, function(file) { if (file.name.length > 100) { fileTooLong = true; }}); if (fileTooLong) { alert("File name too long. Files can be max. 100 characters long."); return; } xhr = new XMLHttpRequest();
+var d = new FormData(); for(var i = 0; i < fileInput.files.length; i++) { d.append('data', fileInput.files[i], _('uploadForm').dataset.path + fileInput.files[i].name); }; xhr.open('POST', '/');
 xhr.upload.addEventListener('progress', progressHandler, false); xhr.addEventListener('load', completeHandler, false); xhr.addEventListener('error', errorHandler, false); xhr.addEventListener('abort', abortHandler, false); _('ulDiv').style.display = 'block'; xhr.send(d); }
 function progressHandler(event) { var percentage = Math.round((event.loaded / event.total) * 100); _('progressBar').value = percentage; _('ulStatus').innerHTML = percentage + '% (' + Math.ceil((event.loaded/(1024*1024)) * 10)/10 + '/' + Math.ceil((event.total/(1024*1024)) * 10)/10 + 'MB) uploaded'; }
-function completeHandler(event) { _('ulStatus').innerHTML = event.target.responseText; reload(); }
-function errorHandler(event) { _('ulStatus').innerHTML = 'Upload Failed'; }
-function abortHandler(event) { _('ulStatus').innerHTML = 'Upload Aborted'; }
-function reload(){ location.reload(); }
+function completeHandler(event) { _('ulStatus').innerHTML = event.target.responseText; reloadFS(); _('uploadForm').reset(); _('ulStatus').innerText = 'Upload done' }
+function errorHandler(event) { _('ulStatus').innerText = 'Upload Failed'; }
+function abortHandler(event) { _('ulStatus').innerText = 'Upload Aborted'; }
+function reload(){location.reload();}
 function loadStatus(){ajax('GET', '/?status=1', renderStatus)}
 function loadFS(url){ajax('GET', url+'?fs=1', renderFS)}
-function writeRfid(url){ if(url.length > 16) {alert('Folder name cannot have more than 16 characters'); return;} var d = new FormData(); d.append('write', 1); ajax('POST', url, renderStatus, d);}
+function reloadFS(){loadFS(_('fs').dataset.path)};
+function writeRfid(url){if(url.length > 16) {alert('Folder name cannot have more than 16 characters'); return;} var d = new FormData(); d.append('write', 1); ajax('POST', url, renderStatus, d);}
 function play(url){var d = new FormData(); d.append('play', 1); ajax('POST', url, renderStatus, d);}
 function playFile(url){var d = new FormData(); d.append('playfile', 1); ajax('POST', url, renderStatus, d);}
 function rootAction(action){var d = new FormData(); d.append(action, 1); ajax('POST', '/', renderStatus, d);}
@@ -24,15 +25,16 @@ function mkdir(){var f = _('folder').value; if(f != ''){var d = new FormData(); 
 function ota(){var d = new FormData(); d.append('ota', 1); ajax('POST', '/', function(){ b('Please wait and do NOT turn off the power!'); location.reload();}, d);}
 function downloadpatch(){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 1) { document.write('Please wait while downloading patch! When the download was successful the system is automatically restarting.'); } else if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('downloadpatch', 1); xhr.send(formData);}
 function formatBytes(a){if(0==a)return"0 Bytes";var c=1024,e=["Bytes","KB","MB","GB"],f=Math.floor(Math.log(a)/Math.log(c));return parseFloat((a/Math.pow(c,f)).toFixed(2))+" "+e[f]}
-function formatNumbers(){ $('.number').forEach(function(n){n.innerText = formatBytes(n.innerText); })}
+function formatNumbers(){$('.number').forEach(function(n){n.innerText = formatBytes(n.innerText);})}
 function renderFS(r){
  var p = JSON.parse(r);
  _('fs').innerHTML = '';
- _('uploadForm').innerHTML=_('uploadForm').innerHTML.replace(/\{path\}/g, p.path);
- if(p.path == '/'){$('.hiddenNoRoot').forEach(function(e){e.style.display='initial'}); $('.hiddenRoot').forEach(function(e){e.style.display='none'});}
- else{$('.hiddenRoot').forEach(function(e){e.style.display='initial'}); $('.hiddenNoRoot').forEach(function(e){e.style.display='none'});}
+ _('fs').dataset.path = p.path + '/';
+ _('uploadForm').dataset.path=p.path + '/';
  p.fs.sort(sortFS); p.fs.forEach(renderFSentry); formatNumbers();
- $('.file').forEach(function(e){e.innerHTML=e.innerHTML.replace(/\{path\}/g, p.path)})}
+ if(p.path == '/'){$('.hiddenNoRoot').forEach(function(e){e.style.display='initial'}); $('.hiddenRoot').forEach(function(e){e.style.display='none'}); $('.file').forEach(function(e){e.innerHTML=e.innerHTML.replace(/\{path\}/g, '')})}
+ else{$('.hiddenRoot').forEach(function(e){e.style.display='initial'}); $('.hiddenNoRoot').forEach(function(e){e.style.display='none'}); $('.file').forEach(function(e){e.innerHTML=e.innerHTML.replace(/\{path\}/g, p.path)})}
+}
 function sortFS(a, b){ if(('size' in a) == ('size' in b)) return ('' + a.name).localeCompare(b.name); else if(!('size' in a)) return -1; else return 1;}
 function renderFSentry(e){
  if('size' in e){ let t = document.importNode(_('fileT').content.querySelector('div'), true); t.innerHTML = t.innerHTML.replace(/\{filename\}/g, e.name).replace(/\{filesize\}/g, e.size); if(e.name.endsWith('.mp3')){t.classList.add('mp3')} _('fs').appendChild(t);}
@@ -77,8 +79,8 @@ function renderStatus(r){
  <div class="file">
  <span class="mp3only">&#x266b; </span>
  <a href="{path}/{filename}">{filename}</a> (<span class="number">{filesize}</span>) 
- <a href="#" class="del" onclick="deleteUrl('{path}/{filename}'); return false;" title="delete">&#x2718;</a> 
- <a href="#" class="mp3only" onclick="playFile('{path}/{filename}'); return false;" title="play">&#x25b6;</a></div>
+ <a title="delete" href="#" class="del" onclick="deleteUrl('{path}/{filename}'); return false;">&#x2718;</a> 
+ <a title="play" href="#" class="mp3only" onclick="playFile('{path}/{filename}'); return false;">&#x25b6;</a></div>
 </template>
 <p style="font-weight: bold; display: none;" id="pairing">Pairing mode active. Place card on shelf to write current configuration for <span class="pairingFile" style="color:red">&nbsp;</span> onto it</p>
 <p id="playback" class="hidden">Currently playing: <strong class="currentFile">&nbsp;</strong><br>
@@ -90,14 +92,14 @@ function renderStatus(r){
  Volume:&nbsp;<meter id="volumeBar" value="0" max="50" style="width:300px;">0</meter><br>
  <a title="decrease volume" href="#" onclick="rootAction('volumeDown'); return false;">&#x1f509;</a> / 
  <a title="increase volume" href="#" onclick="rootAction('volumeUp'); return false;">&#x1f50a;</a> 
- <a class="hiddenNoNight" href="#" title="deactivate night mode" onclick="rootAction('toggleNight'); return false;">&#x1f31b;</a>
- <a class="hiddenNight" href="#" title="activate night mode" onclick="rootAction('toggleNight'); return false;">&#x1f31e;</a>
+ <a title="deactivate night mode" class="hiddenNoNight" href="#" onclick="rootAction('toggleNight'); return false;">&#x1f31b;</a>
+ <a title="activate night mode" class="hiddenNight" href="#" onclick="rootAction('toggleNight'); return false;">&#x1f31e;</a>
 </p>
 <form class="hiddenNoRoot" onsubmit="mkdir(); return false;">Create new folder: 
  <input type="text" name="folder" id="folder">
- <input type="button" value="Create" onclick="mkdir(); return false;"></form>
-<form class="hiddenRoot" id="uploadForm"><p>Upload MP3 file: <input type="file" multiple="true" name="data" accept=".mp3" id="fileInput">
- <input type="button" value="upload" onclick="upload('{path}'); return false;"></p>
+ <input type="submit" value="Create"></form>
+<form class="hiddenRoot" id="uploadForm" onsubmit="upload(); return false;">
+ <p>Upload MP3 file: <input type="file" multiple="true" name="mp3s" accept=".mp3" id="fileInput"> <input type="submit" value="upload"></p>
  <div id="ulDiv" style="display:none;"><progress id="progressBar" value="0" max="100" style="width:300px;"></progress>
  <p id="ulStatus"></p></div></form>
 <p class="hiddenRoot"><a href="#" onclick="loadFS('/'); return false;">Back to top</a></p>

@@ -235,18 +235,18 @@ void ShelfWeb::handleFileUpload() {
 
     _uploadFile.open(filename.c_str(), O_WRITE | O_CREAT);
     _uploadStart = millis();
-    Sprint(F("UPLOAD_FILE_START: "));
+    Sprint(F("Upload start: "));
     Sprintln(filename);
   } else if (upload.status == UPLOAD_FILE_WRITE) {
     if (_uploadFile.isOpen()) {
       _uploadFile.write(upload.buf, upload.currentSize);
-      Sprint(F("UPLOAD_FILE_WRITE: "));
-      Sprintln(upload.currentSize);
+      //Sprint(F("Upload write: "));
+      //Sprintln(upload.currentSize);
     }
   } else if (upload.status == UPLOAD_FILE_END) {
     if (_uploadFile.isOpen()) {
       _uploadFile.close();
-      Sprint(F("UPLOAD_FILE_END: ")); Sprintln(upload.totalSize);
+      Sprint(F("Upload end: ")); Sprintln(upload.totalSize);
       Sprint(F("Took: ")); Sprintln(((millis()-_uploadStart)/1000));
     }
   }
