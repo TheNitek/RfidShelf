@@ -13,7 +13,7 @@ function completeHandler(event) {_('ulStatus').innerHTML = event.target.response
 function errorHandler(event) {_('ulStatus').innerText = 'Upload Failed';}
 function abortHandler(event) {_('ulStatus').innerText = 'Upload Aborted';}
 function loadStatus(){ajax('GET', '/?status=1', renderStatus)}
-function loadFS(url){ajax('GET', url+'?fs=1', renderFS)}
+function loadFS(url){_('loading').style.display='initial'; ajax('GET', url+'?fs=1', renderFS)}
 function reloadFS(){loadFS(_('fs').dataset.path)};
 function writeRfid(url){if(url.length > 16) {alert('Folder name cannot have more than 16 characters'); return;} var d = new FormData(); d.append('write', 1); ajax('POST', url, renderStatus, d);}
 function play(url){var d = new FormData(); d.append('play', 1); ajax('POST', url, renderStatus, d);}
@@ -32,6 +32,7 @@ function renderFS(r){
  p.fs.sort(sortFS); p.fs.forEach(renderFSentry); formatNumbers();
  if(p.path == '/'){$('.hiddenNoRoot').forEach(function(e){e.style.display='initial'}); $('.hiddenRoot').forEach(function(e){e.style.display='none'}); $('.file').forEach(function(e){e.innerHTML=e.innerHTML.replace(/\{path\}/g, '')})}
  else{$('.hiddenRoot').forEach(function(e){e.style.display='initial'}); $('.hiddenNoRoot').forEach(function(e){e.style.display='none'}); $('.file').forEach(function(e){e.innerHTML=e.innerHTML.replace(/\{path\}/g, p.path)})}
+ _('loading').style.display='none';
 }
 function sortFS(a, b){ if(('size' in a) == ('size' in b)) return ('' + a.name).localeCompare(b.name); else if(!('size' in a)) return -1; else return 1;}
 function renderFSentry(e){
@@ -60,12 +61,15 @@ window.onhashchange = function() {loadFS(location.hash.slice(1))};
 <link rel="icon" href="data:;base64,iVBORw0KGgo=">
 <title>RfidShelf</title>
 <style>
- body { font-family: Arial, Helvetica;}
+ body {font-family: Arial, Helvetica;}
  #fs {vertical-align: middle;} #fs div:nth-child(even) { background: LightGray;}
- a { color: #0000EE; text-decoration: none;}
- a.del { color: red;}
- .mp3only, .hiddenPlaying, .hiddenPaused, .hidden, .hiddenNight, .hiddenNoNight, .hiddenNoRoot, .hiddenRoot { display: none;}
- .mp3 .mp3only, .playing .hiddenPaused, .paused .hiddenPlaying, .night .hiddenNoNight, .noNight .hiddenNight { display: initial;}
+ a {color: #0000EE; text-decoration: none;}
+ a.del {color: red;}
+ .mp3only, .hiddenPlaying, .hiddenPaused, .hidden, .hiddenNight, .hiddenNoNight, .hiddenNoRoot, .hiddenRoot {display: none;}
+ .mp3 .mp3only, .playing .hiddenPaused, .paused .hiddenPlaying, .night .hiddenNoNight, .noNight .hiddenNight {display: initial;}
+ #loading {background: rgba(255, 255, 255, 0.5); position: fixed; height: 100%; width: 100%; display: none;}
+ #spinner {border: 20px solid #f3f3f3; border-top: 20px solid #0000EE; border-radius: 50%; width: 120px; height: 120px; animation: spin 2s linear infinite; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);}
+ @keyframes spin {0% {transform: rotate(0deg);} 50% {transform: rotate(360deg); } 100% {transform: rotate(0deg); }}
 </style>
 </head><body>
 <template id="folderT">
@@ -81,6 +85,7 @@ window.onhashchange = function() {loadFS(location.hash.slice(1))};
  <a title="delete" href="#" class="del" onclick="deleteUrl('{path}/{filename}'); return false;">&#x2718;</a> 
  <a title="play" href="#" class="mp3only" onclick="playFile('{path}/{filename}'); return false;">&#x25b6;</a></div>
 </template>
+<div id="loading"><div id="spinner"></div></div>
 <p style="font-weight: bold; display: none;" id="pairing">Pairing mode active. Place card on shelf to write current configuration for <span class="pairingFile" style="color:red">&nbsp;</span> onto it</p>
 <p id="playback" class="hidden">Currently playing: <strong class="currentFile">&nbsp;</strong><br>
  <a class="hiddenPlaying" href="#" onclick="rootAction('resume'); return false;">&#x25b6;</a>
