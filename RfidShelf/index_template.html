@@ -2,18 +2,16 @@
 <html><head><meta charset="utf-8"><script>
 function _(e){return document.getElementById(e);}
 function $(q){return Array.from(document.querySelectorAll(q))}
-function b(c){document.body.innerHTML=c}
 function t(c,v){$(c).forEach(function(e){e.innerText = v})}
 function ajax(m, url, cb, p) {var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState == 4) { cb(xhr.responseText); }}; xhr.open(m, url, true); xhr.send(p);}
 function deleteUrl(url){ if(confirm("Delete?"))ajax('DELETE', url, reloadFS);}
 function upload(){ var fileInput = _('fileInput'); if(fileInput.files.length === 0){ alert('Choose a file first'); return; } var fileTooLong = false; Array.prototype.forEach.call(fileInput.files, function(file) { if (file.name.length > 100) { fileTooLong = true; }}); if (fileTooLong) { alert("File name too long. Files can be max. 100 characters long."); return; } xhr = new XMLHttpRequest();
 var d = new FormData(); for(var i = 0; i < fileInput.files.length; i++) { d.append('data', fileInput.files[i], _('uploadForm').dataset.path + fileInput.files[i].name); }; xhr.open('POST', '/');
 xhr.upload.addEventListener('progress', progressHandler, false); xhr.addEventListener('load', completeHandler, false); xhr.addEventListener('error', errorHandler, false); xhr.addEventListener('abort', abortHandler, false); _('ulDiv').style.display = 'block'; xhr.send(d); }
-function progressHandler(event) { var percentage = Math.round((event.loaded / event.total) * 100); _('progressBar').value = percentage; _('ulStatus').innerHTML = percentage + '% (' + Math.ceil((event.loaded/(1024*1024)) * 10)/10 + '/' + Math.ceil((event.total/(1024*1024)) * 10)/10 + 'MB) uploaded'; }
-function completeHandler(event) { _('ulStatus').innerHTML = event.target.responseText; reloadFS(); _('uploadForm').reset(); _('ulStatus').innerText = 'Upload done' }
-function errorHandler(event) { _('ulStatus').innerText = 'Upload Failed'; }
-function abortHandler(event) { _('ulStatus').innerText = 'Upload Aborted'; }
-function reload(){location.reload();}
+function progressHandler(event) {var percentage = Math.round((event.loaded / event.total) * 100); _('progressBar').value = percentage; _('ulStatus').innerHTML = percentage + '% (' + Math.ceil((event.loaded/(1024*1024)) * 10)/10 + '/' + Math.ceil((event.total/(1024*1024)) * 10)/10 + 'MB) uploaded'; }
+function completeHandler(event) {_('ulStatus').innerHTML = event.target.responseText; reloadFS(); _('uploadForm').reset(); _('ulStatus').innerText = 'Upload done' }
+function errorHandler(event) {_('ulStatus').innerText = 'Upload Failed';}
+function abortHandler(event) {_('ulStatus').innerText = 'Upload Aborted';}
 function loadStatus(){ajax('GET', '/?status=1', renderStatus)}
 function loadFS(url){ajax('GET', url+'?fs=1', renderFS)}
 function reloadFS(){loadFS(_('fs').dataset.path)};
@@ -21,15 +19,15 @@ function writeRfid(url){if(url.length > 16) {alert('Folder name cannot have more
 function play(url){var d = new FormData(); d.append('play', 1); ajax('POST', url, renderStatus, d);}
 function playFile(url){var d = new FormData(); d.append('playfile', 1); ajax('POST', url, renderStatus, d);}
 function rootAction(action){var d = new FormData(); d.append(action, 1); ajax('POST', '/', renderStatus, d);}
-function mkdir(){var f = _('folder').value; if(f != ''){var d = new FormData(); d.append('newFolder', f); ajax('POST', '/', reload, d);}}
-function ota(){var d = new FormData(); d.append('ota', 1); ajax('POST', '/', function(){ b('Please wait and do NOT turn off the power!'); location.reload();}, d);}
-function downloadpatch(){ var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 1) { document.write('Please wait while downloading patch! When the download was successful the system is automatically restarting.'); } else if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('downloadpatch', 1); xhr.send(formData);}
+function mkdir(){var f = _('folder').value; if(f != ''){var d = new FormData(); d.append('newFolder', f); ajax('POST', '/', function(){reloadFS(); _('mkdir').reset();}, d);}}
+function ota(){var d = new FormData(); d.append('ota', 1); ajax('POST', '/', function(){ document.body.innerHTML='Please wait and do NOT turn off the power!'; location.reload();}, d);}
+function downloadpatch(){var xhr = new XMLHttpRequest(); xhr.onreadystatechange = function() { if (xhr.readyState === 1) { document.write('Please wait while downloading patch! When the download was successful the system is automatically restarting.'); } else if (xhr.readyState === 4) { location.reload(); }}; xhr.open('POST', '/'); var formData = new FormData(); formData.append('downloadpatch', 1); xhr.send(formData);}
 function formatBytes(a){if(0==a)return"0 Bytes";var c=1024,e=["Bytes","KB","MB","GB"],f=Math.floor(Math.log(a)/Math.log(c));return parseFloat((a/Math.pow(c,f)).toFixed(2))+" "+e[f]}
 function formatNumbers(){$('.number').forEach(function(n){n.innerText = formatBytes(n.innerText);})}
 function renderFS(r){
  var p = JSON.parse(r);
- _('fs').innerHTML = '';
- _('fs').dataset.path = p.path + '/';
+ _('fs').innerHTML='';
+ _('fs').dataset.path=p.path;
  _('uploadForm').dataset.path=p.path + '/';
  p.fs.sort(sortFS); p.fs.forEach(renderFSentry); formatNumbers();
  if(p.path == '/'){$('.hiddenNoRoot').forEach(function(e){e.style.display='initial'}); $('.hiddenRoot').forEach(function(e){e.style.display='none'}); $('.file').forEach(function(e){e.innerHTML=e.innerHTML.replace(/\{path\}/g, '')})}
@@ -57,6 +55,7 @@ function renderStatus(r){
  t('.firmwareVersion', s.version);
  t('.shelfTime', (new Date(s.time * 1000)).toUTCString());
 }
+window.onhashchange = function() {loadFS(location.hash.slice(1))};
 </script>
 <link rel="icon" href="data:;base64,iVBORw0KGgo=">
 <title>RfidShelf</title>
@@ -70,7 +69,7 @@ function renderStatus(r){
 </style>
 </head><body>
 <template id="folderT">
- <div class="folder">&#x1f4c2; <a href="#/" onclick="loadFS('{foldername}'); return false;">{foldername}</a> 
+ <div class="folder">&#x1f4c2; <a href="#/{foldername}">{foldername}</a> 
  <a href="#" class="del" onclick="deleteUrl('{foldername}'); return false;" title="delete">&#x2718;</a> 
  <a href="#" onclick="writeRfid('{foldername}'); return false;" title="write to card">&#x1f4be;</a> 
  <a href="#" onclick="play('{foldername}'); return false;" title="play folder">&#x25b6;</a></div>
@@ -93,19 +92,18 @@ function renderStatus(r){
  <a title="decrease volume" href="#" onclick="rootAction('volumeDown'); return false;">&#x1f509;</a> / 
  <a title="increase volume" href="#" onclick="rootAction('volumeUp'); return false;">&#x1f50a;</a> 
  <a title="deactivate night mode" class="hiddenNoNight" href="#" onclick="rootAction('toggleNight'); return false;">&#x1f31b;</a>
- <a title="activate night mode" class="hiddenNight" href="#" onclick="rootAction('toggleNight'); return false;">&#x1f31e;</a>
-</p>
-<form class="hiddenNoRoot" onsubmit="mkdir(); return false;">Create new folder: 
+ <a title="activate night mode" class="hiddenNight" href="#" onclick="rootAction('toggleNight'); return false;">&#x1f31e;</a></p>
+<form id="mkdir" class="hiddenNoRoot" onsubmit="mkdir(); return false;">Create new folder: 
  <input type="text" name="folder" id="folder">
  <input type="submit" value="Create"></form>
 <form class="hiddenRoot" id="uploadForm" onsubmit="upload(); return false;">
  <p>Upload MP3 file: <input type="file" multiple="true" name="mp3s" accept=".mp3" id="fileInput"> <input type="submit" value="upload"></p>
  <div id="ulDiv" style="display:none;"><progress id="progressBar" value="0" max="100" style="width:300px;"></progress>
  <p id="ulStatus"></p></div></form>
-<p class="hiddenRoot"><a href="#" onclick="loadFS('/'); return false;">Back to top</a></p>
+<p class="hiddenRoot"><a href="#/">Back to top</a></p>
 <div id="fs">Loading ...</div>
-<form id="patchForm" class="hidden"><p><b>MP3 decoder patch missing</b> (might reduce sound quality) <input type="button" value="Download + Install VS1053 patch" onclick="downloadpatch(); return false;"></p></form>
-<form id="firmwareForm"><p>Version <span class="firmwareVersion">&nbsp;</span> <input type="button" value="Update Firmware" onclick="ota(); return false;"></p></form>
+<form id="patchForm" class="hidden" onsubmit="downloadpatch(); return false;"><p><b>MP3 decoder patch missing</b> (might reduce sound quality) <input type="submit" value="Download + Install VS1053 patch"></p></form>
+<form id="firmwareForm" onsubmit="ota(); return false;"><p>Version <span class="firmwareVersion">&nbsp;</span> <input type="submit" value="Update Firmware"></p></form>
 <p id="time">Shelf Time: <span class="shelfTime">&nbsp;</span></p>
-<script>loadStatus(); loadFS('.')</script>
+<script>loadStatus(); let anchor=location.hash.slice(1); if(anchor == '') location.hash='/'; else loadFS(anchor);</script>
 </body></html>
