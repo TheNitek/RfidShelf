@@ -1,0 +1,23 @@
+name: CI
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v1
+    - name: Setup Python
+      uses: actions/setup-python@master
+      with:
+        python-version: '3.x'
+    - name: Install PlatformIO
+      run: |
+        python -m pip install --upgrade pip
+        pip install -U platformio
+    - name: Build
+      env:
+        PLATFORMIO_CI_SRC: RfidShelf
+      run: platformio ci --board=nodemcuv2 --project-conf=RfidShelf/platformio.ini
