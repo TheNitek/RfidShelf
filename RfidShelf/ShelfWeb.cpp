@@ -84,6 +84,15 @@ void ShelfWeb::sendJsonStatus() {
   snprintf(buffer, sizeof(buffer), "%lu", _timeClient.getEpochTime());
   strcat(output, buffer);
 
+  strcat(output, ",\"sdfree\":");
+  snprintf(buffer, sizeof(buffer), "%u", (uint32_t)(0.000512*_SD.vol()->freeClusterCount()*_SD.vol()->blocksPerCluster()));
+  strcat(output, buffer);
+
+  strcat(output, ",\"sdsize\":");
+  snprintf(buffer, sizeof(buffer), "%u", (uint32_t)(0.000512*_SD.card()->cardCapacity()));
+  strcat(output, buffer);
+  
+
   strcat(output, ",\"version\":");
   snprintf(buffer, sizeof(buffer), "\"%d.%d\"", MAJOR_VERSION, MINOR_VERSION);
   strcat(output, buffer);
