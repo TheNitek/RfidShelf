@@ -55,13 +55,13 @@ void ShelfRfid::handleRfid() {
   Sprintln(_mfrc522.PICC_GetTypeName(piccType));
 
   // Check for compatibility
-  if (piccType != MFRC522::PICC_TYPE_MIFARE_1K ) {
+  if (piccType != MFRC522::PICC_TYPE_MIFARE_1K && piccType != MFRC522::PICC_TYPE_MIFARE_UL ) {
     Sprintln(F("Unsupported card."));
     return;
   }
 
   if (pairingFolder[0] != '\0') {
-    writeRfidBlock(1, 0, (uint8_t*) pairingFolder, 17);
+    writeRfidBlock(1, 0, (uint8_t*) pairingFolder, strlen(pairingFolder)+1);
     writeConfigBlock();
     pairingFolder[0] = '\0';
   }
@@ -69,6 +69,15 @@ void ShelfRfid::handleRfid() {
   // Reset watchdog timer
   ESP.wdtFeed();
   uint8_t readBuffer[18];
+  /* RFID Layout:
+   * Mifare Classic:
+   * Sector 1, Block 0: Folder
+   * Sector 2, Block 0: Config
+   * 
+   * Mifare Ultra:
+   * Page 4-7: Folder
+   * Page 8-11: Config
+  */
   if (readRfidBlock(1, 0, readBuffer, sizeof(readBuffer))) {
     // Store uid
     memcpy(_lastCardUid, _mfrc522.uid.uidByte, 4 * sizeof(uint8_t) );
@@ -76,14 +85,16 @@ void ShelfRfid::handleRfid() {
     if(readBuffer[0] != '\0') {
       char readFolder[18];
       readFolder[0] = '/';
-      // allthough sizeof(readBuffer) == 18, we only get 16 byte of data
+      // allthough sizeof(readBuffer) == 18, we only get 16 byte of data (2 bytes are CRC)
       memcpy(readFolder + 1 , readBuffer, 16 * sizeof(uint8_t) );
       // readBuffer will already contain \0 if the folder name is < 16 chars, but otherwise we need to add it
       readFolder[17] = '\0';
 
-      char currentFolder[100];
-      _playback.currentFolder(currentFolder, sizeof(currentFolder));
-      if (_playback.playbackState() == PLAYBACK_PAUSED && strcmp(readFolder, currentFolder) == 0) {
+      char currentFolder[101];
+      currentFolder[0] = '/';
+      _playback.currentFolder(currentFolder+1, sizeof(currentFolder)-1);
+      if ((_playback.playbackState() != PLAYBACK_NO) && (strcmp(readFolder, currentFolder) == 0)) {
+        Sprint("Resuming "); Sprintln(currentFolder);
         _playback.resumePlayback();
         _playback.playingByCard = true;
       } else if (_playback.switchFolder(readFolder)) {
@@ -132,32 +143,43 @@ void ShelfRfid::writeConfigBlock() {
   writeRfidBlock(2, 0, configBuffer, configLength);
 }
 
-bool ShelfRfid::writeRfidBlock(uint8_t sector, uint8_t relativeBlock, const uint8_t *newContent, uint8_t contentSize) {
+bool ShelfRfid::writeRfidBlock(const uint8_t sector, const uint8_t relativeBlock, const uint8_t *content, const uint8_t contentSize) {
   uint8_t absoluteBlock = (sector * 4) + relativeBlock;
+  MFRC522::StatusCode status;
+  MFRC522::PICC_Type piccType = _mfrc522.PICC_GetType(_mfrc522.uid.sak);
 
-  // Authenticate using key A
-  Sprintln(F("Authenticating using key A..."));
-  MFRC522::StatusCode status = _mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, absoluteBlock, &_key, &(_mfrc522.uid));
-  if (status != MFRC522::STATUS_OK) {
-    Sprint(F("PCD_Authenticate() failed: "));
-    Sprintln(_mfrc522.GetStatusCodeName(status));
-    return false;
+  if(piccType == MFRC522::PICC_TYPE_MIFARE_1K) {
+      // Authenticate using key A
+    Sprintln(F("Authenticating using key A..."));
+    status = _mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, absoluteBlock, &_key, &(_mfrc522.uid));
+    if (status != MFRC522::STATUS_OK) {
+      Sprint(F("PCD_Authenticate() failed: "));
+      Sprintln(_mfrc522.GetStatusCodeName(status));
+      return false;
+    }
   }
 
-  uint8_t bufferSize = 16;
+  const uint8_t bufferSize = 16;
   byte buffer[bufferSize];
-  if (contentSize < bufferSize) {
-    bufferSize = contentSize;
-  }
-  memcpy(buffer, newContent, bufferSize * sizeof(byte) );
 
-  // Write block
-  Sprint(F("Writing data to block: ")); print_byte_array(newContent, contentSize);
-  status = _mfrc522.MIFARE_Write(absoluteBlock, buffer, 16);
-  if (status != MFRC522::STATUS_OK) {
-    Sprint(F("MIFARE_Write() failed: "));
-    Sprintln(_mfrc522.GetStatusCodeName(status));
-    return false;
+  uint8_t blockSize = 16;
+  if(piccType == MFRC522::PICC_TYPE_MIFARE_UL) {
+    blockSize = 4;
+  }
+
+  // While reading works basically the same for Mifare Classic and Ultra, Ultras need to be written in chunks of 4 bytes instead of 16
+  Sprint(F("Writing data: ")); print_byte_array(content, contentSize);
+  for(uint8_t i = 0; (i < 16/blockSize) && (i*blockSize < contentSize); i++) {
+    // Write block
+    memset(buffer, 0, bufferSize * sizeof(uint8_t));
+    memcpy(buffer, content+(i*blockSize), (((i+1)*blockSize > contentSize) ? (contentSize % blockSize) : blockSize) * sizeof(uint8_t) );
+
+    status = _mfrc522.MIFARE_Write(absoluteBlock + i, buffer, bufferSize);
+    if (status != MFRC522::STATUS_OK) {
+      Sprint(F("MIFARE_Write() failed: "));
+      Sprintln(_mfrc522.GetStatusCodeName(status));
+      return false;
+    }
   }
   return true;
 }
@@ -172,25 +194,26 @@ bool ShelfRfid::readRfidBlock(uint8_t sector, uint8_t relativeBlock, uint8_t *ou
   }
 
   uint8_t absoluteBlock = (sector * 4) + relativeBlock;
+  MFRC522::StatusCode status;
+  MFRC522::PICC_Type piccType = _mfrc522.PICC_GetType(_mfrc522.uid.sak);
 
-  // Authenticate using key A
-  Sprintln(F("Authenticating using key A..."));
-  MFRC522::StatusCode status = (MFRC522::StatusCode) _mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, absoluteBlock, &_key, &(_mfrc522.uid));
-  if (status != MFRC522::STATUS_OK) {
-    Sprint(F("PCD_Authenticate() failed: "));
-    Sprintln(_mfrc522.GetStatusCodeName(status));
-    return false;
+  if(piccType == MFRC522::PICC_TYPE_MIFARE_1K) {
+    // Authenticate using key A
+    Sprintln(F("Authenticating using key A..."));
+    status = _mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, absoluteBlock, &_key, &(_mfrc522.uid));
+    if (status != MFRC522::STATUS_OK) {
+      Sprint(F("PCD_Authenticate() failed: "));
+      Sprintln(_mfrc522.GetStatusCodeName(status));
+      return false;
+    }
   }
 
-  Sprint(F("Reading block "));
-  Sprintln(absoluteBlock);
+  Sprint(F("Reading block ")); Sprint(absoluteBlock); Sprintln(F(":"));
   status = _mfrc522.MIFARE_Read(absoluteBlock, outputBuffer, &bufferSize);
   if (status != MFRC522::STATUS_OK) {
-    Sprint(F("MIFARE_Read() failed: "));
-    Sprintln(_mfrc522.GetStatusCodeName(status));
+    Sprint(F("MIFARE_Read() failed: ")); Sprintln(_mfrc522.GetStatusCodeName(status));
     return false;
   }
-  Sprint(F("Data in block ")); Sprint(absoluteBlock); Sprintln(F(":"));
   print_byte_array(outputBuffer, 16);
   Sprintln();
   Sprintln();

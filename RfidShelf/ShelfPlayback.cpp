@@ -134,8 +134,10 @@ void ShelfPlayback::startPlayback() {
   SdFile file;
   _currentFolder.rewind();
 
-  char nextFile[100];
+  char nextFile[100] = F("");
   char filenameChar[100];
+
+  Sprintln(nextFile);
 
   while (file.openNext(&_currentFolder, O_READ))
   {
@@ -153,6 +155,8 @@ void ShelfPlayback::startPlayback() {
     }
   }
 
+  Sprintln(nextFile);
+
   // Start folder from the beginning
   if (strlen(nextFile) == 0) {
     if (strlen(_currentFile) == 0) {
@@ -167,6 +171,8 @@ void ShelfPlayback::startPlayback() {
     }
   }
  
+  Sprintln(nextFile);
+
   char folder[100];
   _currentFolder.getName(folder, sizeof(folder));
 

@@ -55,8 +55,6 @@ function renderStatus(r){
  if(!s.patch){_('patchForm').style.display='initial'}
  t('.firmwareVersion', s.version);
  t('.shelfTime', (new Date(s.time * 1000)).toUTCString());
- t('#sdfree', s.sdfree);
- t('#sdsize', s.sdsize);
 }
 window.onhashchange = function() {loadFS(location.hash.slice(1))};
 </script>
@@ -109,7 +107,6 @@ window.onhashchange = function() {loadFS(location.hash.slice(1))};
  <p id="ulStatus"></p></div></form>
 <p class="hiddenRoot"><a href="#/">Back to top</a></p>
 <div id="fs">Loading ...</div>
-<p><span id="sdfree"></span>/<span id="sdsize"></span>MB available</p>
 <form id="patchForm" class="hidden" onsubmit="downloadpatch(); return false;"><p><b>MP3 decoder patch missing</b> (might reduce sound quality) <input type="submit" value="Download + Install VS1053 patch"></p></form>
 <form id="firmwareForm" onsubmit="ota(); return false;"><p>Version <span class="firmwareVersion">&nbsp;</span> <input type="submit" value="Update Firmware"></p></form>
 <p id="time">Shelf Time: <span class="shelfTime">&nbsp;</span></p>
