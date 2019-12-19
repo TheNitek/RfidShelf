@@ -6,6 +6,7 @@
 #include <DNSServer.h>
 #include <ESP8266mDNS.h>
 #include <ESP8266httpUpdate.h>
+#include <ESP8266HTTPUpdateServer.h>
 #include <Adafruit_VS1053.h>
 #include <SdFat.h>
 #include <NTPClient.h>
@@ -30,6 +31,7 @@ class ShelfWeb {
     NTPClient &_timeClient;
 	  const char* _dnsname = DNS_NAME;
     ESP8266WebServer _server;
+    ESP8266HTTPUpdateServer _httpUpdater;
     SdFile _uploadFile;
     uint32_t _uploadStart;
     void returnOK();

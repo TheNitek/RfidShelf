@@ -19,6 +19,8 @@ void ShelfWeb::begin() {
   _server.on("/", HTTP_POST, defaultCallback, fileUploadCallback);
   _server.onNotFound(defaultCallback);
 
+  _httpUpdater.setup(&_server, "/update", OTA_USERNAME, OTA_PASSWORD);
+
   _server.begin();
   
   MDNS.begin(_dnsname);

@@ -31,6 +31,10 @@
 // DNS name the shelf try to register itself with your local DNS server
 #define DNS_NAME "rfidshelf"
 
+// credentials for OTA browser update
+#define OTA_USERNAME "shelfadmin"
+#define OTA_PASSWORD "1234567890"
+
 // the update url for the OTA update
 #define UPDATE_URL "https://download.naeveke.de/board/latest.bin"
 
