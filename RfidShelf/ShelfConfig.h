@@ -28,9 +28,6 @@
 // MISC SETTINGS
 // -------------------------
 
-// DNS name the shelf try to register itself with your local DNS server
-#define DNS_NAME "rfidshelf"
-
 //#define ARDUINO_OTA_ENABLE 1
 
 // the update url for the OTA update
