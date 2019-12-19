@@ -21,7 +21,6 @@ void ShelfWeb::begin() {
 
   _server.begin();
   
-  MDNS.begin(_dnsname);
   MDNS.addService("http", "tcp", 80);
 }
 

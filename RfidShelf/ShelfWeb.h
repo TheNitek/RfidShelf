@@ -28,7 +28,6 @@ class ShelfWeb {
     ShelfRfid &_rfid;
     SdFat &_SD;
     NTPClient &_timeClient;
-	  const char* _dnsname = DNS_NAME;
     ESP8266WebServer _server;
     SdFile _uploadFile;
     uint32_t _uploadStart;

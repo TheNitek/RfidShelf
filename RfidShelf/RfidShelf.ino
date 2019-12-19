@@ -5,10 +5,15 @@
 #include <WiFiManager.h>
 #include <SdFat.h>
 #include <WiFiUdp.h>
+#include <ESP8266mDNS.h>
 #include <NTPClient.h>
 #include "ShelfPlayback.h"
 #include "ShelfRfid.h"
 #include "ShelfWeb.h"
+
+#ifdef ARDUINO_OTA_ENABLE
+#include <ArduinoOTA.h>
+#endif
 
 #ifdef BUTTONS_ENABLE
 #include "ShelfButtons.h"
@@ -18,12 +23,15 @@
 #include "ShelfPushover.h"
 #endif
 
+
 WiFiManager wifiManager;
 
 SdFat SD;
 
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, NTP_SERVER, NTP_OFFSET, NTP_UPDATE_TIME);
+
+char hostString[16] = {0};
 
 ShelfPlayback playback(SD);
 ShelfRfid rfid(playback);
@@ -66,6 +74,10 @@ void setup() {
   
   playback.begin();
 
+  sprintf(hostString, "SHELF_%06X", ESP.getChipId());
+  Sprint("Hostname: "); Sprintln(hostString);
+  WiFi.hostname(hostString);
+
   wifiManager.setConfigPortalTimeout(3 * 60);
   if (!wifiManager.autoConnect("MP3-SHELF-SETUP", "lacklack")) {
     Sprintln(F("Setup timed out, starting AP"));
@@ -74,6 +86,16 @@ void setup() {
   }
 
   Sprint(F("Connected! IP address: ")); Sprintln(WiFi.localIP());
+
+  if (!MDNS.begin(hostString)) {
+    Sprintln("Error setting up MDNS responder!");
+  }
+
+#ifdef ARDUINO_OTA_ENABLE
+  // TODO move into EEPROM config
+  ArduinoOTA.setPassword((const char *)"shelfshelf");
+  ArduinoOTA.begin();
+#endif
 
   if(NTP_ENABLE == 1) {
     timeClient.begin();
@@ -85,6 +107,7 @@ void setup() {
   buttons.begin();
 #endif
 
+
   Sprintln(F("Init done"));
 }
 
@@ -92,6 +115,12 @@ void loop() {
 #ifdef BUTTONS_ENABLE
   buttons.work();
 #endif
+
+#ifdef ARDUINO_OTA_ENABLE
+  ArduinoOTA.handle();
+#endif
+
+  MDNS.update();
 
   playback.work();
 
