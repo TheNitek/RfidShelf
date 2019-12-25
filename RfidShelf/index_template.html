@@ -126,10 +126,13 @@
          }
      }
      function ota() {
+         s(_('loading'));
+         var v = _('otaurl').value;
+         if(!v || !v.match(/^http.+\/\//)) v = 1;
          var d = new FormData();
-         d.append('ota', 1);
+         d.append('ota', v);
+         _('spinnerTxt').innerText = 'Please wait and do NOT turn off the power!';
          ajax('POST', '/', function () {
-             document.body.innerHTML = 'Please wait and do NOT turn off the power!';
              location.reload();
          }, d);
      }
@@ -221,12 +224,13 @@
          else {
              pb.className = 'hidden'
          }
-         var v = _('volume');
          if (d.night) {
-             v.className = 'night'
+             s(_('noNight'));
+             h(_('night'));
          }
          else {
-             v.className = 'noNight'
+             h(_('noNight'));
+             s(_('night'));
          }
          _('volumeBar').value = d.volume;
          _('volumeBar').innerHTML = d.volume;
@@ -248,11 +252,12 @@
   font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";
  }
 
- #fs {
-  vertical-align: middle;
+ #fs > div {
+  display: flex;
+  align-items: center;
  }
 
- #fs div:nth-child(even) {
+ #fs > div:nth-child(even) {
   background: LightGray;
  }
 
@@ -261,15 +266,15 @@
   text-decoration: none;
  }
 
- a.del {
-  color: red;
+ .del {
+  background: #ff7272;
  }
 
- .mp3only, .hiddenPlaying, .hiddenPaused, .hidden, .hiddenNight, .hiddenNoNight {
+ .mp3only, .hiddenPlaying, .hiddenPaused, .hidden {
   display: none;
  }
 
- .mp3 .mp3only, .playing .hiddenPaused, .paused .hiddenPlaying, .night .hiddenNoNight, .noNight .hiddenNight {
+ .mp3 .mp3only, .playing .hiddenPaused, .paused .hiddenPlaying {
   display: initial;
  }
 
@@ -280,17 +285,21 @@
   width: 100%;
  }
 
+ #spinner, #spinnerTxt {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+ }
+
  #spinner {
   border: 20px solid #f3f3f3;
   border-top: 20px solid #0000EE;
   border-radius: 50%;
   width: 120px;
   height: 120px;
+  margin: -80px;
   animation: spin 2s linear infinite;
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
  }
 
  @keyframes spin {
@@ -311,6 +320,7 @@
  }
 
  input {
+  font-size: 14px;
   height: 40px;
   vertical-align: middle;
   display: inline-block;
@@ -324,36 +334,57 @@
   transition-property: color,background-color,border;
  }
 
- input[type=submit], .btnLike {
+ input[type=submit], button {
   background: #1e87f0;
   color: #fff;
   line-height: 38px;
-  font-size: 14px;
   padding: 0 15px;
  }
 
- input[type=submit]:hover, .btnLike:hover {
+ input[type=submit]:hover, button:hover {
   background-color: #0f7ae5;
  }
 
+ .folder::before {
+  content: '\1f4c2';
+ }
+
+ .mp3::before {
+  content: '\266b';
+  padding-right: 5px;
+ }
+ 
+ .fl {
+  display: flex;
+ }
+ 
+ .fl_exp {
+  flex: 1;
+ }
 </style>
 </head><body>
 <template id="folderT">
- <div class="folder">&#x1f4c2; <a href="#/{foldername}">{foldername}</a> 
- <a href="#" class="del" onclick="deleteUrl('{foldername}'); return false;" title="delete">&#x2718;</a> 
- <a href="#" onclick="writeRfid('{foldername}'); return false;" title="write to card">&#x1f4be;</a>
- <a href="#" onclick="play('{foldername}'); return false;" title="play folder">&#x25b6;</a></div>
+ <div class="folder">
+  <a class="fl_exp" href="#/{foldername}">{foldername}</a>
+  <div>
+   <button class="del" onclick="deleteUrl('{foldername}');" title="delete">&#x2718;</button>
+   <button onclick="writeRfid('{foldername}');" title="write to card">&#x1f4be;</button>
+   <button onclick="play('{foldername}');" title="play folder">&#x25b6;</button>
+  </div>
+ </div>
 </template>
 
 <template id="fileT">
  <div class="file">
- <span class="mp3only">&#x266b; </span>
- <a href="{path}/{filename}">{filename}</a> (<span class="number">{filesize}</span>) 
- <a title="delete" href="#" class="del" onclick="deleteUrl('{path}/{filename}'); return false;">&#x2718;</a> 
- <a title="play" href="#" class="mp3only" onclick="playFile('{path}/{filename}'); return false;">&#x25b6;</a></div>
+  <div class="fl_exp">
+   <a href="{path}/{filename}">{filename}</a> (<span class="number">{filesize}</span>)
+  </div>
+  <button title="delete" class="del" onclick="deleteUrl('{path}/{filename}');">&#x2718;</button>
+  <button title="play" class="mp3only" onclick="playFile('{path}/{filename}');">&#x25b6;</button>
+ </div>
 </template>
 
-<div id="loading" class="hidden"><div id="spinner"></div></div>
+<div id="loading" class="hidden"><div id="spinner"></div><div id="spinnerTxt"></div></div>
 
 <section style="font-weight: bold;" class="hidden" id="pairing">Pairing mode active. Place card on shelf to write current configuration for <span class="pairingFile" style="color:red">&nbsp;</span> onto it</section>
 
@@ -362,10 +393,10 @@
   Currently playing: <strong class="currentFile">&nbsp;</strong><br>
  </div>
  <div style="float: right">
-  <button class="btnLike hiddenPlaying" onclick="rootAction('resume'); return false;">&#x25b6;</button>
-  <button class="btnLike hiddenPaused" onclick="rootAction('pause'); return false;">&#10073;&#10073;</button>
-  <button class="btnLike" onclick="rootAction('stop'); return false;">&#x25a0;</button>
-  <button class="btnLike" onclick="rootAction('skip'); return false;">&#10097;&#10097;</button>
+  <button class="hiddenPlaying" onclick="rootAction('resume'); return false;">&#x25b6;</button>
+  <button class="hiddenPaused" onclick="rootAction('pause'); return false;">&#10073;&#10073;</button>
+  <button onclick="rootAction('stop'); return false;">&#x25a0;</button>
+  <button onclick="rootAction('skip'); return false;">&#10097;&#10097;</button>
  </div>
 </section>
 
@@ -374,40 +405,41 @@
   Volume:&nbsp;<meter id="volumeBar" value="0" max="50" style="width:300px;">0</meter><br>
  </div>
  <div style="float: right">
-  <button title="decrease volume" class="btnLike" onclick="rootAction('volumeDown'); return false;">-</button>
-  <button title="increase volume" class="btnLike" onclick="rootAction('volumeUp'); return false;">+</button>
-  <button title="deactivate night mode" class="hiddenNoNight" onclick="rootAction('toggleNight'); return false;">&#x1f31b;</button>
-  <button title="activate night mode" class="hiddenNight" onclick="rootAction('toggleNight'); return false;">&#x1f31e;</button>
+  <button title="decrease volume" onclick="rootAction('volumeDown'); return false;">-</button>
+  <button title="increase volume" onclick="rootAction('volumeUp'); return false;">+</button>
+  <button title="deactivate night mode" class="hidden" id="noNight" onclick="rootAction('toggleNight'); return false;">&#x1f31b;</button>
+  <button title="activate night mode" class="hidden" id="night" onclick="rootAction('toggleNight'); return false;">&#x1f31e;</button>
  </div>
 </section>
 
-<section id="noRoot" class="hidden">
- <form id="mkdir" onsubmit="mkdir(); return false;">
-  Create new folder:
-  <div style="display: flex">
-    <input type="text" name="folder" id="folder">
-    <input type="submit" value="Create" style="flex: 1;">
-  </div>
- </form>
-</section>
-
-<section id="root" class="hidden">
- <form id="uploadForm" onsubmit="upload(); return false;">
-  <p>
-   Upload MP3 file:
-   <div style="display: flex">
-    <input type="file" multiple="true" name="mp3s" accept=".mp3" id="fileInput">
-    <input type="submit" value="upload" style="flex: 1;">
-   </div>
-  </p>
-  <div id="ulDiv" class="hidden"><progress id="progressBar" value="0" max="100" style="width:300px;"></progress>
-   <p id="ulStatus"></p></div>
- </form>
- <p><a href="#/">Back to top</a></p>
-</section>
-
 <section id="fsContainer" class="hidden">
+ <h3>SD-Card entries:</h3>
  <div id="fs">File System Loading ...</div>
+ <p><a href="#/">Back to root folder</a></p>
+
+ <div id="noRoot" class="hidden">
+  <form id="mkdir" onsubmit="mkdir(); return false;">
+   Create new folder:
+   <div class="fl">
+    <input type="text" name="folder" id="folder">
+    <input type="submit" value="Create" class="fl_exp">
+   </div>
+  </form>
+ </div>
+
+ <div id="root" class="hidden">
+  <form id="uploadForm" onsubmit="upload(); return false;">
+   <p>
+    Upload MP3 file:
+   <div class="fl">
+    <input type="file" multiple="true" name="mp3s" accept=".mp3" id="fileInput">
+    <input type="submit" value="upload" class="fl_exp">
+   </div>
+   </p>
+   <div id="ulDiv" class="hidden"><progress id="progressBar" value="0" max="100" style="width:300px;"></progress>
+    <p id="ulStatus"></p></div>
+  </form>
+ </div>
 </section>
 
 <section id="patchForm" class="hidden">
@@ -415,7 +447,14 @@
 </section>
 
 <section>
- <form onsubmit="ota(); return false;"><p>Version <span class="firmwareVersion">&nbsp;</span> <input type="submit" value="Update Firmware"></p></form>
+ <form onsubmit="ota(); return false;">
+  <p>Version <span class="firmwareVersion">&nbsp;</span>
+  <div class="fl">
+   <input type="text" id="otaurl" placeholder="https://... or leave empty for maintainer's version">
+   <input type="submit" value="update" class="fl_exp">
+  </div>
+  </p>
+ </form>
 </section>
 
 <section>
