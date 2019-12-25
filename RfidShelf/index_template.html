@@ -170,14 +170,14 @@
          p.fs.forEach(renderFSentry);
          formatNumbers();
          if (p.path === '/') {
-             s(_('noRoot'));
-             h(_('root'));
+             s(_('root'));
+             h(_('noRoot'));
              $('.file').forEach(function (e) {
                  e.innerHTML = e.innerHTML.replace(/\{path\}/g, '')
              })
          } else {
-             h(_('noRoot'));
-             s(_('root'));
+             h(_('root'));
+             s(_('noRoot'));
              $('.file').forEach(function (e) {
                  e.innerHTML = e.innerHTML.replace(/\{path\}/g, p.path)
              })
@@ -259,6 +259,10 @@
 
  #fs > div:nth-child(even) {
   background: LightGray;
+ }
+
+ #fs {
+     background: rgba(250, 250, 250);
  }
 
  a {
@@ -386,7 +390,7 @@
 
 <div id="loading" class="hidden"><div id="spinner"></div><div id="spinnerTxt"></div></div>
 
-<section style="font-weight: bold;" class="hidden" id="pairing">Pairing mode active. Place card on shelf to write current configuration for <span class="pairingFile" style="color:red">&nbsp;</span> onto it</section>
+<section class="hidden" id="pairing"><strong>Pairing mode active. Place card on shelf to write current configuration for <span class="pairingFile" style="color:red">&nbsp;</span> onto it</strong></section>
 
 <section id="playback" class="hidden">
  <div style="float:left;">
@@ -401,7 +405,7 @@
 </section>
 
 <section id="volume">
- <div style="float: left">
+ <div style="float:left">
   Volume:&nbsp;<meter id="volumeBar" value="0" max="50" style="width:300px;">0</meter><br>
  </div>
  <div style="float: right">
@@ -415,9 +419,8 @@
 <section id="fsContainer" class="hidden">
  <h3>SD-Card entries:</h3>
  <div id="fs">File System Loading ...</div>
- <p><a href="#/">Back to root folder</a></p>
 
- <div id="noRoot" class="hidden">
+ <div id="root" class="hidden">
   <form id="mkdir" onsubmit="mkdir(); return false;">
    Create new folder:
    <div class="fl">
@@ -427,7 +430,8 @@
   </form>
  </div>
 
- <div id="root" class="hidden">
+ <div id="noRoot" class="hidden">
+  <p><a href="#/">Back to root folder</a></p>
   <form id="uploadForm" onsubmit="upload(); return false;">
    <p>
     Upload MP3 file:
@@ -443,14 +447,14 @@
 </section>
 
 <section id="patchForm" class="hidden">
- <form onsubmit="downloadpatch(); return false;"><p><b>MP3 decoder patch missing</b> (might reduce sound quality) <input type="submit" value="Download + Install VS1053 patch"></p></form>
+ <form onsubmit="downloadpatch(); return false;"><p><strong>MP3 decoder patch missing</strong> (might reduce sound quality) <input type="submit" value="Download + Install VS1053 patch"></p></form>
 </section>
 
 <section>
  <form onsubmit="ota(); return false;">
   <p>Version <span class="firmwareVersion">&nbsp;</span>
   <div class="fl">
-   <input type="text" id="otaurl" placeholder="https://... or leave empty for maintainer's version">
+   <input type="text" id="otaurl" placeholder="https://raw.githubusercontent.com/TheNitek/RfidShelf/master/RfidShelf/build/latest.bin">
    <input type="submit" value="update" class="fl_exp">
   </div>
   </p>
