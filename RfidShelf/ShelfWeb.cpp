@@ -302,11 +302,11 @@ void ShelfWeb::handleDefault() {
       returnOK();
       return;
     } else if (_server.hasArg("ota")) {
-      Sprintln(F("Starting OTA"));
+      Sprint(F("Starting OTA from ")); Sprintln(_server.arg("ota"));
       std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
       // do not validate certificate
       client->setInsecure();
-      t_httpUpdate_return ret = ESPhttpUpdate.update(*client, UPDATE_URL);
+      t_httpUpdate_return ret = ESPhttpUpdate.update(*client, _server.arg("ota"));
       switch (ret) {
         case HTTP_UPDATE_FAILED:
           Sprintf("HTTP_UPDATE_FAILD Error (%d): ", ESPhttpUpdate.getLastError());
