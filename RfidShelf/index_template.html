@@ -1,6 +1,7 @@
 <!doctype html>
 <html><head>
  <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1">
  <script>
      function _(e) {
          return document.getElementById(e);
@@ -90,12 +91,13 @@
      function reloadFS() {
          loadFS(_('fs').dataset.path)
      }
-     function writeRfid(url) {
+     function writeRfidForm() {
+         var d = new FormData($('#confCardContainer form')[0]);
+         var url = d.get('url');
          if (url.length > 16) {
              alert('Folder name cannot have more than 16 characters');
              return;
          }
-         var d = new FormData();
          d.append('write', 1);
          ajax('POST', url, renderStatus, d);
      }
@@ -240,6 +242,23 @@
          t('.firmwareVersion', d.version);
          t('.shelfTime', (new Date(d.time * 1000)).toUTCString())
      }
+     function confNewCard(t, f) {
+         var cont = _('confCardContainer');
+         if (t) s(cont);
+         else { h(cont); return; }
+         var sel = _('confCardFolder');
+         for(var i = 1; i < sel.options.length; i++) sel.remove(i);
+         var addOpt = function(v) {
+             var o = document.createElement("option");
+             o.text = o.val = v;
+             if(v === f) {
+                 o.selected = true;
+             }
+             sel.add(o);
+         };
+         $('#fs .folder a').forEach(function (e) { addOpt(e.innerText); });
+         _('confCardVolume').value = _('volumeBar').value;
+     }
      window.onhashchange = function () {
          loadFS(location.hash.slice(1))
      };
@@ -262,7 +281,7 @@
  }
 
  #fs {
-     background: rgba(250, 250, 250);
+  background: rgb(250, 250, 250);
  }
 
  a {
@@ -323,7 +342,15 @@
   overflow: hidden;
  }
 
- input {
+ #volume .fl > * {
+  margin-left: 5px;
+ }
+
+ select,
+ input[type=text],
+ input[type=submit],
+ input[type=file],
+ input[type=button] {
   font-size: 14px;
   height: 40px;
   vertical-align: middle;
@@ -338,7 +365,7 @@
   transition-property: color,background-color,border;
  }
 
- input[type=submit], button {
+ input[type=submit], input[type=button], button {
   background: #1e87f0;
   color: #fff;
   line-height: 38px;
@@ -360,19 +387,52 @@
  
  .fl {
   display: flex;
+  align-items: center;
  }
  
  .fl_exp {
   flex: 1;
  }
+
+ #confCardContainer { position: fixed; top: 0; left: 0; bottom: 0; right: 0; background: rgba(229, 229, 229, 0.8); }
+ #confCardContainer form { padding: 10px; border: 1px solid #e5e5e5; max-width: 500px; margin: 30px auto; background: #fafafa; }
+ #confCardContainer form > * { margin-bottom: 10px; display: flex; align-items: center; }
+ #confCardContainer span { width: 150px; }
 </style>
 </head><body>
+<div id="confCardContainer" class="hidden">
+ <form onsubmit="writeRfidForm(); return false;">
+  <h3>Configure new card</h3>
+  <div>
+   <span>Folder:</span>
+   <select id="confCardFolder" name="url" class="fl_exp">
+    <option>-- Please choose a folder --</option>
+   </select>
+  </div>
+  <div>
+   <span>Absolute Volume:</span>
+   <input type="text" id="confCardVolume" name="volume" pattern="\d{1,2}" class="fl_exp">
+  </div>
+  <label>
+   <input type="checkbox" name="repeat" value="1" checked="checked">
+   Repeat
+  </label>
+  <label>
+   <input type="checkbox" name="shuffle" value="1">
+   Shuffle Folder
+  </label>
+  <div>
+   <input type="submit" value="Start pairing">
+   <button style="background: #e5e5e5; color: #050505; margin-left: 10px;" onclick="confNewCard(0); return false;">close</button>
+  </div>
+ </form>
+</div>
 <template id="folderT">
  <div class="folder">
   <a class="fl_exp" href="#/{foldername}">{foldername}</a>
   <div>
    <button class="del" onclick="deleteUrl('{foldername}');" title="delete">&#x2718;</button>
-   <button onclick="writeRfid('{foldername}');" title="write to card">&#x1f4be;</button>
+   <button onclick="confNewCard(1, '{foldername}');" title="write to card">&#x1f4be;</button>
    <button onclick="play('{foldername}');" title="play folder">&#x25b6;</button>
   </div>
  </div>
@@ -393,7 +453,7 @@
 <section class="hidden" id="pairing"><strong>Pairing mode active. Place card on shelf to write current configuration for <span class="pairingFile" style="color:red">&nbsp;</span> onto it</strong></section>
 
 <section id="playback" class="hidden">
- <div style="float:left;">
+ <div style="float:left">
   Currently playing: <strong class="currentFile">&nbsp;</strong><br>
  </div>
  <div style="float: right">
@@ -405,10 +465,9 @@
 </section>
 
 <section id="volume">
- <div style="float:left">
-  Volume:&nbsp;<meter id="volumeBar" value="0" max="50" style="width:300px;">0</meter><br>
- </div>
- <div style="float: right">
+ <div class="fl">
+  Volume:&nbsp;
+  <meter id="volumeBar" value="0" max="50" class="fl_exp">0</meter>
   <button title="decrease volume" onclick="rootAction('volumeDown'); return false;">-</button>
   <button title="increase volume" onclick="rootAction('volumeUp'); return false;">+</button>
   <button title="deactivate night mode" class="hidden" id="noNight" onclick="rootAction('toggleNight'); return false;">&#x1f31b;</button>
@@ -446,6 +505,11 @@
  </div>
 </section>
 
+<section>
+ <input type="button" title="configure new card" onclick="confNewCard(1); return false;" value="Configure new card"/>
+</section>
+
+
 <section id="patchForm" class="hidden">
  <form onsubmit="downloadpatch(); return false;"><p><strong>MP3 decoder patch missing</strong> (might reduce sound quality) <input type="submit" value="Download + Install VS1053 patch"></p></form>
 </section>
@@ -454,7 +518,7 @@
  <form onsubmit="ota(); return false;">
   <p>Version <span class="firmwareVersion">&nbsp;</span>
   <div class="fl">
-   <input type="text" id="otaurl" placeholder="https://raw.githubusercontent.com/TheNitek/RfidShelf/master/RfidShelf/build/latest.bin">
+   <input type="text" id="otaurl" value="https://raw.githubusercontent.com/TheNitek/RfidShelf/master/RfidShelf/build/latest.bin">
    <input type="submit" value="update" class="fl_exp">
   </div>
   </p>
