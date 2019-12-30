@@ -99,7 +99,7 @@
              return;
          }
          d.append('write', 1);
-         ajax('POST', url, renderStatus, d);
+         ajax('POST', url, function(r) { confNewCard(0); renderStatus(r); }, d);
      }
      function play(url) {
          var d = new FormData();

@@ -82,10 +82,12 @@ void setup() {
   if (!wifiManager.autoConnect("MP3-SHELF-SETUP", "lacklack")) {
     Sprintln(F("Setup timed out, starting AP"));
     WiFi.mode(WIFI_AP);
-    WiFi.softAP("MP3-SHELF", "lacklack");
+    Sprintln(WiFi.softAP("MP3-SHELF", "lacklack") ? "Soft-AP is set up" : "Soft-AP setup failed");
   }
 
-  Sprint(F("Connected! IP address: ")); Sprintln(WiFi.localIP());
+  if(WiFi.isConnected()) {
+    Sprint(F("Connected! IP address: ")); Sprintln(WiFi.localIP());
+  }
 
   if (!MDNS.begin(hostString)) {
     Sprintln("Error setting up MDNS responder!");

@@ -50,9 +50,10 @@ void ShelfWeb::sendJsonStatus() {
     strcat(output, "NO\"");
   }
 
-  if(_rfid.pairingFolder[0] != '\0') {
+  if(_rfid.hasActivePairing) {
+    nfcTagObject pairingConfig = _rfid.getPairingConfig();
     strcat(output, ",\"pairing\":\"");
-    strcat(output, _rfid.pairingFolder);
+    strcat(output, pairingConfig.folder);
     strcat(output, "\"");
   }
 
@@ -367,9 +368,12 @@ void ShelfWeb::handleDefault() {
       // <= 17 here because leading "/"" is included
       if (_server.hasArg("write") && path.length() <= 17) {
         const char *target = path.c_str();
+        const uint8_t volume = (uint8_t)_server.arg("volume").toInt();
+        const bool repeat = _server.arg("repeat").equals("1");
+        const bool shuffle = _server.arg("shuffle").equals("1");
         // Remove leading "/""
         target++;
-        if (_rfid.startPairing(target)) {
+        if (_rfid.startPairing(target, volume, repeat, shuffle)) {
           sendJsonStatus();
           return;
         }
