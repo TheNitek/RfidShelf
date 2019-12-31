@@ -71,8 +71,9 @@ void setup() {
     SD.initErrorHalt();
   }
   Sprintln(F("SD ready"));
-  
+
   playback.begin();
+  playback.startFilePlayback("", "ready_before_wifi.mp3");
 
   sprintf(hostString, "SHELF_%06X", ESP.getChipId());
   Sprint("Hostname: "); Sprintln(hostString);
@@ -109,6 +110,7 @@ void setup() {
   buttons.begin();
 #endif
 
+  playback.startFilePlayback("", "ready.mp3");
 
   Sprintln(F("Init done"));
 }

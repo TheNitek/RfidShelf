@@ -96,6 +96,9 @@ void ShelfRfid::handleRfidData() {
   memcpy(_lastCardUid, _mfrc522.uid.uidByte, 4 * sizeof(uint8_t) );
 
   if(readBuffer[0] == '\0') {
+    if(_playback.switchFolder("/")) {
+      _playback.startFilePlayback("", "unknown_card.mp3");
+    }
     return;
   }
 
