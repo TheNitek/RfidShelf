@@ -135,32 +135,30 @@ void ShelfRfid::handleRfidConfig() {
     return;
   }
 
-    if(configBuffer[0] < RFID_CONFIG_VERSION) {
-      // "Upgrade" card
-      Sprintln(F("Found old version, upgrading card..."));
-      myCard.volume = DEFAULT_VOLUME;
-      myCard.repeat = false;
-      myCard.shuffle = false;
-      writeConfigBlock();
-    } else {
-      if(configBuffer[1] > 0) {
-        myCard.volume = configBuffer[2];
-        // check for newer config version
-        if(configBuffer[1] == 2) {
-          // we use same bit for some flags
-          myCard.repeat = (configBuffer[3] & B00000001) > 0;
-          myCard.shuffle = (configBuffer[3] & B00000010) > 0;
-          myCard.stopOnRemove = (configBuffer[3] & B00000100) > 0;
-        } else {
-          myCard.repeat = true;
-          myCard.shuffle = false;
-          myCard.stopOnRemove = true;
-        }
+  myCard.repeat = true;
+  myCard.shuffle = false;
+  myCard.stopOnRemove = true;
+
+  if(configBuffer[0] < RFID_CONFIG_VERSION) {
+    // "Upgrade" card
+    Sprintln(F("Found old version, upgrading card..."));
+    myCard.volume = DEFAULT_VOLUME;
+    writeConfigBlock();
+  } else {
+    if(configBuffer[1] > 0) {
+      myCard.volume = configBuffer[2];
+      // check for newer config version
+      if(configBuffer[1] == 2) {
+        // we use same bit for some flags
+        myCard.repeat = (configBuffer[3] & B00000001) > 0;
+        myCard.shuffle = (configBuffer[3] & B00000010) > 0;
+        myCard.stopOnRemove = (configBuffer[3] & B00000100) > 0;
       }
     }
+  }
 
-    Sprint(F("Setting volume: ")); Sprintln(myCard.volume);
-    _playback.volume(myCard.volume);
+  Sprint(F("Setting volume: ")); Sprintln(myCard.volume);
+  _playback.volume(myCard.volume);
 }
 
 nfcTagObject ShelfRfid::getPairingConfig() {
@@ -202,7 +200,7 @@ void ShelfRfid::writeConfigBlock() {
   configBuffer[0] = RFID_CONFIG_VERSION;
   // Length of config entry without header
   configBuffer[1] = configLength-2;
-  configBuffer[2] = _playback.volume();
+  configBuffer[2] = myCard.volume;
   configBuffer[3] = 0;
   if(myCard.repeat) {
     configBuffer[3] = configBuffer[3] | B00000001;
