@@ -19,7 +19,7 @@ void ShelfRfid::handleRfid() {
   _lastRfidCheck = millis();
 
   // While playing check if the tag is still present
-  if ((_playback.playbackState() == PLAYBACK_FILE) && _playback.playingByCard) {
+  if ((_playback.playbackState() == PLAYBACK_FILE) && _playback.playingByCard && myCard.stopOnRemove) {
 
     // Since wireless communication is voodoo we'll give it a few retrys before killing the music
     for (int i = 0; i < 3; i++) {
@@ -117,6 +117,7 @@ void ShelfRfid::handleRfidData() {
     _playback.playingByCard = true;
   } else if (_playback.switchFolder(myCard.folder)) {
     handleRfidConfig();
+    _playback.setPlaybackOption(myCard.repeat, myCard.shuffle);
     _playback.startPlayback();
     _playback.playingByCard = true;
   }
@@ -141,9 +142,17 @@ void ShelfRfid::handleRfidConfig() {
     } else {
       if(configBuffer[1] > 0) {
         myCard.volume = configBuffer[2];
-        // we use same bit for some flags
-        myCard.repeat = (configBuffer[3] & B00000001) > 0;
-        myCard.shuffle = (configBuffer[3] & B00000010) > 0;
+        // check for newer config version
+        if(configBuffer[1] == 2) {
+          // we use same bit for some flags
+          myCard.repeat = (configBuffer[3] & B00000001) > 0;
+          myCard.shuffle = (configBuffer[3] & B00000010) > 0;
+          myCard.stopOnRemove = (configBuffer[3] & B00000100) > 0;
+        } else {
+          myCard.repeat = true;
+          myCard.shuffle = false;
+          myCard.stopOnRemove = true;
+        }
       }
     }
 
@@ -155,7 +164,7 @@ nfcTagObject ShelfRfid::getPairingConfig() {
   return myCard;
 }
 
-bool ShelfRfid::startPairing(const char *folder, uint8_t volume, bool repeat, bool shuffle) {
+bool ShelfRfid::startPairing(const char *folder, uint8_t volume, bool repeat, bool shuffle, bool stopOnRemove) {
   if(strlen(folder) > 16)
     return false;
   
@@ -163,6 +172,7 @@ bool ShelfRfid::startPairing(const char *folder, uint8_t volume, bool repeat, bo
   myCard.volume = volume;
   myCard.repeat = repeat;
   myCard.shuffle = shuffle;
+  myCard.stopOnRemove = stopOnRemove;
 
   Sprintln(F("Pairing mode enabled"));
   dumpCurrentCard();
@@ -177,6 +187,7 @@ void ShelfRfid::dumpCurrentCard() {
   Sprint(F("  volume: ")); Sprintln(myCard.volume);
   Sprint(F("  repeat: ")); Sprintln(myCard.repeat);
   Sprint(F("  shuffle: ")); Sprintln(myCard.shuffle);
+  Sprint(F("  stopOnRemove: ")); Sprintln(myCard.stopOnRemove);
 }
 
 void ShelfRfid::writeConfigBlock() {
@@ -195,6 +206,9 @@ void ShelfRfid::writeConfigBlock() {
   }
   if(myCard.shuffle) {
     configBuffer[3] = configBuffer[3] | B00000010;
+  }
+  if(myCard.stopOnRemove) {
+    configBuffer[3] = configBuffer[3] | B00000100;
   }
   writeRfidBlock(2, 0, configBuffer, configLength);
 }

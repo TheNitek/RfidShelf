@@ -17,6 +17,7 @@ class ShelfPlayback {
       {};
     void begin();
     const bool switchFolder(const char *folder);
+    void setPlaybackOption(bool repeat, bool shuffle);
     void startPlayback();
     void startFilePlayback(const char* folder, const char* file);
     void skipFile();
@@ -46,6 +47,8 @@ class ShelfPlayback {
     char _currentFile[100];
     const bool patchVS1053();
     bool _nightMode = false;
+    bool _repeat = true;
+    bool _shuffle = false;
     // Night mode timeouts NIGHT_TIMEOUT minutes after playback ends, so we need to keep count
     unsigned long _lastNightActivity;
 };

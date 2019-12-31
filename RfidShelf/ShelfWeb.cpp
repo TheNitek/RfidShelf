@@ -371,9 +371,10 @@ void ShelfWeb::handleDefault() {
         const uint8_t volume = (uint8_t)_server.arg("volume").toInt();
         const bool repeat = _server.arg("repeat").equals("1");
         const bool shuffle = _server.arg("shuffle").equals("1");
+        const bool stopOnRemove = _server.arg("stopOnRemove").equals("1");
         // Remove leading "/""
         target++;
-        if (_rfid.startPairing(target, volume, repeat, shuffle)) {
+        if (_rfid.startPairing(target, volume, repeat, shuffle, stopOnRemove)) {
           sendJsonStatus();
           return;
         }

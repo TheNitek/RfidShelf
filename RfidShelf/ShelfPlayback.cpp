@@ -54,7 +54,6 @@ void ShelfPlayback::begin() {
   Sprintln(F("VS1053 found"));
 }
 
-
 const bool ShelfPlayback::switchFolder(const char *folder) {
   Sprint(F("Switching folder to ")); Sprintln(folder);
 
@@ -159,6 +158,10 @@ void ShelfPlayback::startPlayback() {
 
   // Start folder from the beginning
   if (strlen(nextFile) == 0) {
+    if (!_repeat) {
+      stopPlayback();
+      return;
+    }
     if (strlen(_currentFile) == 0) {
       // No _currentFile && no nextFile => Nothing to play!
       Sprintln(F("No mp3 files found"));
@@ -198,6 +201,11 @@ void ShelfPlayback::startFilePlayback(const char *folder, const char *file) {
 void ShelfPlayback::skipFile() {
   _musicPlayer.stopPlaying();
   startPlayback();
+}
+
+void ShelfPlayback::setPlaybackOption(bool repeat, bool shuffle) {
+  _repeat = repeat;
+  _shuffle = shuffle;
 }
 
 void ShelfPlayback::volume(uint8_t volume) {
