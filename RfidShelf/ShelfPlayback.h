@@ -6,6 +6,7 @@
 #include <Adafruit_VS1053.h>
 #include <ESP8266HTTPClient.h>
 #include <SdFat.h>
+#include <BoolArray.h>
 
 enum PlaybackState {PLAYBACK_NO, PLAYBACK_FILE, PLAYBACK_PAUSED};
 
@@ -31,6 +32,9 @@ class ShelfPlayback {
     void startNight();
     const bool isNight();
     void stopNight();
+    void startRandom();
+    const bool isRandom();
+    void stopRandom();
     void setBassAndTreble(uint8_t trebleAmplitude, uint8_t trebleFreqLimit, uint8_t bassAmplitude, uint8_t bassFreqLimit);
     const PlaybackState playbackState() {return _playing;};
     void currentFile(char *name, size_t size);
@@ -43,11 +47,16 @@ class ShelfPlayback {
     Adafruit_VS1053_FilePlayer _musicPlayer;
     SdFat &_SD;
     SdFile _currentFolder;
+    uint16_t _currentFolderFileCount;
     char _currentFile[100];
     const bool patchVS1053();
     bool _nightMode = false;
     // Night mode timeouts NIGHT_TIMEOUT minutes after playback ends, so we need to keep count
     unsigned long _lastNightActivity;
+    bool _randomMode = false;
+    uint16_t _randomPlaybackCount;
+    // Store playback history for random playback to prevent repititions
+    BoolArray _randomHistory;
 };
 
 #endif // ShelfPlayback_h

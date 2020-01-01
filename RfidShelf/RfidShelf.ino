@@ -63,6 +63,8 @@ void setup() {
   pinMode(BREAKOUT_DCS, OUTPUT);
   digitalWrite(BREAKOUT_DCS, HIGH);
 
+  randomSeed(analogRead(A0));
+
   rfid.begin();
     
   //Initialize the SdCard.

@@ -49,9 +49,15 @@ void ShelfPlayback::begin() {
 
   setBassAndTreble(TREBLE_AMPLITUDE, TREBLE_FREQLIMIT, BASS_AMPLITUDE, BASS_FREQLIMIT);
 
+#ifdef DEBUG_ENABLE
   _musicPlayer.dumpRegs();
+#endif
 
   Sprintln(F("VS1053 found"));
+
+  if(_randomHistory.begin(BOOLARRAY_MAXSIZE) != BOOLARRAY_OK){
+    Sprintln(F("Error initializing random history"));
+  }
 }
 
 
@@ -67,6 +73,21 @@ const bool ShelfPlayback::switchFolder(const char *folder) {
   _currentFolder.open(folder);
   _currentFolder.rewind();
   _currentFile[0] = '\0';
+  _currentFolderFileCount = 0;
+
+  SdFile file;
+  char filenameChar[100];
+
+  while (file.openNext(&_currentFolder, O_READ))
+  {
+    file.getName(filenameChar, sizeof(filenameChar));
+  
+    if (!file.isDir() && _musicPlayer.isMP3File(filenameChar)) {
+      _currentFolderFileCount++;
+    }
+    file.close();
+  }
+
   return true;
 }
 
@@ -123,6 +144,8 @@ void ShelfPlayback::stopPlayback() {
   }
   _musicPlayer.stopPlaying();
   _playing = PLAYBACK_NO;
+  _randomHistory.clear();
+  _randomPlaybackCount = 0;
   if(isNight()) {
     _lastNightActivity = millis();
   }
@@ -134,28 +157,58 @@ void ShelfPlayback::startPlayback() {
   SdFile file;
   _currentFolder.rewind();
 
-  char nextFile[100] = F("");
+  char nextFile[100] = "";
   char filenameChar[100];
 
-  Sprintln(nextFile);
+  // Find next file in random playback
+  if(_randomMode && (_currentFolderFileCount-_randomPlaybackCount > 0)) {
 
-  while (file.openNext(&_currentFolder, O_READ))
-  {
+    uint16_t randomNumber = random(_currentFolderFileCount-_randomPlaybackCount);
 
-    file.getName(filenameChar, sizeof(filenameChar));
-    file.close();
-  
-    if (file.isDir() || !_musicPlayer.isMP3File(filenameChar)) {
-      Sprint(F("Ignoring ")); Sprintln(filenameChar);
-      continue;
+    uint16_t hits = 0;
+    uint16_t nextFileIndex = 0;
+    while (file.openNext(&_currentFolder, O_READ)) {
+      file.getName(filenameChar, sizeof(filenameChar));
+    
+      if (file.isDir() || !_musicPlayer.isMP3File(filenameChar)) {
+        Sprint(F("Ignoring ")); Sprintln(filenameChar);
+        file.close();
+        continue;
+      }
+      file.close();
+
+      if(!_randomHistory.get(nextFileIndex)) {
+        if(hits == randomNumber) {
+          strncpy(nextFile, filenameChar, sizeof(nextFile));
+          break;
+        }
+        hits++;
+      }
+      nextFileIndex++;
     }
 
-    if (strcmp(_currentFile, filenameChar) < 0 && (strcmp(filenameChar, nextFile) < 0 || strlen(nextFile) == 0)) {
-      strncpy(nextFile, filenameChar, sizeof(nextFile));
+    _randomHistory.set(nextFileIndex, true);
+    _randomPlaybackCount++;
+  } 
+
+  // Find next file for alphabetical playback
+  if(!_randomMode) {
+    while (file.openNext(&_currentFolder, O_READ))
+    {
+      file.getName(filenameChar, sizeof(filenameChar));
+    
+      if (file.isDir() || !_musicPlayer.isMP3File(filenameChar)) {
+        Sprint(F("Ignoring ")); Sprintln(filenameChar);
+        file.close();
+        continue;
+      }
+      file.close();
+    
+      if (strcmp(_currentFile, filenameChar) < 0 && (strcmp(filenameChar, nextFile) < 0 || strlen(nextFile) == 0)) {
+        strncpy(nextFile, filenameChar, sizeof(nextFile));
+      }
     }
   }
-
-  Sprintln(nextFile);
 
   // Start folder from the beginning
   if (strlen(nextFile) == 0) {
@@ -165,14 +218,16 @@ void ShelfPlayback::startPlayback() {
       stopPlayback();
       return;
     } else {
+      if(_randomMode) {
+        _randomHistory.clear();
+        _randomPlaybackCount = 0;
+      }
       _currentFile[0] = '\0';
       startPlayback();
       return;
     }
   }
  
-  Sprintln(nextFile);
-
   char folder[100];
   _currentFolder.getName(folder, sizeof(folder));
 
@@ -303,4 +358,18 @@ const bool ShelfPlayback::isNight() {
 void ShelfPlayback::stopNight() {
   _nightMode = false;
   volume(_volume);
+}
+
+void ShelfPlayback::startRandom() {
+  _randomMode = true;
+  _randomHistory.clear();
+  _randomPlaybackCount = 0;
+}
+
+const bool ShelfPlayback::isRandom() {
+  return _randomMode;
+}
+
+void ShelfPlayback::stopRandom() {
+  _randomMode = false;
 }

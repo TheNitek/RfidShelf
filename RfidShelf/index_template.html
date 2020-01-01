@@ -225,12 +225,20 @@
              pb.className = 'hidden'
          }
          if (d.night) {
+             h(_('noNight'));
+             s(_('night'));
+         }
+         else {
              s(_('noNight'));
              h(_('night'));
          }
+         if (d.random) {
+             h(_('noRandom'));
+             s(_('random'));
+         }
          else {
-             h(_('noNight'));
-             s(_('night'));
+             s(_('noRandom'));
+             h(_('random'));
          }
          _('volumeBar').value = d.volume;
          _('volumeBar').innerHTML = d.volume;
@@ -280,6 +288,10 @@
 
  .mp3 .mp3only, .playing .hiddenPaused, .paused .hiddenPlaying {
   display: initial;
+ }
+
+ #noRandom {
+  color: gray;
  }
 
  #loading {
@@ -401,6 +413,8 @@
   <button class="hiddenPaused" onclick="rootAction('pause'); return false;">&#10073;&#10073;</button>
   <button onclick="rootAction('stop'); return false;">&#x25a0;</button>
   <button onclick="rootAction('skip'); return false;">&#10097;&#10097;</button>
+  <button title="deactivate random playback" class="hidden" id="random" onclick="rootAction('toggleRandom'); return false;">&#x1f500;</button>
+  <button title="activate random playback" class="hidden" id="noRandom" onclick="rootAction('toggleRandom'); return false;">&#x1f500;</button>
  </div>
 </section>
 
@@ -411,8 +425,8 @@
  <div style="float: right">
   <button title="decrease volume" onclick="rootAction('volumeDown'); return false;">-</button>
   <button title="increase volume" onclick="rootAction('volumeUp'); return false;">+</button>
-  <button title="deactivate night mode" class="hidden" id="noNight" onclick="rootAction('toggleNight'); return false;">&#x1f31b;</button>
-  <button title="activate night mode" class="hidden" id="night" onclick="rootAction('toggleNight'); return false;">&#x1f31e;</button>
+  <button title="deactivate night mode" class="hidden" id="night" onclick="rootAction('toggleNight'); return false;">&#x1f31b;</button>
+  <button title="activate night mode" class="hidden" id="noNight" onclick="rootAction('toggleNight'); return false;">&#x1f31e;</button>
  </div>
 </section>
 

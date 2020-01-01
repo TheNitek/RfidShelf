@@ -79,6 +79,12 @@ void ShelfWeb::sendJsonStatus() {
     strcat(output, ",\"night\":false");
   }
 
+  if(_playback.isRandom()) {
+    strcat(output, ",\"random\":true");
+  } else {
+    strcat(output, ",\"random\":false");
+  }
+  
   strcat(output, ",\"time\":");
   snprintf(buffer, sizeof(buffer), "%lu", _timeClient.getEpochTime());
   strcat(output, buffer);
@@ -356,6 +362,14 @@ void ShelfWeb::handleDefault() {
         _playback.stopNight();
       } else {
         _playback.startNight();
+      }
+      sendJsonStatus();
+      return;
+    } else if (_server.hasArg("toggleRandom")) {
+      if(_playback.isRandom()) {
+        _playback.stopRandom();
+      } else {
+        _playback.startRandom();
       }
       sendJsonStatus();
       return;
