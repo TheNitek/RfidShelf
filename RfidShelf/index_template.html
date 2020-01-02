@@ -226,22 +226,15 @@
          else {
              pb.className = 'hidden'
          }
-         if (d.night) {
-             h(_('noNight'));
-             s(_('night'));
-         }
-         else {
-             s(_('noNight'));
-             h(_('night'));
-         }
-         if (d.random) {
-             h(_('noRandom'));
-             s(_('random'));
-         }
-         else {
-             s(_('noRandom'));
-             h(_('random'));
-         }
+
+         var n = _('night'), noN = _('noNight');
+         h(d.night ? noN : n);
+         s(d.night ? n : noN);
+
+         var shuf = _('shuffle'), noShuf = _('noShuffle');
+         h(d.shuffle ? noShuf : shuf);
+         s(d.shuffle ? shuf : noShuf);
+
          _('volumeBar').value = d.volume;
          _('volumeBar').innerHTML = d.volume;
          if (!d.patch) {
@@ -309,7 +302,7 @@
   display: initial;
  }
 
- #noRandom {
+ #noShuffle {
   color: gray;
  }
 
@@ -396,12 +389,12 @@
   content: '\266b';
   padding-right: 5px;
  }
- 
+
  .fl {
   display: flex;
   align-items: center;
  }
- 
+
  .fl_exp {
   flex: 1;
  }
@@ -477,8 +470,8 @@
   <button class="hiddenPaused" onclick="rootAction('pause'); return false;">&#10073;&#10073;</button>
   <button onclick="rootAction('stop'); return false;">&#x25a0;</button>
   <button onclick="rootAction('skip'); return false;">&#10097;&#10097;</button>
-  <button title="deactivate random playback" class="hidden" id="random" onclick="rootAction('toggleRandom'); return false;">&#x1f500;</button>
-  <button title="activate random playback" class="hidden" id="noRandom" onclick="rootAction('toggleRandom'); return false;">&#x1f500;</button>
+  <button title="deactivate shuffle playback" class="hidden" id="shuffle" onclick="rootAction('toggleShuffle'); return false;">&#x1f500;</button>
+  <button title="activate shuffle playback" class="hidden" id="noShuffle" onclick="rootAction('toggleShuffle'); return false;">&#x1f500;</button>
  </div>
 </section>
 

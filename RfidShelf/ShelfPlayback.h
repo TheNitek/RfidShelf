@@ -33,9 +33,9 @@ class ShelfPlayback {
     void startNight();
     const bool isNight();
     void stopNight();
-    void startRandom();
-    const bool isRandom();
-    void stopRandom();
+    void startShuffle();
+    const bool isShuffle();
+    void stopShuffle();
     void setBassAndTreble(uint8_t trebleAmplitude, uint8_t trebleFreqLimit, uint8_t bassAmplitude, uint8_t bassFreqLimit);
     const PlaybackState playbackState() {return _playing;};
     void currentFile(char *name, size_t size);
@@ -53,13 +53,12 @@ class ShelfPlayback {
     const bool patchVS1053();
     bool _nightMode = false;
     bool _repeat = true;
-    bool _shuffle = false;
     // Night mode timeouts NIGHT_TIMEOUT minutes after playback ends, so we need to keep count
     unsigned long _lastNightActivity;
-    bool _randomMode = false;
-    uint16_t _randomPlaybackCount;
-    // Store playback history for random playback to prevent repititions
-    BoolArray _randomHistory;
+    bool _shuffleMode = false;
+    uint16_t _shufflePlaybackCount;
+    // Store playback history for shuffle playback to prevent repititions
+    BoolArray _shuffleHistory;
 };
 
 #endif // ShelfPlayback_h

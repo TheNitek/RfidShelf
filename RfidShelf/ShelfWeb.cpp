@@ -20,7 +20,7 @@ void ShelfWeb::begin() {
   _server.onNotFound(defaultCallback);
 
   _server.begin();
-  
+
   MDNS.addService("http", "tcp", 80);
 }
 
@@ -80,12 +80,12 @@ void ShelfWeb::sendJsonStatus() {
     strcat(output, ",\"night\":false");
   }
 
-  if(_playback.isRandom()) {
-    strcat(output, ",\"random\":true");
+  if(_playback.isShuffle()) {
+    strcat(output, ",\"shuffle\":true");
   } else {
-    strcat(output, ",\"random\":false");
+    strcat(output, ",\"shuffle\":false");
   }
-  
+
   strcat(output, ",\"time\":");
   snprintf(buffer, sizeof(buffer), "%lu", _timeClient.getEpochTime());
   strcat(output, buffer);
@@ -98,7 +98,7 @@ void ShelfWeb::sendJsonStatus() {
   strcat(output, ",\"sdsize\":");
   snprintf(buffer, sizeof(buffer), "%u", (uint32_t)(0.000512*_SD.card()->cardCapacity()));
   strcat(output, buffer);*/
-  
+
 
   strcat(output, ",\"version\":");
   snprintf(buffer, sizeof(buffer), "\"%d.%d\"", MAJOR_VERSION, MINOR_VERSION);
@@ -366,11 +366,11 @@ void ShelfWeb::handleDefault() {
       }
       sendJsonStatus();
       return;
-    } else if (_server.hasArg("toggleRandom")) {
-      if(_playback.isRandom()) {
-        _playback.stopRandom();
+    } else if (_server.hasArg("toggleShuffle")) {
+      if(_playback.isShuffle()) {
+        _playback.stopShuffle();
       } else {
-        _playback.startRandom();
+        _playback.startShuffle();
       }
       sendJsonStatus();
       return;
@@ -401,13 +401,13 @@ void ShelfWeb::handleDefault() {
         char* pathCStr = (char *)path.c_str();
         char* folderRaw = strtok(pathCStr, "/");
         char* file = strtok(NULL, "/");
-        
+
         if((folderRaw != NULL) && (file != NULL) && strlen(folderRaw) < 90) {
-        
+
           char folder[100] = "/";
           strcat(folder, folderRaw);
           strcat(folder, "/");
-          
+
           if(_playback.switchFolder(folder)) {
             _playback.startFilePlayback(folderRaw, file);
             _playback.playingByCard = false;
