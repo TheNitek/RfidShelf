@@ -9,6 +9,7 @@ jobs:
     
     steps:
     - uses: actions/checkout@v1
+    - uses: actions/setup-node@v1
     - name: Setup Python
       uses: actions/setup-python@master
       with:
@@ -17,6 +18,11 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -U platformio
+    - name: Run HTML-Minifier
+      run: |
+        npm i html-minifier -g
+        cp RfidShelf/index_template.html RfidShelf/index_template.full.html
+        html-minifier RfidShelf/index_template.full.html --collapse-whitespace --remove-comments --remove-optional-tags --remove-redundant-attributes --remove-script-type-attributes --remove-tag-whitespace --use-short-doctype --minify-css true --minify-js true > RfidShelf/index_template.html
     - name: Build
       env:
         PLATFORMIO_CI_SRC: RfidShelf
