@@ -85,7 +85,11 @@ void setup() {
   if (!wifiManager.autoConnect("MP3-SHELF-SETUP", "lacklack")) {
     Sprintln(F("Setup timed out, starting AP"));
     WiFi.mode(WIFI_AP);
-    Sprintln(WiFi.softAP("MP3-SHELF", "lacklack") ? "Soft-AP is set up" : "Soft-AP setup failed");
+    if (WiFi.softAP("MP3-SHELF", "lacklack")) {
+      Sprintln(F("Soft-AP is set up"));
+    } else {
+      Sprintln(F("Soft-AP setup failed"));
+    }
   }
 
   if(WiFi.isConnected()) {
