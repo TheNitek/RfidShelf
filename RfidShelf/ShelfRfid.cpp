@@ -139,7 +139,7 @@ void ShelfRfid::handleRfidConfig() {
   myCard.shuffle = false;
   myCard.stopOnRemove = true;
 
-  if(configBuffer[0] < RFID_CONFIG_VERSION) {
+  if(configBuffer[0] == RFID_CONFIG_VERSION) {
     // "Upgrade" card
     Sprintln(F("Found old version, upgrading card..."));
     myCard.volume = DEFAULT_VOLUME;
