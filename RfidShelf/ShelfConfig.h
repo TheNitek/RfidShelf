@@ -31,7 +31,7 @@
 //#define ARDUINO_OTA_ENABLE 1
 
 // the update url for the OTA update
-#define UPDATE_URL "https://raw.githubusercontent.com/TheNitek/RfidShelf/master/RfidShelf/build/latest.bin"
+#define UPDATE_URL "https://download.naeveke.de/board/latest.bin"
 
 // the url for the patch download
 #define VS1053_PATCH_URL "https://raw.githubusercontent.com/madsci1016/Sparkfun-MP3-Player-Shield-Arduino-Library/master/plugins/patches.053"
