@@ -211,7 +211,7 @@ void ShelfPlayback::startPlayback() {
 
   // Start folder from the beginning
   if (strlen(nextFile) == 0) {
-    if (!_repeat) {
+    if (!_repeatMode) {
       stopPlayback();
       return;
     }
@@ -258,11 +258,24 @@ void ShelfPlayback::skipFile() {
   startPlayback();
 }
 
-void ShelfPlayback::setPlaybackOption(bool repeat, bool shuffle) {
-  _repeat = repeat;
-  if(shuffle) {
+void ShelfPlayback::setPlaybackOption(uint8_t repeat, uint8_t shuffle) {
+  if(repeat == 0) {
+    _repeatMode = generalRepeatMode;
+  } else if(repeat == 3) {
+    _repeatMode = true;
+  } else if(repeat == 2) {
+    _repeatMode = false;
+  }
+  
+  if(shuffle == 0) {
+    if(generalShuffleMode) {
+      startShuffle();
+    } else {
+      stopShuffle();
+    }
+  } else if(shuffle == 3) {
     startShuffle();
-  } else {
+  } else if(shuffle == 2) {
     stopShuffle();
   }
 }

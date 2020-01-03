@@ -19,7 +19,7 @@ void ShelfRfid::handleRfid() {
   _lastRfidCheck = millis();
 
   // While playing check if the tag is still present
-  if ((_playback.playbackState() == PLAYBACK_FILE) && _playback.playingByCard && myCard.stopOnRemove) {
+  if ((_playback.playbackState() == PLAYBACK_FILE) && _playback.playingByCard && myCard.stopOnRemove == 3) {
 
     // Since wireless communication is voodoo we'll give it a few retrys before killing the music
     for (int i = 0; i < 3; i++) {
@@ -135,9 +135,9 @@ void ShelfRfid::handleRfidConfig() {
     return;
   }
 
-  myCard.repeat = true;
-  myCard.shuffle = false;
-  myCard.stopOnRemove = true;
+  myCard.repeat = 0;
+  myCard.shuffle = 0;
+  myCard.stopOnRemove = 0;
 
   if(configBuffer[0] == RFID_CONFIG_VERSION) {
     // "Upgrade" card
@@ -150,9 +150,9 @@ void ShelfRfid::handleRfidConfig() {
       // check for newer config version
       if(configBuffer[1] == 2) {
         // we use same bit for some flags
-        myCard.repeat = (configBuffer[3] & B00000001) > 0;
-        myCard.shuffle = (configBuffer[3] & B00000010) > 0;
-        myCard.stopOnRemove = (configBuffer[3] & B00000100) > 0;
+        myCard.repeat = configBuffer[3] & B00000011;
+        myCard.shuffle = configBuffer[3] >> 2 & B00000011;
+        myCard.stopOnRemove = configBuffer[3] >> 4 & B00000011;
       }
     }
   }
@@ -165,7 +165,7 @@ nfcTagObject ShelfRfid::getPairingConfig() {
   return myCard;
 }
 
-bool ShelfRfid::startPairing(const char *folder, uint8_t volume, bool repeat, bool shuffle, bool stopOnRemove) {
+bool ShelfRfid::startPairing(const char *folder, uint8_t volume, uint8_t repeat, uint8_t shuffle, uint8_t stopOnRemove) {
   if(strlen(folder) > 16)
     return false;
   
@@ -201,16 +201,7 @@ void ShelfRfid::writeConfigBlock() {
   // Length of config entry without header
   configBuffer[1] = configLength-2;
   configBuffer[2] = myCard.volume;
-  configBuffer[3] = 0;
-  if(myCard.repeat) {
-    configBuffer[3] = configBuffer[3] | B00000001;
-  }
-  if(myCard.shuffle) {
-    configBuffer[3] = configBuffer[3] | B00000010;
-  }
-  if(myCard.stopOnRemove) {
-    configBuffer[3] = configBuffer[3] | B00000100;
-  }
+  configBuffer[3] = (myCard.repeat << 0) | (myCard.shuffle << 2) | (myCard.stopOnRemove << 4);
   writeRfidBlock(2, 0, configBuffer, configLength);
 }
 

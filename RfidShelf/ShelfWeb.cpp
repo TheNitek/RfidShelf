@@ -80,10 +80,16 @@ void ShelfWeb::sendJsonStatus() {
     strcat(output, ",\"night\":false");
   }
 
-  if(_playback.isShuffle()) {
+  if(_playback.generalShuffleMode) {
     strcat(output, ",\"shuffle\":true");
   } else {
     strcat(output, ",\"shuffle\":false");
+  }
+
+  if(_playback.isShuffle()) {
+    strcat(output, ",\"currentShuffle\":true");
+  } else {
+    strcat(output, ",\"currentShuffle\":false");
   }
 
   strcat(output, ",\"time\":");
@@ -367,9 +373,11 @@ void ShelfWeb::handleDefault() {
       sendJsonStatus();
       return;
     } else if (_server.hasArg("toggleShuffle")) {
-      if(_playback.isShuffle()) {
+      if(_playback.generalShuffleMode) {
+        _playback.generalShuffleMode = false;
         _playback.stopShuffle();
       } else {
+        _playback.generalShuffleMode = true;
         _playback.startShuffle();
       }
       sendJsonStatus();
@@ -383,9 +391,18 @@ void ShelfWeb::handleDefault() {
       if (_server.hasArg("write") && path.length() <= 17) {
         const char *target = path.c_str();
         const uint8_t volume = (uint8_t)_server.arg("volume").toInt();
-        const bool repeat = _server.arg("repeat").equals("1");
-        const bool shuffle = _server.arg("shuffle").equals("1");
-        const bool stopOnRemove = _server.arg("stopOnRemove").equals("1");
+        uint8_t repeat = 0;       // keep configured setting
+        uint8_t shuffle = 0;      // keep configured setting
+        uint8_t stopOnRemove = 0; // keep configured setting
+        if(_server.arg("repeat").equals("1") || _server.arg("repeat").equals("0")) {
+          repeat = 2 + _server.arg("repeat").toInt();
+        }
+        if(_server.arg("shuffle").equals("1") || _server.arg("shuffle").equals("0")) {
+          repeat = 2 + _server.arg("shuffle").toInt();
+        }
+        if(_server.arg("stopOnRemove").equals("1") || _server.arg("stopOnRemove").equals("0")) {
+          repeat = 2 + _server.arg("stopOnRemove").toInt();
+        }
         // Remove leading "/""
         target++;
         if (_rfid.startPairing(target, volume, repeat, shuffle, stopOnRemove)) {
