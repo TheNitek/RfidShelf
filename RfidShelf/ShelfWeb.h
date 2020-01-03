@@ -41,6 +41,7 @@ class ShelfWeb {
     void handleFileUpload();
     void handleDefault();
     void downloadPatch();
+    void updateOTA();
 };
 
 #endif // ShelfWeb_h

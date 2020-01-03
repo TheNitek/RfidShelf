@@ -343,20 +343,6 @@ const bool ShelfPlayback::patchVS1053() {
   return true;
 }
 
-void ShelfPlayback::work() {
-  if (_playing == PLAYBACK_FILE) {
-    if (_musicPlayer.playingMusic) {
-      _musicPlayer.feedBuffer();
-    } else {
-      startPlayback();
-    }
-    return;
-  // if not playing and timeout => disable night mode
-  } else if (isNight() && (millis() - _lastNightActivity > NIGHT_TIMEOUT)) {
-    stopNight();
-  }
-}
-
 void ShelfPlayback::startNight() {
   _lastNightActivity = millis();
   _nightMode = true;
@@ -384,4 +370,18 @@ const bool ShelfPlayback::isShuffle() {
 
 void ShelfPlayback::stopShuffle() {
   _shuffleMode = false;
+}
+
+void ShelfPlayback::work() {
+  if (_playing == PLAYBACK_FILE) {
+    if (_musicPlayer.playingMusic) {
+      _musicPlayer.feedBuffer();
+    } else {
+      startPlayback();
+    }
+    return;
+  // if not playing and timeout => disable night mode
+  } else if (isNight() && (millis() - _lastNightActivity > NIGHT_TIMEOUT)) {
+    stopNight();
+  }
 }
