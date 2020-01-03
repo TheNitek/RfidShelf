@@ -19,7 +19,7 @@ void ShelfRfid::handleRfid() {
   _lastRfidCheck = millis();
 
   // While playing check if the tag is still present
-  if ((_playback.playbackState() == PLAYBACK_FILE) && _playback.playingByCard) {
+  if ((_playback.playbackState() == PLAYBACK_FILE) && _playback.playingByCard && myCard.stopOnRemove) {
 
     // Since wireless communication is voodoo we'll give it a few retrys before killing the music
     for (int i = 0; i < 3; i++) {
@@ -60,14 +60,23 @@ void ShelfRfid::handleRfid() {
     return;
   }
 
-  if (pairingFolder[0] != '\0') {
-    writeRfidBlock(1, 0, (uint8_t*) pairingFolder, strlen(pairingFolder)+1);
+  if (hasActivePairing) {
+    writeRfidBlock(1, 0, (uint8_t*) myCard.folder, strlen(myCard.folder)+1);
     writeConfigBlock();
-    pairingFolder[0] = '\0';
+    hasActivePairing = false;
   }
 
   // Reset watchdog timer
   ESP.wdtFeed();
+  handleRfidData();
+
+  // Halt PICC
+  _mfrc522.PICC_HaltA();
+  // Stop encryption on PCD
+  _mfrc522.PCD_StopCrypto1();
+}
+
+void ShelfRfid::handleRfidData() {
   uint8_t readBuffer[18];
   /* RFID Layout:
    * Mifare Classic:
@@ -78,68 +87,130 @@ void ShelfRfid::handleRfid() {
    * Page 4-7: Folder
    * Page 8-11: Config
   */
-  if (readRfidBlock(1, 0, readBuffer, sizeof(readBuffer))) {
-    // Store uid
-    memcpy(_lastCardUid, _mfrc522.uid.uidByte, 4 * sizeof(uint8_t) );
+  if (!readRfidBlock(1, 0, readBuffer, sizeof(readBuffer))) {
+    // we could not read card, skip handling
+    return;
+  }
 
-    if(readBuffer[0] != '\0') {
-      char readFolder[18];
-      readFolder[0] = '/';
-      // allthough sizeof(readBuffer) == 18, we only get 16 byte of data (2 bytes are CRC)
-      memcpy(readFolder + 1 , readBuffer, 16 * sizeof(uint8_t) );
-      // readBuffer will already contain \0 if the folder name is < 16 chars, but otherwise we need to add it
-      readFolder[17] = '\0';
+  // Store uid
+  memcpy(_lastCardUid, _mfrc522.uid.uidByte, 4 * sizeof(uint8_t) );
 
-      char currentFolder[101];
-      currentFolder[0] = '/';
-      _playback.currentFolder(currentFolder+1, sizeof(currentFolder)-1);
-      if ((_playback.playbackState() != PLAYBACK_NO) && (strcmp(readFolder, currentFolder) == 0)) {
-        Sprint("Resuming "); Sprintln(currentFolder);
-        _playback.resumePlayback();
-        _playback.playingByCard = true;
-      } else if (_playback.switchFolder(readFolder)) {
-        uint8_t configBuffer[18];
-        if (readRfidBlock(2, 0, configBuffer, sizeof(configBuffer)) && (configBuffer[0] == 137)) {
-          if(configBuffer[1] > 0) {
-            Sprint(F("Setting volume: ")); Sprintln(configBuffer[2]);
-            _playback.volume(configBuffer[2]);
-          }
-        } else {
-          _playback.volume(DEFAULT_VOLUME);
-          // "Upgrade" card
-          writeConfigBlock();
-        }
+  if(readBuffer[0] == '\0') {
+    if(_playback.switchFolder("/")) {
+      _playback.startFilePlayback("", "unknown_card.mp3");
+    }
+    return;
+  }
 
-        _playback.startPlayback();
-        _playback.playingByCard = true;
+  char readFolder[18];
+  readFolder[0] = '/';
+  // allthough sizeof(readBuffer) == 18, we only get 16 byte of data (2 bytes are CRC)
+  memcpy(readFolder + 1 , readBuffer, 16 * sizeof(uint8_t) );
+  // readBuffer will already contain \0 if the folder name is < 16 chars, but otherwise we need to add it
+  readFolder[17] = '\0';
+
+  strcpy(myCard.folder, readFolder);
+
+  char currentFolder[101];
+  currentFolder[0] = '/';
+  _playback.currentFolder(currentFolder+1, sizeof(currentFolder)-1);
+  if ((_playback.playbackState() != PLAYBACK_NO) && (strcmp(myCard.folder, currentFolder) == 0)) {
+    Sprint("Resuming "); Sprintln(currentFolder);
+    _playback.resumePlayback();
+    _playback.playingByCard = true;
+  } else if (_playback.switchFolder(myCard.folder)) {
+    handleRfidConfig();
+    _playback.setPlaybackOption(myCard.repeat, myCard.shuffle);
+    _playback.startPlayback();
+    _playback.playingByCard = true;
+  }
+
+  dumpCurrentCard();
+}
+
+void ShelfRfid::handleRfidConfig() {
+  uint8_t configBuffer[18];
+  if (!readRfidBlock(2, 0, configBuffer, sizeof(configBuffer))) {
+    // we could not read card config, skip handling
+    return;
+  }
+
+  myCard.repeat = true;
+  myCard.shuffle = false;
+  myCard.stopOnRemove = true;
+
+  if(configBuffer[0] == RFID_CONFIG_VERSION) {
+    // "Upgrade" card
+    Sprintln(F("Found old version, upgrading card..."));
+    myCard.volume = DEFAULT_VOLUME;
+    writeConfigBlock();
+  } else {
+    if(configBuffer[1] > 0) {
+      myCard.volume = configBuffer[2];
+      // check for newer config version
+      if(configBuffer[1] == 2) {
+        // we use same bit for some flags
+        myCard.repeat = (configBuffer[3] & B00000001) > 0;
+        myCard.shuffle = (configBuffer[3] & B00000010) > 0;
+        myCard.stopOnRemove = (configBuffer[3] & B00000100) > 0;
       }
     }
   }
 
-  // Halt PICC
-  _mfrc522.PICC_HaltA();
-  // Stop encryption on PCD
-  _mfrc522.PCD_StopCrypto1();
+  Sprint(F("Setting volume: ")); Sprintln(myCard.volume);
+  _playback.volume(myCard.volume);
 }
 
-bool ShelfRfid::startPairing(const char *folder) {
+nfcTagObject ShelfRfid::getPairingConfig() {
+  return myCard;
+}
+
+bool ShelfRfid::startPairing(const char *folder, uint8_t volume, bool repeat, bool shuffle, bool stopOnRemove) {
   if(strlen(folder) > 16)
     return false;
   
-  strcpy(pairingFolder, folder);
+  strcpy(myCard.folder, folder);
+  myCard.volume = volume;
+  myCard.repeat = repeat;
+  myCard.shuffle = shuffle;
+  myCard.stopOnRemove = stopOnRemove;
+
+  Sprintln(F("Pairing mode enabled"));
+  dumpCurrentCard();
+
+  hasActivePairing = true;
   return true;
 }
 
+void ShelfRfid::dumpCurrentCard() {
+  Sprintln(F("Current card data: "));
+  Sprint(F("  folder: ")); Sprintln(myCard.folder);
+  Sprint(F("  volume: ")); Sprintln(myCard.volume);
+  Sprint(F("  repeat: ")); Sprintln(myCard.repeat);
+  Sprint(F("  shuffle: ")); Sprintln(myCard.shuffle);
+  Sprint(F("  stopOnRemove: ")); Sprintln(myCard.stopOnRemove);
+}
+
 void ShelfRfid::writeConfigBlock() {
-  uint8_t configLength = 3;
+  uint8_t configLength = 4;
 
   // Store config (like volume)
   uint8_t configBuffer[configLength];
   // Magic number to mark config block and distinguish legacy cards without it
-  configBuffer[0] = 137;
+  configBuffer[0] = RFID_CONFIG_VERSION;
   // Length of config entry without header
   configBuffer[1] = configLength-2;
-  configBuffer[2] = _playback.volume();
+  configBuffer[2] = myCard.volume;
+  configBuffer[3] = 0;
+  if(myCard.repeat) {
+    configBuffer[3] = configBuffer[3] | B00000001;
+  }
+  if(myCard.shuffle) {
+    configBuffer[3] = configBuffer[3] | B00000010;
+  }
+  if(myCard.stopOnRemove) {
+    configBuffer[3] = configBuffer[3] | B00000100;
+  }
   writeRfidBlock(2, 0, configBuffer, configLength);
 }
 

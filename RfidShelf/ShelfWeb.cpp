@@ -20,7 +20,7 @@ void ShelfWeb::begin() {
   _server.onNotFound(defaultCallback);
 
   _server.begin();
-  
+
   MDNS.addService("http", "tcp", 80);
 }
 
@@ -50,9 +50,10 @@ void ShelfWeb::sendJsonStatus() {
     strcat(output, "NO\"");
   }
 
-  if(_rfid.pairingFolder[0] != '\0') {
+  if(_rfid.hasActivePairing) {
+    nfcTagObject pairingConfig = _rfid.getPairingConfig();
     strcat(output, ",\"pairing\":\"");
-    strcat(output, _rfid.pairingFolder);
+    strcat(output, pairingConfig.folder);
     strcat(output, "\"");
   }
 
@@ -79,12 +80,12 @@ void ShelfWeb::sendJsonStatus() {
     strcat(output, ",\"night\":false");
   }
 
-  if(_playback.isRandom()) {
-    strcat(output, ",\"random\":true");
+  if(_playback.isShuffle()) {
+    strcat(output, ",\"shuffle\":true");
   } else {
-    strcat(output, ",\"random\":false");
+    strcat(output, ",\"shuffle\":false");
   }
-  
+
   strcat(output, ",\"time\":");
   snprintf(buffer, sizeof(buffer), "%lu", _timeClient.getEpochTime());
   strcat(output, buffer);
@@ -97,7 +98,7 @@ void ShelfWeb::sendJsonStatus() {
   strcat(output, ",\"sdsize\":");
   snprintf(buffer, sizeof(buffer), "%u", (uint32_t)(0.000512*_SD.card()->cardCapacity()));
   strcat(output, buffer);*/
-  
+
 
   strcat(output, ",\"version\":");
   snprintf(buffer, sizeof(buffer), "\"%d.%d\"", MAJOR_VERSION, MINOR_VERSION);
@@ -308,11 +309,11 @@ void ShelfWeb::handleDefault() {
       returnOK();
       return;
     } else if (_server.hasArg("ota")) {
-      Sprintln(F("Starting OTA"));
+      Sprint(F("Starting OTA from ")); Sprintln(_server.arg("ota"));
       std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
       // do not validate certificate
       client->setInsecure();
-      t_httpUpdate_return ret = ESPhttpUpdate.update(*client, UPDATE_URL);
+      t_httpUpdate_return ret = ESPhttpUpdate.update(*client, _server.arg("ota"));
       switch (ret) {
         case HTTP_UPDATE_FAILED:
           Sprintf("HTTP_UPDATE_FAILD Error (%d): ", ESPhttpUpdate.getLastError());
@@ -365,11 +366,11 @@ void ShelfWeb::handleDefault() {
       }
       sendJsonStatus();
       return;
-    } else if (_server.hasArg("toggleRandom")) {
-      if(_playback.isRandom()) {
-        _playback.stopRandom();
+    } else if (_server.hasArg("toggleShuffle")) {
+      if(_playback.isShuffle()) {
+        _playback.stopShuffle();
       } else {
-        _playback.startRandom();
+        _playback.startShuffle();
       }
       sendJsonStatus();
       return;
@@ -381,9 +382,13 @@ void ShelfWeb::handleDefault() {
       // <= 17 here because leading "/"" is included
       if (_server.hasArg("write") && path.length() <= 17) {
         const char *target = path.c_str();
+        const uint8_t volume = (uint8_t)_server.arg("volume").toInt();
+        const bool repeat = _server.arg("repeat").equals("1");
+        const bool shuffle = _server.arg("shuffle").equals("1");
+        const bool stopOnRemove = _server.arg("stopOnRemove").equals("1");
         // Remove leading "/""
         target++;
-        if (_rfid.startPairing(target)) {
+        if (_rfid.startPairing(target, volume, repeat, shuffle, stopOnRemove)) {
           sendJsonStatus();
           return;
         }
@@ -396,13 +401,13 @@ void ShelfWeb::handleDefault() {
         char* pathCStr = (char *)path.c_str();
         char* folderRaw = strtok(pathCStr, "/");
         char* file = strtok(NULL, "/");
-        
+
         if((folderRaw != NULL) && (file != NULL) && strlen(folderRaw) < 90) {
-        
+
           char folder[100] = "/";
           strcat(folder, folderRaw);
           strcat(folder, "/");
-          
+
           if(_playback.switchFolder(folder)) {
             _playback.startFilePlayback(folderRaw, file);
             _playback.playingByCard = false;

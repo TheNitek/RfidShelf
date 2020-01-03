@@ -73,8 +73,9 @@ void setup() {
     SD.initErrorHalt();
   }
   Sprintln(F("SD ready"));
-  
+
   playback.begin();
+  playback.startFilePlayback("", "ready_before_wifi.mp3");
 
   sprintf(hostString, "SHELF_%06X", ESP.getChipId());
   Sprint("Hostname: "); Sprintln(hostString);
@@ -84,10 +85,16 @@ void setup() {
   if (!wifiManager.autoConnect("MP3-SHELF-SETUP", "lacklack")) {
     Sprintln(F("Setup timed out, starting AP"));
     WiFi.mode(WIFI_AP);
-    WiFi.softAP("MP3-SHELF", "lacklack");
+    if (WiFi.softAP("MP3-SHELF", "lacklack")) {
+      Sprintln(F("Soft-AP is set up"));
+    } else {
+      Sprintln(F("Soft-AP setup failed"));
+    }
   }
 
-  Sprint(F("Connected! IP address: ")); Sprintln(WiFi.localIP());
+  if(WiFi.isConnected()) {
+    Sprint(F("Connected! IP address: ")); Sprintln(WiFi.localIP());
+  }
 
   if (!MDNS.begin(hostString)) {
     Sprintln("Error setting up MDNS responder!");
@@ -109,6 +116,7 @@ void setup() {
   buttons.begin();
 #endif
 
+  playback.startFilePlayback("", "ready.mp3");
 
   Sprintln(F("Init done"));
 }

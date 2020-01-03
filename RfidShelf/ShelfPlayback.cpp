@@ -55,11 +55,10 @@ void ShelfPlayback::begin() {
 
   Sprintln(F("VS1053 found"));
 
-  if(_randomHistory.begin(BOOLARRAY_MAXSIZE) != BOOLARRAY_OK){
-    Sprintln(F("Error initializing random history"));
+  if(_shuffleHistory.begin(BOOLARRAY_MAXSIZE) != BOOLARRAY_OK){
+    Sprintln(F("Error initializing shuffle history"));
   }
 }
-
 
 const bool ShelfPlayback::switchFolder(const char *folder) {
   Sprint(F("Switching folder to ")); Sprintln(folder);
@@ -81,7 +80,7 @@ const bool ShelfPlayback::switchFolder(const char *folder) {
   while (file.openNext(&_currentFolder, O_READ))
   {
     file.getName(filenameChar, sizeof(filenameChar));
-  
+
     if (!file.isDir() && _musicPlayer.isMP3File(filenameChar)) {
       _currentFolderFileCount++;
     }
@@ -138,14 +137,14 @@ void ShelfPlayback::stopPlayback() {
   if(_playing == PLAYBACK_NO) {
     return;
   }
-  
+
   if (AMP_POWER > 0) {
     digitalWrite(AMP_POWER, LOW);
   }
   _musicPlayer.stopPlaying();
   _playing = PLAYBACK_NO;
-  _randomHistory.clear();
-  _randomPlaybackCount = 0;
+  _shuffleHistory.clear();
+  _shufflePlaybackCount = 0;
   if(isNight()) {
     _lastNightActivity = millis();
   }
@@ -160,16 +159,16 @@ void ShelfPlayback::startPlayback() {
   char nextFile[100] = "";
   char filenameChar[100];
 
-  // Find next file in random playback
-  if(_randomMode && (_currentFolderFileCount-_randomPlaybackCount > 0)) {
+  // Find next file in shuffle playback
+  if(_shuffleMode && (_currentFolderFileCount-_shufflePlaybackCount > 0)) {
 
-    uint16_t randomNumber = random(_currentFolderFileCount-_randomPlaybackCount);
+    uint16_t shuffleNumber = random(_currentFolderFileCount-_shufflePlaybackCount);
 
     uint16_t hits = 0;
     uint16_t nextFileIndex = 0;
     while (file.openNext(&_currentFolder, O_READ)) {
       file.getName(filenameChar, sizeof(filenameChar));
-    
+
       if (file.isDir() || !_musicPlayer.isMP3File(filenameChar)) {
         Sprint(F("Ignoring ")); Sprintln(filenameChar);
         file.close();
@@ -177,8 +176,8 @@ void ShelfPlayback::startPlayback() {
       }
       file.close();
 
-      if(!_randomHistory.get(nextFileIndex)) {
-        if(hits == randomNumber) {
+      if(!_shuffleHistory.get(nextFileIndex)) {
+        if(hits == shuffleNumber) {
           strncpy(nextFile, filenameChar, sizeof(nextFile));
           break;
         }
@@ -187,23 +186,23 @@ void ShelfPlayback::startPlayback() {
       nextFileIndex++;
     }
 
-    _randomHistory.set(nextFileIndex, true);
-    _randomPlaybackCount++;
-  } 
+    _shuffleHistory.set(nextFileIndex, true);
+    _shufflePlaybackCount++;
+  }
 
   // Find next file for alphabetical playback
-  if(!_randomMode) {
+  if(!_shuffleMode) {
     while (file.openNext(&_currentFolder, O_READ))
     {
       file.getName(filenameChar, sizeof(filenameChar));
-    
+
       if (file.isDir() || !_musicPlayer.isMP3File(filenameChar)) {
         Sprint(F("Ignoring ")); Sprintln(filenameChar);
         file.close();
         continue;
       }
       file.close();
-    
+
       if (strcmp(_currentFile, filenameChar) < 0 && (strcmp(filenameChar, nextFile) < 0 || strlen(nextFile) == 0)) {
         strncpy(nextFile, filenameChar, sizeof(nextFile));
       }
@@ -212,22 +211,26 @@ void ShelfPlayback::startPlayback() {
 
   // Start folder from the beginning
   if (strlen(nextFile) == 0) {
+    if (!_repeat) {
+      stopPlayback();
+      return;
+    }
     if (strlen(_currentFile) == 0) {
       // No _currentFile && no nextFile => Nothing to play!
       Sprintln(F("No mp3 files found"));
       stopPlayback();
       return;
     } else {
-      if(_randomMode) {
-        _randomHistory.clear();
-        _randomPlaybackCount = 0;
+      if(_shuffleMode) {
+        _shuffleHistory.clear();
+        _shufflePlaybackCount = 0;
       }
       _currentFile[0] = '\0';
       startPlayback();
       return;
     }
   }
- 
+
   char folder[100];
   _currentFolder.getName(folder, sizeof(folder));
 
@@ -246,13 +249,22 @@ void ShelfPlayback::startFilePlayback(const char *folder, const char *file) {
   if (AMP_POWER > 0) {
     digitalWrite(AMP_POWER, HIGH);
   }
-  
+
   _musicPlayer.startPlayingFile(fullPath);
 }
 
 void ShelfPlayback::skipFile() {
   _musicPlayer.stopPlaying();
   startPlayback();
+}
+
+void ShelfPlayback::setPlaybackOption(bool repeat, bool shuffle) {
+  _repeat = repeat;
+  if(shuffle) {
+    startShuffle();
+  } else {
+    stopShuffle();
+  }
 }
 
 void ShelfPlayback::volume(uint8_t volume) {
@@ -263,7 +275,7 @@ void ShelfPlayback::volume(uint8_t volume) {
   }
 
   uint8_t calcVolume = volume;
-  
+
   if(isNight()) {
     calcVolume = 50 - (NIGHT_FACTOR * (50 - _volume));
   }
@@ -360,16 +372,16 @@ void ShelfPlayback::stopNight() {
   volume(_volume);
 }
 
-void ShelfPlayback::startRandom() {
-  _randomMode = true;
-  _randomHistory.clear();
-  _randomPlaybackCount = 0;
+void ShelfPlayback::startShuffle() {
+  _shuffleMode = true;
+  _shuffleHistory.clear();
+  _shufflePlaybackCount = 0;
 }
 
-const bool ShelfPlayback::isRandom() {
-  return _randomMode;
+const bool ShelfPlayback::isShuffle() {
+  return _shuffleMode;
 }
 
-void ShelfPlayback::stopRandom() {
-  _randomMode = false;
+void ShelfPlayback::stopShuffle() {
+  _shuffleMode = false;
 }
