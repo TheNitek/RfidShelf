@@ -12,9 +12,9 @@
 struct nfcTagObject {
   char folder[17] = {'\0'};
   uint8_t volume;
-  bool repeat;
-  bool shuffle;
-  bool stopOnRemove;
+  uint8_t repeat;       // 0 = current setting, 2 = no, 3 = yes
+  uint8_t shuffle;      // 0 = current setting, 2 = no, 3 = yes
+  uint8_t stopOnRemove; // 0 = current setting, 2 = no, 3 = yes
 };
 
 class ShelfRfid {
@@ -25,7 +25,7 @@ class ShelfRfid {
       {};
     void begin();
     void handleRfid();
-    bool startPairing(const char *folder, uint8_t volume, bool repeat, bool shuffle, bool stopOnRemove);
+    bool startPairing(const char *folder, uint8_t volume, uint8_t repeat, uint8_t shuffle, uint8_t stopOnRemove);
     nfcTagObject getPairingConfig();
     bool hasActivePairing = false;
   private:

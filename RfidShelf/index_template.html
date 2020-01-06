@@ -54,7 +54,6 @@
          for (var i = 0; i < fileInput.files.length; i++) {
              d.append('data', fileInput.files[i], _('uploadForm').dataset.path + fileInput.files[i].name);
          }
-         ;
          xhr.open('POST', '/');
          xhr.upload.addEventListener('progress', progressHandler, false);
          xhr.addEventListener('load', completeHandler, false);
@@ -418,18 +417,37 @@
    <span>Absolute Volume:</span>
    <input type="text" id="confCardVolume" name="volume" pattern="\d{1,2}" class="fl_exp">
   </div>
-  <label>
-   <input type="checkbox" name="repeat" value="1" checked="checked">
-   Repeat
-  </label>
-  <label>
-   <input type="checkbox" name="shuffle" value="1">
-   Shuffle Folder
-  </label>
-  <label>
-    <input type="checkbox" name="stopOnRemove" value="1">
-    Play without card
-   </label>
+  <table>
+   <thead>
+   <tr>
+    <th>Option</th>
+    <th>Yes</th>
+    <th>No</th>
+    <th>Keep current setting</th>
+   </tr>
+   </thead>
+   <tr>
+    <td>Repeat</td>
+    <td><input type="radio" name="repeat" value="1"></td>
+    <td><input type="radio" name="repeat" value="0"></td>
+    <td><input type="radio" name="repeat" value="" checked="checked"></td>
+   </tr>
+
+   <tr>
+    <td>Shuffle Folder</td>
+    <td><input type="radio" name="shuffle" value="1"></td>
+    <td><input type="radio" name="shuffle" value="0"></td>
+    <td><input type="radio" name="shuffle" value="" checked="checked"></td>
+   </tr>
+
+   <tr>
+    <td>Stop on card remove</td>
+    <td><input type="radio" name="stopOnRemove" value="1"></td>
+    <td><input type="radio" name="stopOnRemove" value="0"></td>
+    <td><input type="radio" name="stopOnRemove" value="" checked="checked"></td>
+   </tr>
+  </table>
+
   <div>
    <input type="submit" value="Start pairing">
    <button style="background: #e5e5e5; color: #050505; margin-left: 10px;" onclick="confNewCard(0); return false;">close</button>
