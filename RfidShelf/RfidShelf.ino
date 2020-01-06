@@ -115,6 +115,8 @@ void setup() {
   buttons.begin();
 #endif
 
+  playback.startFilePlayback("", "ready.mp3");
+
   Sprintln(F("Init done"));
 }
 

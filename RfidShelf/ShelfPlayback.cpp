@@ -250,7 +250,10 @@ void ShelfPlayback::startFilePlayback(const char *folder, const char *file) {
     digitalWrite(AMP_POWER, HIGH);
   }
 
-  _musicPlayer.startPlayingFile(fullPath);
+  if(!_musicPlayer.startPlayingFile(fullPath)) {
+    Sprintln("Could not start playback");
+    stopPlayback();
+  }
 }
 
 void ShelfPlayback::skipFile() {
@@ -389,10 +392,49 @@ void ShelfPlayback::work() {
   if (_playing == PLAYBACK_FILE) {
     if (_musicPlayer.playingMusic) {
       _musicPlayer.feedBuffer();
-    } else {
-      startPlayback();
+      return;
     }
+    
+    // If playingMusic is false there might still be data buffered in the VS1053 so we need to query its registers
+    if((_musicPlayer.sciRead(VS1053_REG_HDAT0) == 0) && (_musicPlayer.sciRead(VS1053_REG_HDAT1) == 0)) {
+      startPlayback();
+      return;
+    }
+
+    // Follow the datasheet:
+    // Read extra parameter value endFillByte
+    _musicPlayer.sciWrite(VS1053_REG_WRAMADDR, VS1053_GPIO_DDR);
+    uint8_t endFillByte = (uint8_t)(_musicPlayer.sciRead(VS1053_REG_WRAM) & 0xFF);
+    uint8_t endFillBytes[32];
+    memset(endFillBytes, endFillByte, sizeof(endFillBytes));
+    // Send at least 2052 bytes of endFillByte[7:0] (we'll do a few more)
+    for(uint8_t i = 0; i <= 64; i++) {
+      while(!_musicPlayer.readyForData()) ESP.wdtFeed();
+      _musicPlayer.playData(endFillBytes, sizeof(endFillBytes));
+    }
+    // Set SCI MODE bit SM CANCEL
+    _musicPlayer.sciWrite(VS1053_REG_MODE, VS1053_MODE_SM_LINE1 | VS1053_MODE_SM_SDINEW | VS1053_MODE_SM_CANCEL);
+    // Send at least 32 bytes of endFillByte[7:0]
+    // Read SCI MODE. If SM CANCEL is still set, send again. 
+    for(uint8_t i = 0; i <= 64; i++) {
+      while(!_musicPlayer.readyForData()) ESP.wdtFeed();
+      _musicPlayer.playData(endFillBytes, sizeof(endFillBytes));
+      if((_musicPlayer.sciRead(VS1053_REG_MODE) & VS1053_MODE_SM_CANCEL) == 0) {
+        uint16_t hdat0 = _musicPlayer.sciRead(VS1053_REG_HDAT0);
+        uint16_t hdat1 = _musicPlayer.sciRead(VS1053_REG_HDAT1);
+        if(!(hdat0 == 0) || !(hdat1 == 0)) {
+          Sprint("HDAT not 0: "); Sprint(hdat0); Sprint(" "); Sprint(hdat1); Sprintln();
+        }
+        return;
+      }
+    }
+
+    // If SM CANCEL hasn’t cleared after sending 2048 bytes, do a 
+    // software reset (this should be extremely rare)
+    Sprintln(F("Cancel after playback failed."));
+    _musicPlayer.softReset();
     return;
+
   // if not playing and timeout => disable night mode
   } else if (isNight() && (millis() - _lastNightActivity > NIGHT_TIMEOUT)) {
     stopNight();
