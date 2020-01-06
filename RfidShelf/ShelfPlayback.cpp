@@ -27,7 +27,7 @@ void ShelfPlayback::begin() {
 
   Sprintln(F("VS1053 soft reset done"));
 
-  if (patchVS1053()) {
+  if (_patchVS1053()) {
 #ifdef USE_DIFFERENTIAL_OUTPUT
     // Enable differential output
     uint16_t mode = VS1053_MODE_SM_DIFF | VS1053_MODE_SM_SDINEW;
@@ -145,6 +145,8 @@ void ShelfPlayback::stopPlayback() {
   _playing = PLAYBACK_NO;
   _shuffleHistory.clear();
   _shufflePlaybackCount = 0;
+  _repeatMode = defaultRepeatMode;
+  _shuffleMode = defaultShuffleMode;
   if(isNight()) {
     _lastNightActivity = millis();
   }
@@ -261,28 +263,6 @@ void ShelfPlayback::skipFile() {
   startPlayback();
 }
 
-void ShelfPlayback::setPlaybackOption(uint8_t repeat, uint8_t shuffle) {
-  if(repeat == 0) {
-    _repeatMode = generalRepeatMode;
-  } else if(repeat == 3) {
-    _repeatMode = true;
-  } else if(repeat == 2) {
-    _repeatMode = false;
-  }
-  
-  if(shuffle == 0) {
-    if(generalShuffleMode) {
-      startShuffle();
-    } else {
-      stopShuffle();
-    }
-  } else if(shuffle == 3) {
-    startShuffle();
-  } else if(shuffle == 2) {
-    stopShuffle();
-  }
-}
-
 void ShelfPlayback::volume(uint8_t volume) {
   if(volume > 50) {
     _volume = 50;
@@ -323,7 +303,7 @@ void ShelfPlayback::setBassAndTreble(uint8_t trebleAmplitude, uint8_t trebleFreq
   _musicPlayer.sciWrite(VS1053_REG_BASS, bassReg);
 }
 
-const bool ShelfPlayback::patchVS1053() {
+const bool ShelfPlayback::_patchVS1053() {
   Sprintln(F("Installing patch to VS1053"));
 
   SdFile file;
@@ -382,6 +362,18 @@ void ShelfPlayback::startShuffle() {
 
 const bool ShelfPlayback::isShuffle() {
   return _shuffleMode;
+}
+
+void ShelfPlayback::stopRepeat() {
+  _repeatMode = false;
+}
+
+void ShelfPlayback::startRepeat() {
+  _repeatMode = true;
+}
+
+const bool ShelfPlayback::isRepeat() {
+  return _repeatMode;
 }
 
 void ShelfPlayback::stopShuffle() {

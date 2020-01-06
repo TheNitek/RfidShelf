@@ -34,14 +34,15 @@ class ShelfRfid {
     MFRC522::MIFARE_Key _key;
     byte _lastCardUid[4]; // Init array that will store new card uid
     unsigned long _lastRfidCheck = 0L;
-    nfcTagObject myCard;
-    void handleRfidData();
-    void handleRfidConfig();
-    static void print_byte_array(const uint8_t *buffer, const uint8_t  bufferSize);
-    void writeConfigBlock();
-    bool writeRfidBlock(uint8_t sector, uint8_t relativeBlock, const uint8_t *content, uint8_t contentSize) ;
-    bool readRfidBlock(uint8_t sector, uint8_t relativeBlock, uint8_t *outputBuffer, uint8_t bufferSize);
-    void dumpCurrentCard();
+    nfcTagObject _myCard;
+    void _handleRfidData();
+    void _handleRfidConfig();
+    static void _print_byte_array(const uint8_t *buffer, const uint8_t  bufferSize);
+    void _writeConfigBlock();
+    bool _writeRfidBlock(uint8_t sector, uint8_t relativeBlock, const uint8_t *content, uint8_t contentSize) ;
+    bool _readRfidBlock(uint8_t sector, uint8_t relativeBlock, uint8_t *outputBuffer, uint8_t bufferSize);
+    void _setPlaybackOptions(uint8_t repeat, uint8_t shuffle);
+    void _dumpCurrentCard();
 };
 
 #endif // ShelfRfid_h

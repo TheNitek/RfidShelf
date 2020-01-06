@@ -31,17 +31,17 @@ class ShelfWeb {
     ESP8266WebServer _server;
     SdFile _uploadFile;
     uint32_t _uploadStart;
-    void returnOK();
-    void returnHttpStatus(uint16_t statusCode, const char *msg);
-    void sendHTML();
-    void sendJsonStatus();
-    void sendJsonFS(const char *path);
-    bool loadFromSdCard(const char *path);
-    void handleWriteRfid(const char *folder);
-    void handleFileUpload();
-    void handleDefault();
-    void downloadPatch();
-    void updateOTA();
+    void _returnOK();
+    void _returnHttpStatus(uint16_t statusCode, const char *msg);
+    void _sendHTML();
+    void _sendJsonStatus();
+    void _sendJsonFS(const char *path);
+    bool _loadFromSdCard(const char *path);
+    void _handleWriteRfid(const char *folder);
+    void _handleFileUpload();
+    void _handleDefault();
+    void _downloadPatch();
+    void _updateOTA();
 };
 
 #endif // ShelfWeb_h

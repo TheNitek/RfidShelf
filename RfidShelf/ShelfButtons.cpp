@@ -17,7 +17,7 @@ void ShelfButtons::begin() {
 void ShelfButtons::work() {
   _pauseButton.read();
   _skipButton.read();
-  handleVolume();
+  _handleVolume();
 }
 
 void ShelfButtons::handlePause() {
@@ -28,7 +28,7 @@ void ShelfButtons::handleSkip() {
   _instance->_playback.skipFile();
 }
 
-void ShelfButtons::handleVolume() {
+void ShelfButtons::_handleVolume() {
   // Note: Analog volume always wins! Volume from cards/web will be ignored/overwritten
 
   if (millis() - _lastAnalogCheck < 500) {

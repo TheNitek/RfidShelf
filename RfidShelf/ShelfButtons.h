@@ -20,7 +20,7 @@ class ShelfButtons {
     EasyButton _pauseButton;
     EasyButton _skipButton;
     uint8_t _lastAnalogVolume = DEFAULT_VOLUME;
-    void handleVolume();
+    void _handleVolume();
 };
 
 #endif // ShelfButtons_h

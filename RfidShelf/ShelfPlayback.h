@@ -18,7 +18,6 @@ class ShelfPlayback {
       {};
     void begin();
     const bool switchFolder(const char *folder);
-    void setPlaybackOption(uint8_t repeat, uint8_t shuffle);
     void startPlayback();
     void startFilePlayback(const char* folder, const char* file);
     void skipFile();
@@ -36,14 +35,17 @@ class ShelfPlayback {
     void startShuffle();
     const bool isShuffle();
     void stopShuffle();
+    void startRepeat();
+    const bool isRepeat();
+    void stopRepeat();
     void setBassAndTreble(uint8_t trebleAmplitude, uint8_t trebleFreqLimit, uint8_t bassAmplitude, uint8_t bassFreqLimit);
     const PlaybackState playbackState() {return _playing;};
     void currentFile(char *name, size_t size);
     void currentFolder(char *name, size_t size);
     void work();
     bool playingByCard = true;
-    bool generalShuffleMode = false;
-    bool generalRepeatMode = true;
+    bool defaultShuffleMode = false;
+    bool defaultRepeatMode = true;
   private:
     uint8_t _volume = DEFAULT_VOLUME;
     PlaybackState _playing = PLAYBACK_NO;
@@ -52,7 +54,7 @@ class ShelfPlayback {
     SdFile _currentFolder;
     uint16_t _currentFolderFileCount;
     char _currentFile[100];
-    const bool patchVS1053();
+    const bool _patchVS1053();
     bool _nightMode = false;
     // Night mode timeouts NIGHT_TIMEOUT minutes after playback ends, so we need to keep count
     unsigned long _lastNightActivity;
