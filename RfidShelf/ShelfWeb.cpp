@@ -171,8 +171,7 @@ bool ShelfWeb::loadFromSdCard(const char *path) {
   if (dataFile.isDir()) {
     sendJsonFS(path);
   } else {
-    String dataType = "application/octet-stream";
-    if (_server.streamFile(dataFile, dataType) != dataFile.size()) {
+    if (_server.streamFile(dataFile, "application/octet-stream") != dataFile.size()) {
       Sprintln(F("Sent less data than expected!"));
     }
   }
