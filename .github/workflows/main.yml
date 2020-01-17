@@ -21,3 +21,14 @@ jobs:
       env:
         PLATFORMIO_CI_SRC: RfidShelf
       run: platformio ci --board=nodemcuv2 --project-conf=RfidShelf/platformio.ini
+    - name: Upload artifact
+      uses: actions/upload-artifact@v1
+      with:
+        name: Latest Firmware Build
+        path: RfidShelf/build/latest.bin
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
