@@ -400,52 +400,55 @@
 
  #confCardContainer { position: fixed; top: 0; left: 0; bottom: 0; right: 0; background: rgba(229, 229, 229, 0.8); }
  #confCardContainer form { padding: 10px; border: 1px solid #e5e5e5; max-width: 500px; margin: 30px auto; background: #fafafa; }
- #confCardContainer form > * { margin-bottom: 10px; display: flex; align-items: center; }
- #confCardContainer span { width: 150px; }
+ #confCardContainer form > div { margin-bottom: 10px; display: flex; align-items: center; }
+ #confCardContainer span, #confCardContainer label { width: 150px; }
 </style>
 </head><body>
 <div id="confCardContainer" class="hidden">
  <form onsubmit="writeRfidForm(); return false;">
   <h3>Configure new card</h3>
   <div>
-   <span>Folder:</span>
-   <select id="confCardFolder" name="url" class="fl_exp">
-    <option>-- Please choose a folder --</option>
-   </select>
+   <label for="confCardFolder">Folder:</label>
+    <select id="confCardFolder" name="url" class="fl_exp">
+        <option>-- Please choose a folder --</option>
+    </select>
   </div>
   <div>
-   <span>Absolute Volume:</span>
-   <input type="text" id="confCardVolume" name="volume" pattern="\d{1,2}" class="fl_exp">
+   <label for="confCardVolume">Absolute Volume:</label>
+   <input type="range" id="confCardVolume" name="volume" min="0" max="50" step="5" value="40" class="fl_exp" oninput="confCardVolumeOutput.value = confCardVolume.value">
+   <output id="confCardVolumeOutput" for="confCardVolume">40</output>
   </div>
   <table>
    <thead>
-   <tr>
-    <th>Option</th>
-    <th>Yes</th>
-    <th>No</th>
-    <th>Keep current setting</th>
-   </tr>
+    <tr>
+     <th>Option</th>
+     <th>Yes</th>
+     <th>No</th>
+     <th>Keep current setting</th>
+    </tr>
    </thead>
-   <tr>
-    <td>Repeat</td>
-    <td><input type="radio" name="repeat" value="1"></td>
-    <td><input type="radio" name="repeat" value="0"></td>
-    <td><input type="radio" name="repeat" value="" checked="checked"></td>
-   </tr>
+   <tbody>
+    <tr>
+     <td>Repeat</td>
+     <td><input type="radio" name="repeat" value="1"></td>
+     <td><input type="radio" name="repeat" value="0"></td>
+     <td><input type="radio" name="repeat" value="2" checked="checked"></td>
+    </tr>
 
-   <tr>
-    <td>Shuffle Folder</td>
-    <td><input type="radio" name="shuffle" value="1"></td>
-    <td><input type="radio" name="shuffle" value="0"></td>
-    <td><input type="radio" name="shuffle" value="" checked="checked"></td>
-   </tr>
+    <tr>
+     <td>Shuffle Folder</td>
+     <td><input type="radio" name="shuffle" value="1"></td>
+     <td><input type="radio" name="shuffle" value="0"></td>
+     <td><input type="radio" name="shuffle" value="2" checked="checked"></td>
+    </tr>
 
-   <tr>
-    <td>Stop on card remove</td>
-    <td><input type="radio" name="stopOnRemove" value="1"></td>
-    <td><input type="radio" name="stopOnRemove" value="0"></td>
-    <td><input type="radio" name="stopOnRemove" value="" checked="checked"></td>
-   </tr>
+    <tr>
+     <td>Stop on card remove</td>
+     <td><input type="radio" name="stopOnRemove" value="1"></td>
+     <td><input type="radio" name="stopOnRemove" value="0"></td>
+     <td><input type="radio" name="stopOnRemove" value="2" checked="checked"></td>
+    </tr>
+   </tbody>
   </table>
 
   <div>

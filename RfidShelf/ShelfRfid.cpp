@@ -19,7 +19,7 @@ void ShelfRfid::handleRfid() {
   _lastRfidCheck = millis();
 
   // While playing check if the tag is still present
-  if ((_playback.playbackState() == PLAYBACK_FILE) && _playback.playingByCard && _myCard.stopOnRemove == 3) {
+  if ((_playback.playbackState() == PLAYBACK_FILE) && _playback.playingByCard && (_currentCard.stopOnRemove > 0)) {
 
     // Since wireless communication is voodoo we'll give it a few retrys before killing the music
     for (int i = 0; i < 3; i++) {
@@ -61,7 +61,7 @@ void ShelfRfid::handleRfid() {
   }
 
   if (hasActivePairing) {
-    _writeRfidBlock(1, 0, (uint8_t*) _myCard.folder, strlen(_myCard.folder)+1);
+    _writeRfidBlock(1, 0, (uint8_t*) _currentCard.folder, strlen(_currentCard.folder)+1);
     _writeConfigBlock();
     hasActivePairing = false;
   }
@@ -109,18 +109,18 @@ void ShelfRfid::_handleRfidData() {
   // readBuffer will already contain \0 if the folder name is < 16 chars, but otherwise we need to add it
   readFolder[17] = '\0';
 
-  strcpy(_myCard.folder, readFolder);
+  strcpy(_currentCard.folder, readFolder);
 
   char currentFolder[101];
   currentFolder[0] = '/';
   _playback.currentFolder(currentFolder+1, sizeof(currentFolder)-1);
-  if ((_playback.playbackState() != PLAYBACK_NO) && (strcmp(_myCard.folder, currentFolder) == 0)) {
+  if ((_playback.playbackState() != PLAYBACK_NO) && (strcmp(_currentCard.folder, currentFolder) == 0)) {
     Sprint("Resuming "); Sprintln(currentFolder);
     _playback.resumePlayback();
     _playback.playingByCard = true;
-  } else if (_playback.switchFolder(_myCard.folder)) {
+  } else if (_playback.switchFolder(_currentCard.folder)) {
     _handleRfidConfig();
-    _setPlaybackOptions(_myCard.repeat, _myCard.shuffle);
+    _setPlaybackOptions(_currentCard.repeat, _currentCard.shuffle);
     _playback.startPlayback();
     _playback.playingByCard = true;
   }
@@ -135,60 +135,60 @@ void ShelfRfid::_handleRfidConfig() {
     return;
   }
 
-  _myCard.repeat = 0;
-  _myCard.shuffle = 0;
-  _myCard.stopOnRemove = 0;
+  _currentCard.repeat = 0;
+  _currentCard.shuffle = 0;
+  _currentCard.stopOnRemove = 0;
 
   if(configBuffer[0] != RFID_CONFIG_VERSION) {
     // "Upgrade" card
     Sprintln(F("Found old version, upgrading card..."));
-    _myCard.volume = DEFAULT_VOLUME;
+    _currentCard.volume = DEFAULT_VOLUME;
     _writeConfigBlock();
   } else {
     if(configBuffer[1] > 0) {
-      _myCard.volume = configBuffer[2];
+      _currentCard.volume = configBuffer[2];
       // check for newer config version
       if(configBuffer[1] == 2) {
         // we use same bit for some flags
-        _myCard.repeat = configBuffer[3] & B00000011;
-        _myCard.shuffle = configBuffer[3] >> 2 & B00000011;
-        _myCard.stopOnRemove = configBuffer[3] >> 4 & B00000011;
+        _currentCard.repeat = configBuffer[3] & B00000011;
+        _currentCard.shuffle = configBuffer[3] >> 2 & B00000011;
+        _currentCard.stopOnRemove = configBuffer[3] >> 4 & B00000011;
       }
     }
   }
 
-  Sprint(F("Setting volume: ")); Sprintln(_myCard.volume);
-  _playback.volume(_myCard.volume);
+  Sprint(F("Setting volume: ")); Sprintln(_currentCard.volume);
+  _playback.volume(_currentCard.volume);
 }
 
 
 void ShelfRfid::_setPlaybackOptions(uint8_t repeat, uint8_t shuffle) {
-  if(repeat == 3) {
+  if(repeat == 1) {
     _playback.startRepeat();
-  } else if(repeat == 2) {
+  } else if(repeat == 0) {
     _playback.stopRepeat();
   }
   
-  if(shuffle == 3) {
+  if(shuffle == 1) {
     _playback.startShuffle();
-  } else if(shuffle == 2) {
+  } else if(shuffle == 0) {
     _playback.stopShuffle();
   }
 }
 
 nfcTagObject ShelfRfid::getPairingConfig() {
-  return _myCard;
+  return _currentCard;
 }
 
-bool ShelfRfid::startPairing(const char *folder, uint8_t volume, uint8_t repeat, uint8_t shuffle, uint8_t stopOnRemove) {
+bool ShelfRfid::startPairing(const char *folder, const uint8_t volume, const uint8_t repeat, const uint8_t shuffle, const uint8_t stopOnRemove) {
   if(strlen(folder) > 16)
     return false;
   
-  strcpy(_myCard.folder, folder);
-  _myCard.volume = volume;
-  _myCard.repeat = repeat;
-  _myCard.shuffle = shuffle;
-  _myCard.stopOnRemove = stopOnRemove;
+  strcpy(_currentCard.folder, folder);
+  _currentCard.volume = volume;
+  _currentCard.repeat = repeat;
+  _currentCard.shuffle = shuffle;
+  _currentCard.stopOnRemove = stopOnRemove;
 
   Sprintln(F("Pairing mode enabled"));
   _dumpCurrentCard();
@@ -199,11 +199,11 @@ bool ShelfRfid::startPairing(const char *folder, uint8_t volume, uint8_t repeat,
 
 void ShelfRfid::_dumpCurrentCard() {
   Sprintln(F("Current card data: "));
-  Sprint(F("  folder: ")); Sprintln(_myCard.folder);
-  Sprint(F("  volume: ")); Sprintln(_myCard.volume);
-  Sprint(F("  repeat: ")); Sprintln(_myCard.repeat);
-  Sprint(F("  shuffle: ")); Sprintln(_myCard.shuffle);
-  Sprint(F("  stopOnRemove: ")); Sprintln(_myCard.stopOnRemove);
+  Sprint(F("  folder: ")); Sprintln(_currentCard.folder);
+  Sprint(F("  volume: ")); Sprintln(_currentCard.volume);
+  Sprint(F("  repeat: ")); Sprintln(_currentCard.repeat);
+  Sprint(F("  shuffle: ")); Sprintln(_currentCard.shuffle);
+  Sprint(F("  stopOnRemove: ")); Sprintln(_currentCard.stopOnRemove);
 }
 
 void ShelfRfid::_writeConfigBlock() {
@@ -215,8 +215,8 @@ void ShelfRfid::_writeConfigBlock() {
   configBuffer[0] = RFID_CONFIG_VERSION;
   // Length of config entry without header
   configBuffer[1] = configLength-2;
-  configBuffer[2] = _myCard.volume;
-  configBuffer[3] = (_myCard.repeat << 0) | (_myCard.shuffle << 2) | (_myCard.stopOnRemove << 4);
+  configBuffer[2] = _currentCard.volume;
+  configBuffer[3] = (_currentCard.repeat << 0) | (_currentCard.shuffle << 2) | (_currentCard.stopOnRemove << 4);
   _writeRfidBlock(2, 0, configBuffer, configLength);
 }
 

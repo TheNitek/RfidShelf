@@ -25,7 +25,7 @@ class ShelfRfid {
       {};
     void begin();
     void handleRfid();
-    bool startPairing(const char *folder, uint8_t volume, uint8_t repeat, uint8_t shuffle, uint8_t stopOnRemove);
+    bool startPairing(const char *folder, const uint8_t volume, const uint8_t repeat, const uint8_t shuffle, const uint8_t stopOnRemove);
     nfcTagObject getPairingConfig();
     bool hasActivePairing = false;
   private:
@@ -34,7 +34,7 @@ class ShelfRfid {
     MFRC522::MIFARE_Key _key;
     byte _lastCardUid[4]; // Init array that will store new card uid
     unsigned long _lastRfidCheck = 0L;
-    nfcTagObject _myCard;
+    nfcTagObject _currentCard;
     void _handleRfidData();
     void _handleRfidConfig();
     static void _print_byte_array(const uint8_t *buffer, const uint8_t  bufferSize);

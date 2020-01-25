@@ -389,19 +389,10 @@ void ShelfWeb::_handleDefault() {
       // <= 17 here because leading "/"" is included
       if (_server.hasArg("write") && path.length() <= 17) {
         const char *target = path.c_str();
-        const uint8_t volume = (uint8_t)_server.arg("volume").toInt();
-        uint8_t repeat = 0;       // keep configured setting
-        uint8_t shuffle = 0;      // keep configured setting
-        uint8_t stopOnRemove = 0; // keep configured setting
-        if(_server.arg("repeat").equals("1") || _server.arg("repeat").equals("0")) {
-          repeat = 2 + _server.arg("repeat").toInt();
-        }
-        if(_server.arg("shuffle").equals("1") || _server.arg("shuffle").equals("0")) {
-          repeat = 2 + _server.arg("shuffle").toInt();
-        }
-        if(_server.arg("stopOnRemove").equals("1") || _server.arg("stopOnRemove").equals("0")) {
-          repeat = 2 + _server.arg("stopOnRemove").toInt();
-        }
+        const uint8_t volume = 50-(uint8_t)_server.arg("volume").toInt();
+        uint8_t repeat = _server.arg("repeat").toInt();
+        uint8_t shuffle = _server.arg("shuffle").toInt();
+        uint8_t stopOnRemove = _server.arg("stopOnRemove").toInt();
         // Remove leading "/""
         target++;
         if (_rfid.startPairing(target, volume, repeat, shuffle, stopOnRemove)) {
