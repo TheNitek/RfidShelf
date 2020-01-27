@@ -115,7 +115,7 @@ void ShelfRfid::_handleRfidData() {
   currentFolder[0] = '/';
   _playback.currentFolder(currentFolder+1, sizeof(currentFolder)-1);
   if ((_playback.playbackState() != PLAYBACK_NO) && (strcmp(_currentCard.folder, currentFolder) == 0)) {
-    Sprint("Resuming "); Sprintln(currentFolder);
+    Sprint(F("Resuming ")); Sprintln(currentFolder);
     _playback.resumePlayback();
     _playback.playingByCard = true;
   } else if (_playback.switchFolder(_currentCard.folder)) {

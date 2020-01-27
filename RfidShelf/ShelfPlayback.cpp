@@ -100,6 +100,7 @@ void ShelfPlayback::currentFile(char *filename, size_t size) {
 
 void ShelfPlayback::resumePlayback() {
   if(_playing != PLAYBACK_PAUSED) {
+    Sprintf(F("Wrong playback state for resume: %d"), _playing);
     return;
   }
   if (AMP_POWER > 0) {
@@ -386,12 +387,16 @@ void ShelfPlayback::work() {
       _musicPlayer.feedBuffer();
       return;
     }
+
+    Sprintln(F("Not playing"));
     
     // If playingMusic is false there might still be data buffered in the VS1053 so we need to query its registers
     if((_musicPlayer.sciRead(VS1053_REG_HDAT0) == 0) && (_musicPlayer.sciRead(VS1053_REG_HDAT1) == 0)) {
       startPlayback();
       return;
     }
+
+    Sprintln(F("Flushing VS1053 buffer"));
 
     // Follow the datasheet:
     // Read extra parameter value endFillByte
@@ -414,7 +419,7 @@ void ShelfPlayback::work() {
       if((_musicPlayer.sciRead(VS1053_REG_MODE) & VS1053_MODE_SM_CANCEL) == 0) {
         uint16_t hdat0 = _musicPlayer.sciRead(VS1053_REG_HDAT0);
         uint16_t hdat1 = _musicPlayer.sciRead(VS1053_REG_HDAT1);
-        if(!(hdat0 == 0) || !(hdat1 == 0)) {
+        if(hdat0 != 0 || hdat1 != 0) {
           Sprint("HDAT not 0: "); Sprint(hdat0); Sprint(" "); Sprint(hdat1); Sprintln();
         }
         return;
