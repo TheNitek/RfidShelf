@@ -8,14 +8,23 @@
 #include <MFRC522.h>
 #include <SdFat.h>
 
+#define RFID_CONFIG_MARKER 137
+
+struct cardConfig {
+  uint8_t magicByte;
+  uint8_t size;
+  uint8_t volume;
+  uint8_t repeat : 2;       // 2 = current setting, 0 = no, 1 = yes
+  uint8_t shuffle : 2;      // 2 = current setting, 0 = no, 1 = yes
+  uint8_t stopOnRemove : 2; // 2 = current setting, 0 = no, 1 = yes
+};
+
 // this object stores nfc tag data
 struct nfcTagObject {
   char folder[17] = {'\0'};
-  uint8_t volume;
-  uint8_t repeat;       // 0 = current setting, 2 = no, 3 = yes
-  uint8_t shuffle;      // 0 = current setting, 2 = no, 3 = yes
-  uint8_t stopOnRemove; // 0 = current setting, 2 = no, 3 = yes
+  cardConfig config;
 };
+
 
 class ShelfRfid {
   public:
@@ -35,14 +44,15 @@ class ShelfRfid {
     byte _lastCardUid[4]; // Init array that will store new card uid
     unsigned long _lastRfidCheck = 0L;
     nfcTagObject _currentCard;
+    nfcTagObject _pairingCard;
     void _handleRfidData();
     void _handleRfidConfig();
     static void _print_byte_array(const uint8_t *buffer, const uint8_t  bufferSize);
-    void _writeConfigBlock();
-    bool _writeRfidBlock(uint8_t sector, uint8_t relativeBlock, const uint8_t *content, uint8_t contentSize) ;
+    void _writeConfigBlock(const cardConfig *config);
+    bool _writeRfidBlock(const uint8_t sector, const uint8_t relativeBlock, const uint8_t *content, uint8_t contentSize) ;
     bool _readRfidBlock(uint8_t sector, uint8_t relativeBlock, uint8_t *outputBuffer, uint8_t bufferSize);
     void _setPlaybackOptions(uint8_t repeat, uint8_t shuffle);
-    void _dumpCurrentCard();
+    void _dumpCurrentCard(const nfcTagObject* card);
 };
 
 #endif // ShelfRfid_h

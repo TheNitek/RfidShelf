@@ -17,9 +17,6 @@
 // enable differential output, if disabled mono output is used
 //#define USE_DIFFERENTIAL_OUTPUT
 
-// current RFID config version
-#define RFID_CONFIG_VERSION 137
-
 // the default play volume (0-50)
 // lower value means louder!
 #define DEFAULT_VOLUME 10

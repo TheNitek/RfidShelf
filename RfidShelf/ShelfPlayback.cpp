@@ -42,16 +42,9 @@ void ShelfPlayback::begin() {
     Sprintln(F("Could not load patch"));
   }
 
-  Sprint(F("SampleRate "));
-  Sprintln(_musicPlayer.sciRead(VS1053_REG_AUDATA));
-
   _musicPlayer.setVolume(_volume, _volume);
 
   setBassAndTreble(TREBLE_AMPLITUDE, TREBLE_FREQLIMIT, BASS_AMPLITUDE, BASS_FREQLIMIT);
-
-#ifdef DEBUG_ENABLE
-  _musicPlayer.dumpRegs();
-#endif
 
   Sprintln(F("VS1053 found"));
 
@@ -300,7 +293,6 @@ void ShelfPlayback::setBassAndTreble(uint8_t trebleAmplitude, uint8_t trebleFreq
   bassReg |= bassAmplitude;
   bassReg <<= 4;
   bassReg |= bassFreqLimit;
-  Sprintf(F("bass value: %04x\n"), bassReg);
   _musicPlayer.sciWrite(VS1053_REG_BASS, bassReg);
 }
 
@@ -388,8 +380,6 @@ void ShelfPlayback::work() {
       return;
     }
 
-    Sprintln(F("Not playing"));
-    
     // If playingMusic is false there might still be data buffered in the VS1053 so we need to query its registers
     if((_musicPlayer.sciRead(VS1053_REG_HDAT0) == 0) && (_musicPlayer.sciRead(VS1053_REG_HDAT1) == 0)) {
       startPlayback();
