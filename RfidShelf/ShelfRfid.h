@@ -11,7 +11,7 @@
 #define RFID_CONFIG_MARKER 137
 
 struct cardConfig {
-  uint8_t magicByte;
+  uint8_t magicByte = RFID_CONFIG_MARKER;
   uint8_t size;
   uint8_t volume;
   uint8_t repeat : 2;       // 2 = current setting, 0 = no, 1 = yes
@@ -46,7 +46,7 @@ class ShelfRfid {
     nfcTagObject _currentCard;
     nfcTagObject _pairingCard;
     void _handleRfidData();
-    void _handleRfidConfig();
+    bool _handleRfidConfig();
     static void _print_byte_array(const uint8_t *buffer, const uint8_t  bufferSize);
     void _writeConfigBlock(const cardConfig *config);
     bool _writeRfidBlock(const uint8_t sector, const uint8_t relativeBlock, const uint8_t *content, uint8_t contentSize) ;

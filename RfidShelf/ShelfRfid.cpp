@@ -61,6 +61,7 @@ void ShelfRfid::handleRfid() {
   }
 
   if (hasActivePairing) {
+    _playback.stopPlayback();
     _writeRfidBlock(1, 0, (uint8_t*) _pairingCard.folder, strlen(_pairingCard.folder)+1);
     _writeConfigBlock(&_pairingCard.config);
     hasActivePairing = false;
@@ -96,9 +97,6 @@ void ShelfRfid::_handleRfidData() {
   memcpy(_lastCardUid, _mfrc522.uid.uidByte, 4 * sizeof(uint8_t) );
 
   if(readBuffer[0] == '\0') {
-    if(_playback.switchFolder("/")) {
-      _playback.startFilePlayback("", "unknown_card.mp3");
-    }
     return;
   }
 
@@ -116,9 +114,8 @@ void ShelfRfid::_handleRfidData() {
     Sprint(F("Resuming ")); Sprintln(currentFolder);
     _playback.resumePlayback();
     _playback.playingByCard = true;
-  } else if (_playback.switchFolder(readFolder)) {
+  } else if (_playback.switchFolder(readFolder) && _handleRfidConfig()) {
     strcpy(_currentCard.folder, readFolder);
-    _handleRfidConfig();
     _setPlaybackOptions(_currentCard.config.repeat, _currentCard.config.shuffle);
     _playback.startPlayback();
     _playback.playingByCard = true;
@@ -130,11 +127,11 @@ void ShelfRfid::_handleRfidData() {
   _dumpCurrentCard(&_currentCard);
 }
 
-void ShelfRfid::_handleRfidConfig() {
+bool ShelfRfid::_handleRfidConfig() {
   uint8_t configBuffer[18];
   if (!_readRfidBlock(2, 0, configBuffer, sizeof(configBuffer))) {
     // we could not read card config, skip handling
-    return;
+    return false;
   }
 
   memcpy(&_currentCard.config, configBuffer, sizeof(cardConfig));
@@ -156,6 +153,7 @@ void ShelfRfid::_handleRfidConfig() {
 
   Sprint(F("Setting volume: ")); Sprintln(_currentCard.config.volume);
   _playback.volume(_currentCard.config.volume);
+  return true;
 }
 
 

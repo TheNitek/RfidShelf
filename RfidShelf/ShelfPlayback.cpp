@@ -46,7 +46,7 @@ void ShelfPlayback::begin() {
 
   setBassAndTreble(TREBLE_AMPLITUDE, TREBLE_FREQLIMIT, BASS_AMPLITUDE, BASS_FREQLIMIT);
 
-  Sprintln(F("VS1053 found"));
+  Sprintln(F("VS1053 initialized"));
 
   if(_shuffleHistory.begin(BOOLARRAY_MAXSIZE) != BOOLARRAY_OK){
     Sprintln(F("Error initializing shuffle history"));
@@ -93,7 +93,7 @@ void ShelfPlayback::currentFile(char *filename, size_t size) {
 
 void ShelfPlayback::resumePlayback() {
   if(_playing != PLAYBACK_PAUSED) {
-    Sprintf(F("Wrong playback state for resume: %d"), _playing);
+    Sprintf(F("Wrong playback state for resume: %d\n"), _playing);
     return;
   }
   if (AMP_POWER > 0) {
@@ -328,7 +328,6 @@ const bool ShelfPlayback::_patchVS1053() {
   }
   file.close();
 
-  Sprint(F("Number of bytes: ")); Sprintln(i);
   return true;
 }
 

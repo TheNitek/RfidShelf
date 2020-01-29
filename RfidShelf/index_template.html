@@ -171,17 +171,17 @@
          p.fs.forEach(renderFSentry);
          formatNumbers();
          if (p.path === '/') {
-             show(_('root'));
-             hide(_('noRoot'));
-             $('.file').forEach(function (e) {
-                 e.innerHTML = e.innerHTML.replace(/\{path\}/g, '')
-             })
+            $('.root').forEach(show);
+            $('.noRoot').forEach(hide);
+            $('.file').forEach(function (e) {
+                e.innerHTML = e.innerHTML.replace(/\{path\}/g, '')
+            })
          } else {
-             hide(_('root'));
-             show(_('noRoot'));
-             $('.file').forEach(function (e) {
-                 e.innerHTML = e.innerHTML.replace(/\{path\}/g, p.path)
-             })
+            $('.root').forEach(hide);
+            $('.noRoot').forEach(show);
+            $('.file').forEach(function (e) {
+                e.innerHTML = e.innerHTML.replace(/\{path\}/g, p.path)
+            })
          }
          hide(_('loading'));
      }
@@ -511,7 +511,7 @@
  <h3>SD-Card entries:</h3>
  <div id="fs">File System Loading ...</div>
 
- <div id="root" class="hidden">
+ <div class="root hidden">
   <form id="mkdir" onsubmit="mkdir(); return false;">
    Create new folder:
    <div class="fl">
@@ -521,7 +521,7 @@
   </form>
  </div>
 
- <div id="noRoot" class="hidden">
+ <div class="noRoot hidden">
   <p><a href="#/">Back to root folder</a></p>
   <form id="uploadForm" onsubmit="upload(); return false;">
    <p>
@@ -541,7 +541,7 @@
  <form onsubmit="downloadpatch(); return false;"><p><strong>MP3 decoder patch missing</strong> (might reduce sound quality) <input type="submit" value="Download + Install VS1053 patch"></p></form>
 </section>
 
-<section>
+<section class="root hidden">
  <form onsubmit="ota(); return false;">
   <p>Version <span class="firmwareVersion">&nbsp;</span>
   <div class="fl">
