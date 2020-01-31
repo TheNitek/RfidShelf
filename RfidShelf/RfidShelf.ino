@@ -4,9 +4,9 @@
 #include <ESP8266WiFi.h>
 #include <WiFiManager.h>
 #include <SdFat.h>
-#include <WiFiUdp.h>
+#include <SD.h>
 #include <ESP8266mDNS.h>
-#include <NTPClient.h>
+#include <time.h>
 #include "ShelfPlayback.h"
 #include "ShelfRfid.h"
 #include "ShelfWeb.h"
@@ -26,16 +26,13 @@
 
 WiFiManager wifiManager;
 
-SdFat SD;
-
-WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, NTP_SERVER, NTP_OFFSET, NTP_UPDATE_TIME);
+sdfat::SdFat sdCard;
 
 char hostString[16] = {0};
 
-ShelfPlayback playback(SD);
+ShelfPlayback playback(sdCard);
 ShelfRfid rfid(playback);
-ShelfWeb webInterface(playback, rfid, SD, timeClient);
+ShelfWeb webInterface(playback, rfid, sdCard);
 #ifdef BUTTONS_ENABLE
 ShelfButtons buttons(playback);
 #endif
@@ -68,11 +65,16 @@ void setup() {
   rfid.begin();
     
   //Initialize the SdCard.
-  if (!SD.begin(SD_CS) || !SD.chdir("/")) {
-    Sprintln(F("Could not initialize SD card"));
-    SD.initErrorHalt();
+  if (!sdCard.begin(SD_CS) || !sdCard.chdir("/")) {
+    Sprintln(F("Could not initialize SD card width SdFat"));
+    sdCard.initErrorHalt();
+  }
+  Sprintln(F("SDFat ready"));
+  if(!SD.begin(SD_CS)){
+    Sprintln(F("Could not initialize SD card with SD"));
   }
   Sprintln(F("SD ready"));
+
 
   playback.begin();
 
@@ -106,7 +108,7 @@ void setup() {
 #endif
 
   if(NTP_ENABLE == 1) {
-    timeClient.begin();
+    configTime("CET-1CEST,M3.5.0,M10.5.0/3", "de.pool.ntp.org");
   }
 
   webInterface.begin();
@@ -138,10 +140,6 @@ void loop() {
 #ifdef PUSHOVER_ENABLE
   pushover.sendPoweredNotification();
 #endif
-
-  if(NTP_ENABLE == 1) {
-    timeClient.update();
-  }
 
   webInterface.work();
 }

@@ -3,7 +3,7 @@
 // This sucks - Maybe refactor ShelfWeb to singleton
 ShelfWeb *ShelfWeb::_instance;
 
-ShelfWeb::ShelfWeb(ShelfPlayback &playback, ShelfRfid &rfid, SdFat &sd, NTPClient &timeClient) : _playback(playback), _rfid(rfid), _SD(sd), _timeClient(timeClient) {
+ShelfWeb::ShelfWeb(ShelfPlayback &playback, ShelfRfid &rfid, sdfat::SdFat &sd) : _playback(playback), _rfid(rfid), _SD(sd) {
   _instance = this;
 }
 
@@ -93,7 +93,7 @@ void ShelfWeb::_sendJsonStatus() {
   }
 
   strcat(output, ",\"time\":");
-  snprintf(buffer, sizeof(buffer), "%lu", _timeClient.getEpochTime());
+  snprintf(buffer, sizeof(buffer), "%lu", time(nullptr));
   strcat(output, buffer);
 
   // This is too slow on bigger cards, so it needs to be moved somewhere else
@@ -118,18 +118,18 @@ void ShelfWeb::_sendJsonFS(const char *path) {
   _server.setContentLength(CONTENT_LENGTH_UNKNOWN);
   _server.send_P(200, "application/json", "{\"fs\":[");
 
-  SdFile dir;
-  dir.open(path, O_READ);
+  sdfat::SdFile dir;
+  dir.open(path, sdfat::O_READ);
   dir.rewind();
 
-  SdFile entry;
+  sdfat::SdFile entry;
 
   char buffer[101];
   char output[256];
 
   bool first = true;
 
-  while (entry.openNext(&dir, O_READ)) {
+  while (entry.openNext(&dir, sdfat::O_READ)) {
     if(first) {
       first = false;
       strcpy(output, "{\"name\":\"");
@@ -160,10 +160,10 @@ void ShelfWeb::_sendJsonFS(const char *path) {
 }
 
 bool ShelfWeb::_loadFromSdCard(const char *path) {
-  File dataFile = _SD.open(path);
+  sdfat::File dataFile = _SD.open(path);
 
   if (!dataFile) {
-    Sprintln(F("File not open"));
+    Sprintln("File not open");
     _returnHttpStatus(404, "Not found");
     return false;
   }
@@ -172,7 +172,7 @@ bool ShelfWeb::_loadFromSdCard(const char *path) {
     _sendJsonFS(path);
   } else {
     if (_server.streamFile(dataFile, "application/octet-stream") != dataFile.size()) {
-      Sprintln(F("Sent less data than expected!"));
+      Sprintln("Sent less data than expected!");
     }
   }
   dataFile.close();
@@ -180,7 +180,7 @@ bool ShelfWeb::_loadFromSdCard(const char *path) {
 }
 
 void ShelfWeb::_downloadPatch() {
-  Sprintln(F("Starting patch download"));
+  Sprintln("Starting patch download");
   std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
   // do not validate certificate
   client->setInsecure();
@@ -200,8 +200,8 @@ void ShelfWeb::_downloadPatch() {
   int len = httpClient.getSize();
   WiFiClient* stream = httpClient.getStreamPtr();
   uint8_t buffer[128] = { 0 };
-  SdFile patchFile;
-  patchFile.open("/patches.053", O_WRITE | O_CREAT);
+  sdfat::SdFile patchFile;
+  patchFile.open("/patches.053",sdfat::O_WRITE | sdfat::O_CREAT);
   while (httpClient.connected() && (len > 0 || len == -1)) {
     // get available data size
     size_t size = stream->available();
@@ -230,7 +230,7 @@ void ShelfWeb::_downloadPatch() {
 void ShelfWeb::_handleFileUpload() {
   // Upload always happens on /
   if (_server.uri() != "/") {
-    Sprintln(F("Invalid upload URI"));
+    Sprintln("Invalid upload URI");
     return;
   }
 
@@ -240,12 +240,12 @@ void ShelfWeb::_handleFileUpload() {
     String filename = upload.filename;
 
     if (!Adafruit_VS1053_FilePlayer::isMP3File((char *)filename.c_str())) {
-      Sprint(F("Not a MP3: ")); Sprintln(filename);
+      Sprint("Not a MP3: "); Sprintln(filename);
       return;
     }
 
     if (!filename.startsWith("/")) {
-      Sprintln(F("Invalid upload target"));
+      Sprintln("Invalid upload target");
       return;
     }
 
@@ -254,28 +254,28 @@ void ShelfWeb::_handleFileUpload() {
       return;
     }
 
-    _uploadFile.open(filename.c_str(), O_WRITE | O_CREAT);
+    _uploadFile.open(filename.c_str(), sdfat::O_WRITE | sdfat::O_CREAT);
     _uploadStart = millis();
-    Sprint(F("Upload start: "));
+    Sprint("Upload start: ");
     Sprintln(filename);
   } else if (upload.status == UPLOAD_FILE_WRITE) {
     if (_uploadFile.isOpen()) {
       _uploadFile.write(upload.buf, upload.currentSize);
-      //Sprint(F("Upload write: "));
+      //Sprint("Upload write: "));
       //Sprintln(upload.currentSize);
     }
   } else if (upload.status == UPLOAD_FILE_END) {
     if (_uploadFile.isOpen()) {
       _uploadFile.close();
-      Sprint(F("Upload end: ")); Sprintln(upload.totalSize);
-      Sprint(F("Took: ")); Sprintln(((millis()-_uploadStart)/1000));
+      Sprint("Upload end: "); Sprintln(upload.totalSize);
+      Sprint("Took: "); Sprintln(((millis()-_uploadStart)/1000));
     }
   }
 }
 
 void ShelfWeb::_handleDefault() {
   String path = _server.urlDecode(_server.uri());
-  Sprintf(F("Request to: %s\n"), path.c_str());
+  Sprintf("Request to: %s\n", path.c_str());
   if (_server.method() == HTTP_GET) {
     if (_server.hasArg("status")) {
       _sendJsonStatus();
@@ -293,15 +293,15 @@ void ShelfWeb::_handleDefault() {
       return;
     }
 
-    SdFile file;
+    sdfat::SdFile file;
     file.open(path.c_str());
     if (file.isDir()) {
       if(!file.rmRfStar()) {
-        Sprintln(F("Could not delete folder"));
+        Sprintln("Could not delete folder");
       }
     } else {
       if(!_SD.remove(path.c_str())) {
-        Sprintln(F("Could not delete file"));
+        Sprintln("Could not delete file");
       }
     }
     file.close();
@@ -309,12 +309,12 @@ void ShelfWeb::_handleDefault() {
     return;
   } else if (_server.method() == HTTP_POST) {
     if (_server.hasArg("newFolder")) {
-      Sprint(F("Creating folder ")); Sprintln(_server.arg("newFolder"));
+      Sprint("Creating folder "); Sprintln(_server.arg("newFolder"));
       _SD.mkdir(_server.arg("newFolder").c_str());
       _returnOK();
       return;
     } else if (_server.hasArg("ota")) {
-      Sprint(F("Starting OTA from ")); Sprintln(_server.arg("ota"));
+      Sprint("Starting OTA from "); Sprintln(_server.arg("ota"));
       std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
       // do not validate certificate
       client->setInsecure();
@@ -326,10 +326,10 @@ void ShelfWeb::_handleDefault() {
           _returnHttpStatus(500, "Update failed, please try again");
           return;
         case HTTP_UPDATE_NO_UPDATES:
-          Sprintln(F("HTTP_UPDATE_NO_UPDATES"));
+          Sprintln("HTTP_UPDATE_NO_UPDATES");
           break;
         case HTTP_UPDATE_OK:
-          Sprintln(F("HTTP_UPDATE_OK"));
+          Sprintln("HTTP_UPDATE_OK");
           break;
       }
       _returnOK();
@@ -382,7 +382,7 @@ void ShelfWeb::_handleDefault() {
       _sendJsonStatus();
       return;
     } else if (_server.uri() == "/") {
-      Sprintln(F("Probably got an upload request"));
+      Sprintln("Probably got an upload request");
       _returnOK();
       return;
     } else if (_SD.exists(path.c_str())) {
