@@ -1,6 +1,10 @@
 #ifndef ShelfConfig_h
 #define ShelfConfig_h
 
+#include <Arduino.h>
+#include <TZ.h>
+
+
 // -------------------------
 // AUDIO SETTINGS
 // -------------------------
@@ -17,10 +21,6 @@
 // enable differential output, if disabled mono output is used
 //#define USE_DIFFERENTIAL_OUTPUT
 
-// the default play volume (0-50)
-// lower value means louder!
-#define DEFAULT_VOLUME 10
-
 #define NIGHT_FACTOR 0.25f
 #define NIGHT_TIMEOUT 300000
 
@@ -35,14 +35,6 @@
 
 // the url for the patch download
 #define VS1053_PATCH_URL "https://raw.githubusercontent.com/madsci1016/Sparkfun-MP3-Player-Shield-Arduino-Library/master/plugins/patches.053"
-
-#define NTP_ENABLE 0
-// Adress of the NTP server
-#define NTP_SERVER "pool.ntp.org"
-// Time offset to UTC in seconds
-#define NTP_OFFSET 2*60*60
-// NTP update interval in ms
-#define NTP_UPDATE_TIME 24*60*60*1000
 
 // -------------------------
 // HARDWARE BUTTONS
@@ -90,5 +82,46 @@
 #if defined(BUTTONS_ENABLE) && defined(DEBUG_ENABLE)
   #error "BUTTONS_ENABLE cannot be used with DEBUG_ENABLE"
 #endif
+
+struct Timeslot_t
+{
+    Timeslot_t() : monday(false), tuesday(false), wednesday(false), thursday(false), friday(false), saturday(false), sunday(false) {}
+    bool monday : 1;
+    bool tuesday : 1;
+    bool wednesday : 1;
+    bool thursday : 1;
+    bool friday : 1;
+    bool saturday : 1;
+    bool sunday : 1;
+    uint8_t startHour = 0;
+    uint8_t startMinutes = 0;
+    uint8_t endHour = 0;
+    uint8_t endMinutes = 0;
+};
+
+struct ShelfConfig_t {
+    ShelfConfig_t() {
+        sprintf(hostname, "SHELF_%06X", ESP.getChipId());
+        defaultRepeat = true;
+        defaultShuffle = false;
+        defaultStopOnRemove = true;
+        strncpy(timezone, TZ_Europe_Berlin, sizeof(timezone));
+        strncpy(ntpServer, "pool.ntp.org", sizeof(ntpServer));
+    };
+    uint8_t version = 1;
+    char hostname[20];
+    char ntpServer[100];
+    char timezone[50];
+    uint8_t defaultVolumne = 10;
+    bool defaultRepeat : 1;
+    bool defaultShuffle : 1;
+    bool defaultStopOnRemove : 1;
+    Timeslot_t nightModeTimes[5];
+};
+
+namespace ShelfConfig {
+    extern ShelfConfig_t config;
+    void init();
+};
 
 #endif // ShelfConfig_h

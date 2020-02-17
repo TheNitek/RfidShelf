@@ -34,6 +34,7 @@ class ShelfWeb {
     void _returnHttpStatus(uint16_t statusCode, const char *msg);
     void _sendHTML();
     void _sendJsonStatus();
+    void _sendJsonConfig();
     void _sendJsonFS(const char *path);
     bool _loadFromSdCard(const char *path);
     void _handleWriteRfid(const char *folder);

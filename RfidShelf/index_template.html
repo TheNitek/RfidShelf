@@ -80,7 +80,7 @@
          _('ulStatus').innerText = 'Upload Aborted';
      }
      function loadStatus() {
-         ajax('GET', '/?status=1', renderStatus)
+         ajax('GET', '/?status', renderStatus)
      }
      function loadFS(url) {
          show(_('loading'));
@@ -101,30 +101,27 @@
          ajax('POST', url, function(r) { hide(_('pairingContainer')); renderStatus(r); }, d);
      }
      function play(url) {
-         var d = new FormData();
-         d.append('play', 1);
-         ajax('POST', url, renderStatus, d);
+        var d = new FormData();
+        d.append('play', 1);
+        ajax('POST', url, renderStatus, d);
      }
      function playFile(url) {
-         var d = new FormData();
-         d.append('playfile', 1);
-         ajax('POST', url, renderStatus, d);
+        var d = new FormData();
+        d.append('playfile', 1);
+        ajax('POST', url, renderStatus, d);
      }
      function rootAction(action) {
-         var d = new FormData();
-         d.append(action, 1);
-         ajax('POST', '/', renderStatus, d);
+        var d = new FormData();
+        d.append(action, 1);
+        ajax('POST', '/', renderStatus, d);
      }
      function mkdir() {
-         var f = _('folder').value;
-         if (f != '') {
-             var d = new FormData();
-             d.append('newFolder', f);
-             ajax('POST', '/', function () {
-                 reloadFS();
-                 _('mkdir').reset();
-             }, d);
-         }
+        _('mkdirSubmit').disabled=true;
+        var d = new FormData(_('mkdirForm'));
+        ajax('POST', '/', function () {
+        hide(_('mkdirContainer'))
+        reloadFS();
+        }, d);
      }
      function ota() {
          show(_('loading'));
@@ -132,7 +129,7 @@
          if(!v || !v.match(/^http.+\/\//)) v = 1;
          var d = new FormData();
          d.append('ota', v);
-         _('spinnerTxt').innerText = 'Please wait and do NOT turn off the power!';
+         _('spinnerTxt').innerHtml = 'Please wait and do NOT turn off the power! Meanwhile you can have a look at the <a href="https://github.com/TheNitek/RfidShelf/releases">changelog</a>.';
          ajax('POST', '/', function () {
              location.reload();
          }, d);
@@ -141,7 +138,7 @@
          var xhr = new XMLHttpRequest();
          xhr.onreadystatechange = function () {
              if (xhr.readyState === 1) {
-                 document.write('Please wait while downloading patch! When the download was successful the system is automatically restarting.');
+                 document.write('Please wait while the patch is downloading! Once the download is finished the system will restart automatically.');
              } else if (xhr.readyState === 4) {
                  location.reload();
              }
@@ -207,23 +204,23 @@
          var d = JSON.parse(r);
          if ('pairing' in d) {
              t('.pairingFile', '/' + d.pairing);
-             show(_('pairing'))
+             show(_('pairing'));
          }
          else {
-             hide(_('pairing'))
+             hide(_('pairing'));
          }
          var pb = _('playback');
          if ('currentFile' in d) {
-             t('.currentFile', d.currentFile)
+             t('.currentFile', '/' + d.currentFolder + '/' + d.currentFile);
          }
          if (d.playback == 'FILE') {
-             pb.className = 'playing'
+             pb.className = 'playing';
          }
          else if (d.playback == 'PAUSED') {
-             pb.className = 'paused'
+             pb.className = 'paused';
          }
          else {
-             pb.className = 'hidden'
+             pb.className = 'hidden';
          }
 
          var n = _('night'), noN = _('noNight');
@@ -237,10 +234,10 @@
          _('volumeBar').value = d.volume;
          _('volumeBar').innerHTML = d.volume;
          if (!d.patch) {
-             show(_('patchForm'))
+             show(_('patchForm'));
          }
          t('.firmwareVersion', d.version);
-         t('.shelfTime', (new Date(d.time * 1000)).toUTCString())
+         t('.shelfTime', (new Date(d.time * 1000)).toUTCString());
      }
      function showPairing(f) {
          _('pairingForm').reset();
@@ -259,11 +256,32 @@
          _('pairingVolume').value = _('volumeBar').value;
          _('pairingVolumeOutput').value = _('volumeBar').value;
      }
+     function loadConfig() {
+        ajax('GET', '/?config', function(r) {
+            var d = JSON.parse(r);
+            _('configHostname').value = d.host;
+            _('configNtp').value = d.ntp;
+            _('configTimezone').value = d.tz;
+            _('configRepeat').checked = d.repeat;
+            _('configShuffle').checked = d.shuffle;
+            _('configStopOnRemove').checked = d.stopOnRemove;
+            show(_('configContainer'));
+            hide(_('loading'));
+        });
+     }
+     function showConfig() {
+        show(_('loading'));
+        loadConfig();
+     }
+     function showMkdir() {
+         _('mkdirForm').reset();
+         show(_('mkdirContainer'));
+     }
      window.onhashchange = function () {
          loadFS(location.hash.slice(1))
-     };
+     }
 </script>
-<link rel="icon" href="data:;base64,iVBORw0KGgo=">
+<link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAb1BMVEVHcExdretcre9crOtdre1druxcrOxdrexcrOxdre1cq+xdrexdrexdrexcru1bqu1drexdru1Voexcru1cq+terexdrexbqelVqv9drOuAv/9druxdr+xdrexcretdretVqu5crexcsfFcrOxdrezU0qxCAAAAJHRSTlMA+DOpxfBX4nKMS/2XyMIV57YNRj9t6xwGnARCXaGC3g+FJFB4ExNpAAAAhElEQVQYGQXBh2ECQRAEMAH/7B45GZzj9F+jJdiMww4AVLICOEKdVhtwPZ+2UA0YyRaq8fjbGPfPK1SzT1bGBFRTyc6YgGpq92BMWNdi21RjTJiTNNUuy5cJ52SxpPo2JxOe10+/qP5IcgB898/ctzmLNWCfpF2WR4B7kncAeNt/jVfAP9X/CDiacj3PAAAAAElFTkSuQmCC">
 <title>RfidShelf</title>
 <style>
  body {
@@ -282,6 +300,7 @@
 
  #fs {
   background: rgb(250, 250, 250);
+  clear: both;
  }
 
  a {
@@ -291,6 +310,10 @@
 
  .del {
   background: #ff7272;
+ }
+
+ .create {
+  background: limegreen;
  }
 
  .mp3only, .hiddenPlaying, .hiddenPaused, .hidden {
@@ -376,9 +399,36 @@
   padding: 0 15px;
  }
 
+ button .close {
+    background: #e5e5e5;
+    color: #050505;
+ }
+
  input[type=submit]:hover, button:hover {
   background-color: #0f7ae5;
  }
+
+ .weekdays input {
+  display: none!important;
+}
+
+.weekdays input[type=checkbox] + label {
+  display: inline-block;
+  border-radius: 6px;
+  background: #e5e5e5;
+  height: 30px;
+  width: 30px;
+  margin-right: 3px;
+  line-height: 30px;
+  text-align: center;
+  cursor: pointer;
+  margin: 5px;
+}
+
+.weekdays input[type=checkbox]:checked + label {
+  background: limegreen;
+  color: #ffffff;
+}
 
  .folder::before {
   content: '\1f4c2';
@@ -398,13 +448,13 @@
   flex: 1;
  }
 
- #pairingContainer { position: fixed; top: 0; left: 0; bottom: 0; right: 0; background: rgba(229, 229, 229, 0.8); }
- #pairingContainer form { padding: 10px; border: 1px solid #e5e5e5; max-width: 500px; margin: 30px auto; background: #fafafa; }
- #pairingContainer form > div { margin-bottom: 10px; display: flex; align-items: center; }
- #pairingContainer span, #pairingContainer label { width: 150px; }
+ .modal { position: fixed; top: 0; left: 0; bottom: 0; right: 0; background: rgba(229, 229, 229, 0.8); }
+ .modal form { padding: 10px; border: 1px solid #e5e5e5; max-width: 500px; margin: 30px auto; background: #fafafa; }
+ .modal form > div { margin-bottom: 10px; display: flex; align-items: center; }
+ .modal span, .modal label { width: 200px; }
 </style>
 </head><body>
-<div id="pairingContainer" class="hidden">
+<div id="pairingContainer" class="hidden modal">
  <form id="pairingForm" onsubmit="startPairing(); return false;">
   <h3>Pair new card</h3>
   <div>
@@ -453,9 +503,76 @@
 
   <div>
    <input type="submit" value="Start pairing">
-   <button style="background: #e5e5e5; color: #050505; margin-left: 10px;" onclick="hide(_('pairingContainer')); return false;">close</button>
+   <button class="close" style="margin-left: 10px;" onclick="hide(_('pairingContainer')); return false;">close</button>
   </div>
  </form>
+</div>
+<div id="configContainer" class="hidden modal">
+ <form id="configForm">
+  <h3>Configuration</h3>
+  <div>
+   <label for="configHostname">Hostname:</label>
+   <input id="configHostname" name="host" class="fl_exp" />
+  </div>
+  <div>
+    <label for="configNtp">Time Server:</label>
+    <input id="configNtp" name="ntp" class="fl_exp" />
+   </div>
+   <div>
+    <label for="configTimezone">Timezone <a href="https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv">&#x2754;</a>:</label>
+    <input id="configTimezone" name="tz" class="fl_exp" />
+   </div>
+    <div>
+   <label for="configShuffle">Shuffle by default:</label>
+   <input type="checkbox" id="configShuffle" name="shuffle" class="fl_exp" value="1">
+  </div>
+  <div>
+   <label for="configRepeat">Repeat by default:</label>
+   <input type="checkbox" id="configRepeat" name="repeat" class="fl_exp" value="1">
+  </div>
+  <div>
+   <label for="configStopOnRemove">Stop on card removal by default:</label>
+   <input type="checkbox" id="configStopOnRemove" name="stopOnRemove" class="fl_exp" value="1">
+  </div>
+  <fieldset>
+   <legend>Activate nightmode:</legend>
+   <div>
+    <div class="weekdays">
+        <input type="checkbox" id="configDayMonday" class="weekday" />
+        <label for="configDayMonday">M</label>
+        <input type="checkbox" id="configDayTuesday" class="weekday" />
+        <label for="configDayTuesday">T</label>
+        <input type="checkbox" id="configDayWednesday" class="weekday" />
+        <label for="configDayWednesday">W</label>
+        <input type="checkbox" id="configDayThursday" class="weekday" />
+        <label for="configDayThursday">T</label>
+        <input type="checkbox" id="configDayFriday" class="weekday" />
+        <label for="configDayFriday">F</label>
+        <input type="checkbox" id="configDaySaturday" class="weekday" />
+        <label for="configDaySaturday">S</label>
+        <input type="checkbox" id="configDaySunday" class="weekday" />
+        <label for="configDaySunday">S</label>
+    </div>
+    <div>
+     <label>From: <input type="time" name="fromTime" value="18:00"></label>
+     <label>To: <input type="time" name="toTime" value="06:00"></label>
+    </div>
+   </div>
+  </fieldset>
+ </form>
+</div>
+<div id="mkdirContainer" class="hidden modal">
+ <form id="mkdirForm" onsubmit="mkdir(); return false;">
+  <h3>Create folder</h3>
+  <div>
+    <label for="newFolder">Folder name:</label>
+    <input type="text" id="newFolder" name="newFolder" required>
+  </div>
+  <div class="fl">
+   <input type="submit" id="mkdirSubmit" value="Create" class="fl_exp">
+   <button class="close" style="margin-left: 10px;" onclick="hide(_('mkdirContainer')); return false;">close</button>
+  </div>
+ </form>     
 </div>
 <template id="folderT">
  <div class="folder">
@@ -507,38 +624,34 @@
  </div>
 </section>
 
+<section id="patchForm" class="hidden">
+ <form onsubmit="downloadpatch(); return false;"><p><strong>MP3 decoder patch missing</strong> (might reduce sound quality) <input type="submit" value="Download + Install VS1053 patch"></p></form>
+</section>
+   
 <section id="fsContainer" class="hidden">
- <h3>SD-Card entries:</h3>
- <div id="fs">File System Loading ...</div>
-
- <div class="root hidden">
-  <form id="mkdir" onsubmit="mkdir(); return false;">
-   Create new folder:
-   <div class="fl">
-    <input type="text" name="folder" id="folder">
-    <input type="submit" value="Create" class="fl_exp">
-   </div>
-  </form>
+ <h3 style="float:left">SD-Card entries:</h3>
+ <div style="float:right">
+    <button class="create" title="create folder" onclick="showMkdir(); return false;">+</button>
+    <button title="settings" onclick="showConfig(); return false;">&#x2699;</button>
  </div>
+ <div id="fs">File System Loading ...</div>
 
  <div class="noRoot hidden">
   <p><a href="#/">Back to root folder</a></p>
   <form id="uploadForm" onsubmit="upload(); return false;">
    <p>
     Upload MP3 file:
-   <div class="fl">
-    <input type="file" multiple="true" name="mp3s" accept=".mp3" id="fileInput">
-    <input type="submit" value="upload" class="fl_exp">
-   </div>
+    <div class="fl">
+     <input type="file" multiple="true" name="mp3s" accept=".mp3" id="fileInput">
+     <input type="submit" value="upload" class="fl_exp">
+    </div>
    </p>
-   <div id="ulDiv" class="hidden"><progress id="progressBar" value="0" max="100" style="width:300px;"></progress>
-    <p id="ulStatus"></p></div>
+   <div id="ulDiv" class="hidden">
+    <progress id="progressBar" value="0" max="100" style="width:300px;"></progress>
+    <p id="ulStatus"></p>
+   </div>
   </form>
  </div>
-</section>
-
-<section id="patchForm" class="hidden">
- <form onsubmit="downloadpatch(); return false;"><p><strong>MP3 decoder patch missing</strong> (might reduce sound quality) <input type="submit" value="Download + Install VS1053 patch"></p></form>
 </section>
 
 <section class="root hidden">
@@ -559,6 +672,12 @@
 <script>loadStatus();
 var anchor = location.hash.slice(1);
 if (anchor == '') location.hash = '/'; else loadFS(anchor);
+$('.modal').forEach(function(el){
+    el.addEventListener("click", function(e) {
+        if(e.target.classList.contains('modal'))
+            hide(el);
+    });
+});
 </script>
 
 </body>

@@ -7,6 +7,7 @@
 #include <SD.h>
 #include <ESP8266mDNS.h>
 #include <time.h>
+#include <coredecls.h>        // settimeofday_cb()
 #include "ShelfPlayback.h"
 #include "ShelfRfid.h"
 #include "ShelfWeb.h"
@@ -28,8 +29,6 @@ WiFiManager wifiManager;
 
 sdfat::SdFat sdCard;
 
-char hostString[16] = {0};
-
 ShelfPlayback playback(sdCard);
 ShelfRfid rfid(playback);
 ShelfWeb webInterface(playback, rfid, sdCard);
@@ -40,10 +39,13 @@ ShelfButtons buttons(playback);
 ShelfPushover pushover;
 #endif
 
-void setup() {
-  // Seems to make flashing more reliable
-  delay(100);
+void timeCallback() {
+      Sprint("Time updated: ");
+      time_t now = time(nullptr);
+      Sprintln(ctime(&now));
+    }
 
+void setup() {
 #ifdef DEBUG_ENABLE
   Serial.begin(115200);
 #endif
@@ -62,6 +64,9 @@ void setup() {
 
   randomSeed(analogRead(A0));
 
+  // Load config
+  ShelfConfig::init();
+
   rfid.begin();
     
   //Initialize the SdCard.
@@ -78,9 +83,14 @@ void setup() {
 
   playback.begin();
 
-  sprintf(hostString, "SHELF_%06X", ESP.getChipId());
-  Sprint("Hostname: "); Sprintln(hostString);
-  WiFi.hostname(hostString);
+  if(strcmp(ShelfConfig::config.ntpServer, "") != 0) {
+    settimeofday_cb(timeCallback);
+    configTime(ShelfConfig::config.timezone, ShelfConfig::config.ntpServer);
+  }
+
+
+  Sprint("Hostname: "); Sprintln(ShelfConfig::config.hostname);
+  WiFi.hostname(ShelfConfig::config.hostname);
 
   wifiManager.setConfigPortalTimeout(3 * 60);
   if (!wifiManager.autoConnect("MP3-SHELF-SETUP", "lacklack")) {
@@ -97,7 +107,7 @@ void setup() {
     Sprint(F("Connected! IP address: ")); Sprintln(WiFi.localIP());
   }
 
-  if (!MDNS.begin(hostString)) {
+  if (!MDNS.begin(ShelfConfig::config.hostname)) {
     Sprintln("Error setting up MDNS responder!");
   }
 
@@ -106,10 +116,6 @@ void setup() {
   ArduinoOTA.setPassword((const char *)"shelfshelf");
   ArduinoOTA.begin();
 #endif
-
-  if(NTP_ENABLE == 1) {
-    configTime("CET-1CEST,M3.5.0,M10.5.0/3", "de.pool.ntp.org");
-  }
 
   webInterface.begin();
 

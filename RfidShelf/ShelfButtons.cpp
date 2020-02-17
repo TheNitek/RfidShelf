@@ -8,6 +8,7 @@ ShelfButtons::ShelfButtons(ShelfPlayback &playback) : _playback(playback), _paus
 };
 
 void ShelfButtons::begin() {
+  _lastAnalogVolume = ShelfConfig::config.defaultVolumne;
   _pauseButton.begin();
   _pauseButton.onPressed(handlePause);
   _skipButton.begin();

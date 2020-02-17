@@ -44,10 +44,8 @@ class ShelfPlayback {
     void currentFolder(char *name, size_t size);
     void work();
     bool playingByCard = true;
-    bool defaultShuffleMode = false;
-    bool defaultRepeatMode = true;
   private:
-    uint8_t _volume = DEFAULT_VOLUME;
+    uint8_t _volume;
     PlaybackState _playing = PLAYBACK_NO;
     Adafruit_VS1053_FilePlayer _musicPlayer;
     sdfat::SdFat &_SD;

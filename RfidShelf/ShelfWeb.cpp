@@ -37,9 +37,8 @@ void ShelfWeb::_sendHTML() {
   _server.send_P(200, "text/html", ShelfHtml::INDEX, ShelfHtml::INDEX_SIZE);
 }
 
-
 void ShelfWeb::_sendJsonStatus() {
-  char output[512] = "{\"playback\":\"";
+  char output[768] = "{\"playback\":\"";
   char buffer[101];
 
   if(_playback.playbackState() == PLAYBACK_FILE) {
@@ -80,16 +79,10 @@ void ShelfWeb::_sendJsonStatus() {
     strcat(output, ",\"night\":false");
   }
 
-  if(_playback.defaultShuffleMode) {
+  if(_playback.isShuffle()) {
     strcat(output, ",\"shuffle\":true");
   } else {
     strcat(output, ",\"shuffle\":false");
-  }
-
-  if(_playback.isShuffle()) {
-    strcat(output, ",\"currentShuffle\":true");
-  } else {
-    strcat(output, ",\"currentShuffle\":false");
   }
 
   strcat(output, ",\"time\":");
@@ -100,7 +93,6 @@ void ShelfWeb::_sendJsonStatus() {
   /*strcat(output, ",\"sdfree\":");
   snprintf(buffer, sizeof(buffer), "%u", (uint32_t)(0.000512*_SD.vol()->freeClusterCount()*_SD.vol()->blocksPerCluster()));
   strcat(output, buffer);
-
   strcat(output, ",\"sdsize\":");
   snprintf(buffer, sizeof(buffer), "%u", (uint32_t)(0.000512*_SD.card()->cardCapacity()));
   strcat(output, buffer);*/
@@ -110,6 +102,54 @@ void ShelfWeb::_sendJsonStatus() {
   snprintf(buffer, sizeof(buffer), "\"%d.%d\"", MAJOR_VERSION, MINOR_VERSION);
   strcat(output, buffer);
   strcat(output, "}");
+
+  _server.send_P(200, "application/json", output);
+}
+
+void ShelfWeb::_sendJsonConfig() {
+  using namespace ShelfConfig;
+  char output[768] = "{\"host\":\"";
+  char buffer[101];
+
+  strcat(output, config.hostname);
+  strcat(output, "\",\"ntp\":\"");
+  strcat(output, config.ntpServer);
+  strcat(output, "\",\"tz\":\"");
+  strcat(output, config.timezone);
+  strcat(output, "\",\"volume\":");
+  snprintf(buffer, sizeof(buffer), "%d", config.defaultVolumne);
+  strcat(output, buffer);
+  strcat(output, ",\"repeat\":");
+  strcat(output, config.defaultRepeat ? "true" : "false");
+  strcat(output, ",\"shuffle\":");
+  strcat(output, config.defaultShuffle ? "true" : "false");
+  strcat(output, ",\"stopOnRemove\":");
+  strcat(output, config.defaultStopOnRemove ? "true" : "false");
+  strcat(output, ",\"nightMode\":[");
+  for(uint8_t i = 0; i < sizeof(config.nightModeTimes)/sizeof(Timeslot_t); i++) {
+    strcat(output, "{");
+    strcat(output, "\"days\":[");
+    strcat(output, config.nightModeTimes[i].monday ? "true," : "false,");
+    strcat(output, config.nightModeTimes[i].tuesday ? "true," : "false,");
+    strcat(output, config.nightModeTimes[i].wednesday ? "true," : "false,");
+    strcat(output, config.nightModeTimes[i].thursday ? "true," : "false,");
+    strcat(output, config.nightModeTimes[i].friday ? "true," : "false,");
+    strcat(output, config.nightModeTimes[i].saturday ? "true," : "false,");
+    strcat(output, config.nightModeTimes[i].sunday ? "true" : "false");
+    strcat(output, "],\"start\":\"");
+    snprintf(buffer, sizeof(buffer), "%02d:%02d", config.nightModeTimes[i].startHour, config.nightModeTimes[i].startMinutes);
+    strcat(output, buffer);
+    strcat(output, "\",\"end\":\"");
+    snprintf(buffer, sizeof(buffer), "%02d:%02d", config.nightModeTimes[i].endHour, config.nightModeTimes[i].endMinutes);
+    strcat(output, buffer);
+    strcat(output, "\"");
+
+    strcat(output, "}");
+    if(i < sizeof(config.nightModeTimes)/sizeof(Timeslot_t) - 1) {
+      strcat(output, ",");
+    }
+  }
+  strcat(output, "]}");
 
   _server.send_P(200, "application/json", output);
 }
@@ -280,13 +320,19 @@ void ShelfWeb::_handleDefault() {
     if (_server.hasArg("status")) {
       _sendJsonStatus();
       return;
-    } else if(path == "/" && !_server.hasArg("fs")) {
-      _sendHTML();
-      return;
-    } else {
-      _loadFromSdCard(path.c_str());
+    }
+    if (_server.hasArg("config")) {
+      _sendJsonConfig();
       return;
     }
+    if(path == "/" && !_server.hasArg("fs")) {
+      _sendHTML();
+      return;
+    }
+
+    // start file download
+    _loadFromSdCard(path.c_str());
+    return;
   } else if (_server.method() == HTTP_DELETE) {
     if (path == "/" || !_SD.exists(path.c_str())) {
       _returnHttpStatus(400, "Bad path");
@@ -372,11 +418,9 @@ void ShelfWeb::_handleDefault() {
       _sendJsonStatus();
       return;
     } else if (_server.hasArg("toggleShuffle")) {
-      if(_playback.defaultShuffleMode) {
-        _playback.defaultShuffleMode = false;
+      if(_playback.isShuffle()) {
         _playback.stopShuffle();
       } else {
-        _playback.defaultShuffleMode = true;
         _playback.startShuffle();
       }
       _sendJsonStatus();

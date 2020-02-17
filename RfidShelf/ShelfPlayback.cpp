@@ -42,7 +42,7 @@ void ShelfPlayback::begin() {
     Sprintln("Could not load patch");
   }
 
-  _musicPlayer.setVolume(_volume, _volume);
+  volume(ShelfConfig::config.defaultVolumne);
 
   setBassAndTreble(TREBLE_AMPLITUDE, TREBLE_FREQLIMIT, BASS_AMPLITUDE, BASS_FREQLIMIT);
 
@@ -96,6 +96,11 @@ void ShelfPlayback::resumePlayback() {
     Sprintf("Wrong playback state for resume: %d\n", _playing);
     return;
   }
+  if(!_musicPlayer.currentTrack) {
+    // Workaround until https://github.com/adafruit/Adafruit_VS1053_Library/pull/58 gets merged
+    Sprintln("No playback file open");
+    return;
+  }
   if (AMP_POWER > 0) {
     digitalWrite(AMP_POWER, HIGH);
   }
@@ -139,8 +144,8 @@ void ShelfPlayback::stopPlayback() {
   _playing = PLAYBACK_NO;
   _shuffleHistory.clear();
   _shufflePlaybackCount = 0;
-  _repeatMode = defaultRepeatMode;
-  _shuffleMode = defaultShuffleMode;
+  _repeatMode = ShelfConfig::config.defaultRepeat;
+  _shuffleMode = ShelfConfig::config.defaultShuffle;
   if(isNight()) {
     _lastNightActivity = millis();
   }
@@ -418,6 +423,7 @@ void ShelfPlayback::work() {
     // If SM CANCEL hasn’t cleared after sending 2048 bytes, do a 
     // software reset (this should be extremely rare)
     Sprintln("Cancel after playback failed.");
+    // TODO check if this deletes the patch
     _musicPlayer.softReset();
     return;
 
