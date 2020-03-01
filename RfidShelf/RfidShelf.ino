@@ -2,8 +2,9 @@
 #include "ShelfPins.h"
 #include "ShelfConfig.h"
 #include <ESP8266WiFi.h>
-#include <WiFiManager.h>
-#include <SdFat.h>
+#include <ESPAsyncWebServer.h>
+#include <ESPAsyncWiFiManager.h>
+#include "SdFs.h"
 #include <SD.h>
 #include <ESP8266mDNS.h>
 #include <time.h>
@@ -20,18 +21,16 @@
 #include "ShelfButtons.h"
 #endif
 
-#ifdef PUSHOVER_ENABLE
-#include "ShelfPushover.h"
-#endif
 
+AsyncWebServer webserver(80);
+DNSServer dns;
 
-WiFiManager wifiManager;
+SDFSConfig sdConfig(SD_CS);
+FS sd = FS(FSImplPtr(new sdfs::SDFSImpl()));
 
-sdfat::SdFat sdCard;
-
-ShelfPlayback playback(sdCard);
+ShelfPlayback playback(sd);
 ShelfRfid rfid(playback);
-ShelfWeb webInterface(playback, rfid, sdCard);
+ShelfWeb webInterface(webserver, playback, rfid, sd);
 #ifdef BUTTONS_ENABLE
 ShelfButtons buttons(playback);
 #endif
@@ -40,10 +39,11 @@ ShelfPushover pushover;
 #endif
 
 void timeCallback() {
-      Sprint("Time updated: ");
-      time_t now = time(nullptr);
-      Sprintln(ctime(&now));
-    }
+  Sprint("Time updated: ");
+  time_t now = time(nullptr);
+  Sprintln(ctime(&now));
+}
+
 
 void setup() {
 #ifdef DEBUG_ENABLE
@@ -70,16 +70,16 @@ void setup() {
   rfid.begin();
     
   //Initialize the SdCard.
-  if (!sdCard.begin(SD_CS) || !sdCard.chdir("/")) {
+  sd.setConfig(sdConfig);
+  if (!sd.begin() || !sd.exists("/")) {
     Sprintln(F("Could not initialize SD card width SdFat"));
-    sdCard.initErrorHalt();
+    while(1) ESP.wdtFeed();
   }
   Sprintln(F("SDFat ready"));
   if(!SD.begin(SD_CS)){
     Sprintln(F("Could not initialize SD card with SD"));
   }
   Sprintln(F("SD ready"));
-
 
   playback.begin();
 
@@ -88,12 +88,13 @@ void setup() {
     configTime(ShelfConfig::config.timezone, ShelfConfig::config.ntpServer);
   }
 
-
   Sprint("Hostname: "); Sprintln(ShelfConfig::config.hostname);
   WiFi.hostname(ShelfConfig::config.hostname);
 
+  AsyncWiFiManager wifiManager(&webserver,&dns);
+
   wifiManager.setConfigPortalTimeout(3 * 60);
-  if (!wifiManager.autoConnect("MP3-SHELF-SETUP", "lacklack")) {
+  if (!wifiManager.autoConnect("MP3-SHELF-SETUP", "lacklack", 3, 0)) {
     Sprintln(F("Setup timed out, starting AP"));
     WiFi.mode(WIFI_AP);
     if (WiFi.softAP("MP3-SHELF", "lacklack")) {
@@ -142,10 +143,6 @@ void loop() {
   playback.work();
 
   rfid.handleRfid();
-
-#ifdef PUSHOVER_ENABLE
-  pushover.sendPoweredNotification();
-#endif
 
   webInterface.work();
 }

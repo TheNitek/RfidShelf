@@ -12,7 +12,7 @@ enum PlaybackState {PLAYBACK_NO, PLAYBACK_FILE, PLAYBACK_PAUSED};
 
 class ShelfPlayback {
   public:
-    ShelfPlayback(sdfat::SdFat &sd) :
+    ShelfPlayback(FS &sd) :
       _musicPlayer(Adafruit_VS1053_FilePlayer(BREAKOUT_RESET, BREAKOUT_CS, BREAKOUT_DCS, DREQ, SD_CS)),
       _SD(sd)
       {};
@@ -48,7 +48,7 @@ class ShelfPlayback {
     uint8_t _volume;
     PlaybackState _playing = PLAYBACK_NO;
     Adafruit_VS1053_FilePlayer _musicPlayer;
-    sdfat::SdFat &_SD;
+    FS &_SD;
     sdfat::SdFile _currentFolder;
     uint16_t _currentFolderFileCount;
     char _currentFile[100];
