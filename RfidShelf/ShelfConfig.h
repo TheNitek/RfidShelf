@@ -59,26 +59,6 @@
     #define Sprintf(a, b)
 #endif
 
-// -------------------------
-// NOTIFICTATION SETTINGS
-// -------------------------
-// enable sending of notifications using pushover
-// #define PUSHOVER_ENABLE
-#ifdef PUSHOVER_ENABLE
-    // your pushover user key
-    #define PUSHOVER_USER "user"
-    // your pushover application token
-    #define PUSHOVER_TOKEN "key"
-    // receiving device(s), leave empty to send notifications to all devices
-    #define PUSHOVER_DEVICE ""
-    // name of this RfidShelf (in case you have multiple)
-    #define PUSHOVER_RFIDSHELD_NAME "RfidShelf"
-    // timeout for periodic sending of the powered notification in ms (defaults to 30 min)
-    #define PUSHOVER_POWERED_NOTIFICATION_TIME 30 * 60 * 1000
-    // sound to play for powered notification
-    #define PUSHOVER_POWERED_SOUND "climb"
-#endif
-
 #if defined(BUTTONS_ENABLE) && defined(DEBUG_ENABLE)
   #error "BUTTONS_ENABLE cannot be used with DEBUG_ENABLE"
 #endif

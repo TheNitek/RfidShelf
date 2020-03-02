@@ -20,11 +20,6 @@
 #include "ShelfButtons.h"
 #endif
 
-#ifdef PUSHOVER_ENABLE
-#include "ShelfPushover.h"
-#endif
-
-
 WiFiManager wifiManager;
 
 sdfat::SdFat sdCard;
@@ -34,9 +29,6 @@ ShelfRfid rfid(playback);
 ShelfWeb webInterface(playback, rfid, sdCard);
 #ifdef BUTTONS_ENABLE
 ShelfButtons buttons(playback);
-#endif
-#ifdef PUSHOVER_ENABLE
-ShelfPushover pushover;
 #endif
 
 void timeCallback() {
@@ -142,10 +134,6 @@ void loop() {
   playback.work();
 
   rfid.handleRfid();
-
-#ifdef PUSHOVER_ENABLE
-  pushover.sendPoweredNotification();
-#endif
 
   webInterface.work();
 }

@@ -1,27 +1,44 @@
 #include "ShelfWeb.h"
 
-// This sucks - Maybe refactor ShelfWeb to singleton
-ShelfWeb *ShelfWeb::_instance;
-
-ShelfWeb::ShelfWeb(ShelfPlayback &playback, ShelfRfid &rfid, sdfat::SdFat &sd) : _playback(playback), _rfid(rfid), _SD(sd) {
-  _instance = this;
-}
-
-void ShelfWeb::defaultCallback() {
-  _instance->_handleDefault();
-}
-
-void ShelfWeb::fileUploadCallback() {
-  _instance->_handleFileUpload();
-}
-
 void ShelfWeb::begin() {
-  _server.on("/", HTTP_POST, defaultCallback, fileUploadCallback);
+  std::function<void(void)> defaultCallback = std::bind(&ShelfWeb::_handleDefault, this);
+  _server.on(
+    "/",
+    HTTP_POST,
+    defaultCallback,
+    std::bind(&ShelfWeb::_handleFileUpload, this)
+  );
   _server.onNotFound(defaultCallback);
-
   _server.begin();
+  BrightnessCallbackFunction brightnessCallback = std::bind(&ShelfWeb::_handleBrightness, this, std::placeholders::_1);
+  espalexa.addDevice(ShelfConfig::config.hostname, brightnessCallback, _playback.volume()*5); //simplest definition, default state off
+  espalexa.begin(&_server);
 
   MDNS.addService("http", "tcp", 80);
+}
+
+void ShelfWeb::_handleBrightness(uint8_t brightness) {
+  Sprintf("Got brightness: %d\n", brightness);
+  if(brightness == 0) {
+    if(_playback.playbackState() == PLAYBACK_FILE) {
+      _playback.pausePlayback();
+    }
+    return;
+  }
+
+  // Don't change volume on 255 because it's most likely "on" and we don't want on to turn up the volume to maxium then
+  if(brightness < 255) {
+    uint8_t volume = brightness/5;
+    if(volume > 50) {
+      volume = 50;
+    }
+    _playback.volume(50-volume);
+  }
+
+  // Resume playback AFTER we set the volume to avoid loud surprises
+  if(_playback.playbackState() == PLAYBACK_PAUSED) {
+    _playback.resumePlayback();
+  }
 }
 
 void ShelfWeb::_returnOK() {
@@ -59,6 +76,9 @@ void ShelfWeb::_sendJsonStatus() {
   if(_playback.playbackState() != PLAYBACK_NO) {
     _playback.currentFile(buffer, sizeof(buffer));
     strcat(output, ",\"currentFile\":\"");
+    strcat(output, buffer);
+    _playback.currentFolder(buffer, sizeof(buffer));
+    strcat(output, "\",\"currentFolder\":\"");
     strcat(output, buffer);
     strcat(output, "\"");
   }
@@ -294,6 +314,11 @@ void ShelfWeb::_handleFileUpload() {
       return;
     }
 
+    if(_playback.playbackState() == PLAYBACK_FILE) {
+      Sprintln("Pausing playback for upload");
+      _playback.pausePlayback();
+    }
+
     _uploadFile.open(filename.c_str(), sdfat::O_WRITE | sdfat::O_CREAT);
     _uploadStart = millis();
     Sprint("Upload start: ");
@@ -316,6 +341,9 @@ void ShelfWeb::_handleFileUpload() {
 void ShelfWeb::_handleDefault() {
   String path = _server.urlDecode(_server.uri());
   Sprintf("Request to: %s\n", path.c_str());
+  if (espalexa.handleAlexaApiCall(_server.uri(), _server.arg(0))) {
+    return;
+  }
   if (_server.method() == HTTP_GET) {
     if (_server.hasArg("status")) {
       _sendJsonStatus();
@@ -476,5 +504,7 @@ void ShelfWeb::_handleDefault() {
 }
 
 void ShelfWeb::work() {
-  _server.handleClient();
+  // Not needed because espalexa does it
+  //_server.handleClient();
+  espalexa.loop();
 }

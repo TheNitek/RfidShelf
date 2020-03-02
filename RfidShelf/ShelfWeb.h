@@ -6,6 +6,7 @@
 #include <DNSServer.h>
 #include <ESP8266mDNS.h>
 #include <ESP8266httpUpdate.h>
+#include <Espalexa.h>
 #include <Adafruit_VS1053.h>
 #include <SdFat.h>
 #include <time.h>
@@ -17,16 +18,14 @@
 
 class ShelfWeb {
   public:
-    ShelfWeb(ShelfPlayback &playback, ShelfRfid &rfid, sdfat::SdFat &sd);
+    ShelfWeb(ShelfPlayback &playback, ShelfRfid &rfid, sdfat::SdFat &sd) : _playback(playback), _rfid(rfid), _SD(sd) {}
     void begin();
     void work();
-    static void defaultCallback();
-    static void fileUploadCallback();
   private:
-    static ShelfWeb *_instance;
     ShelfPlayback &_playback;
     ShelfRfid &_rfid;
     sdfat::SdFat &_SD;
+    Espalexa espalexa;
     ESP8266WebServer _server;
     sdfat::SdFile _uploadFile;
     uint32_t _uploadStart;
@@ -40,6 +39,7 @@ class ShelfWeb {
     void _handleWriteRfid(const char *folder);
     void _handleFileUpload();
     void _handleDefault();
+    void _handleBrightness(uint8_t brightness);
     void _downloadPatch();
     void _updateOTA();
 };
