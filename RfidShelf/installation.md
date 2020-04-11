@@ -9,6 +9,7 @@ You can flash the software using Arduino IDE or PlatformIO.
  * MFRC522
  * SdFat
  * WifiManager
+ * BoolArray
 1. Install [my fork of the Adafruit_VS1053_Library](https://github.com/TheNitek/Adafruit_VS1053_Library)
 1. Open the RfidShelf.ino sketch and flash it into the ESP8266
 1. Watch the serial console during boot up
