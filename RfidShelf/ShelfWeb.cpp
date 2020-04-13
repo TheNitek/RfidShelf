@@ -10,34 +10,50 @@ void ShelfWeb::begin() {
   );
   _server.onNotFound(defaultCallback);
   _server.begin();
-  BrightnessCallbackFunction brightnessCallback = std::bind(&ShelfWeb::_handleBrightness, this, std::placeholders::_1);
-  espalexa.addDevice(ShelfConfig::config.hostname, brightnessCallback, _playback.volume()*5); //simplest definition, default state off
+
+  DeviceCallbackFunction deviceCallback = std::bind(&ShelfWeb::_deviceCallback, this, std::placeholders::_1);
+  _alexaDevice = new EspalexaDevice(ShelfConfig::config.hostname, deviceCallback, EspalexaDeviceType::dimmable, 50);
+  _alexaDevice->setPercent(2*(50-_playback.volume()));
+  espalexa.addDevice(_alexaDevice);
   espalexa.begin(&_server);
+
+  PlaybackCallbackFunction playbackCallback = std::bind(&ShelfWeb::_playbackCallback, this, std::placeholders::_1, std::placeholders::_2);
+  _playback.callback = playbackCallback;
 
   MDNS.addService("http", "tcp", 80);
 }
 
-void ShelfWeb::_handleBrightness(uint8_t brightness) {
-  Sprintf("Got brightness: %d\n", brightness);
-  if(brightness == 0) {
-    if(_playback.playbackState() == PLAYBACK_FILE) {
-      _playback.pausePlayback();
-    }
-    return;
+void ShelfWeb::_deviceCallback(EspalexaDevice* device) {
+  Sprintf("Got device callback type: %d\n", device->getLastChangedProperty());
+
+  switch(device->getLastChangedProperty()) {
+    case EspalexaDeviceProperty::off:
+      if(_playback.playbackState() == PLAYBACK_FILE) {
+        _playback.pausePlayback();
+      }
+      break;
+    case EspalexaDeviceProperty::on: 
+      if(_playback.playbackState() == PLAYBACK_PAUSED) {
+        _playback.playingByCard = false;
+        _playback.resumePlayback();
+        device->setPercent(2*(50-_playback.volume()));
+      }
+      break;
+    case EspalexaDeviceProperty::bri:
+      _playback.volume(50-device->getPercent()/2, false);
+      break;
+    default:
+      Sprintln("Callback ignored");
   }
 
-  // Don't change volume on 255 because it's most likely "on" and we don't want on to turn up the volume to maxium then
-  if(brightness < 255) {
-    uint8_t volume = brightness/5;
-    if(volume > 50) {
-      volume = 50;
-    }
-    _playback.volume(50-volume);
-  }
 
-  // Resume playback AFTER we set the volume to avoid loud surprises
-  if(_playback.playbackState() == PLAYBACK_PAUSED) {
-    _playback.resumePlayback();
+}
+
+void ShelfWeb::_playbackCallback(PlaybackState state, uint8_t volume) {
+  if(state == PLAYBACK_FILE) {
+    _alexaDevice->setPercent(2*(50-_playback.volume()));
+  } else {
+    _alexaDevice->setValue(0);
   }
 }
 

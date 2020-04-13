@@ -106,6 +106,9 @@ void ShelfPlayback::resumePlayback() {
   }
   _musicPlayer.pausePlaying(false);
   _playing = PLAYBACK_FILE;
+  if(callback != nullptr) {
+    callback(_playing, _volume);
+  }
 }
 
 void ShelfPlayback::pausePlayback() {
@@ -117,6 +120,9 @@ void ShelfPlayback::pausePlayback() {
   }
   _musicPlayer.pausePlaying(true);
   _playing = PLAYBACK_PAUSED;
+  if(callback != nullptr) {
+    callback(_playing, _volume);
+  }
   if(isNight()) {
     _lastNightActivity = millis();
   }
@@ -142,6 +148,9 @@ void ShelfPlayback::stopPlayback() {
   }
   _musicPlayer.stopPlaying();
   _playing = PLAYBACK_NO;
+  if(callback != nullptr) {
+    callback(_playing, _volume);
+  }
   _shuffleHistory.clear();
   _shufflePlaybackCount = 0;
   _repeatMode = ShelfConfig::config.defaultRepeat;
@@ -244,7 +253,11 @@ void ShelfPlayback::startFilePlayback(const char *folder, const char *file) {
 
   Sprint("Playing "); Sprintln(fullPath);
 
-  _playing = PLAYBACK_FILE;
+  if(_playing != PLAYBACK_FILE) {
+    _playing = PLAYBACK_FILE;
+    callback(_playing, _volume);
+  }
+
   strncpy(_currentFile, file, sizeof(_currentFile));
 
   if (AMP_POWER > 0) {
@@ -262,11 +275,15 @@ void ShelfPlayback::skipFile() {
   startPlayback();
 }
 
-void ShelfPlayback::volume(uint8_t volume) {
+void ShelfPlayback::volume(uint8_t volume, bool notifyCallback) {
   if(volume > 50) {
     _volume = 50;
   } else {
     _volume = volume;
+  }
+
+  if(callback != nullptr && notifyCallback) {
+    callback(_playing, _volume);
   }
 
   uint8_t calcVolume = volume;

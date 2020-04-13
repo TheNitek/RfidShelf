@@ -9,6 +9,7 @@
 #include <BoolArray.h>
 
 enum PlaybackState {PLAYBACK_NO, PLAYBACK_FILE, PLAYBACK_PAUSED};
+typedef std::function<void(PlaybackState state, uint8_t volume)> PlaybackCallbackFunction;
 
 class ShelfPlayback {
   public:
@@ -26,7 +27,7 @@ class ShelfPlayback {
     void togglePause();
     void stopPlayback();
     const uint8_t volume() {return _volume;};
-    void volume(uint8_t volume);
+    void volume(uint8_t volume, bool notifyCallback=true);
     void volumeDown();
     void volumeUp();
     void startNight();
@@ -44,6 +45,7 @@ class ShelfPlayback {
     void currentFolder(char *name, size_t size);
     void work();
     bool playingByCard = true;
+    PlaybackCallbackFunction callback = nullptr;
   private:
     uint8_t _volume;
     PlaybackState _playing = PLAYBACK_NO;

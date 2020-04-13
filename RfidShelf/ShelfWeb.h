@@ -7,6 +7,7 @@
 #include <ESP8266mDNS.h>
 #include <ESP8266httpUpdate.h>
 #define ESPALEXA_MAXDEVICES 1
+//#define ESPALEXA_DEBUG
 #include <Espalexa.h>
 #include <Adafruit_VS1053.h>
 #include <SdFat.h>
@@ -27,6 +28,7 @@ class ShelfWeb {
     ShelfRfid &_rfid;
     sdfat::SdFat &_SD;
     Espalexa espalexa;
+    EspalexaDevice* _alexaDevice;
     ESP8266WebServer _server;
     sdfat::SdFile _uploadFile;
     uint32_t _uploadStart;
@@ -40,9 +42,10 @@ class ShelfWeb {
     void _handleWriteRfid(const char *folder);
     void _handleFileUpload();
     void _handleDefault();
-    void _handleBrightness(uint8_t brightness);
+    void _deviceCallback(EspalexaDevice* device);
     void _downloadPatch();
     void _updateOTA();
+    void _playbackCallback(PlaybackState state, uint8_t volume);
 };
 
 #endif // ShelfWeb_h

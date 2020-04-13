@@ -11,7 +11,6 @@ You can flash the software using Arduino IDE or PlatformIO.
  * BoolArray
  * Adafruit_VS1053_Library
  * EasyButton
- * 
 1. Install [my fork of the Espalexa](https://github.com/TheNitek/Espalexa)
 1. Open the RfidShelf.ino sketch and flash it into the ESP8266
 1. Watch the serial console during boot up
