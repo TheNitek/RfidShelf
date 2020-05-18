@@ -9,7 +9,8 @@ void ShelfWeb::begin() {
     std::bind(&ShelfWeb::_handleFileUpload, this)
   );
   _server.onNotFound(defaultCallback);
-  _server.begin();
+  // Done by espalexa
+  //_server.begin();
 
   DeviceCallbackFunction deviceCallback = std::bind(&ShelfWeb::_deviceCallback, this, std::placeholders::_1);
   _alexaDevice = new EspalexaDevice(ShelfConfig::config.hostname, deviceCallback, EspalexaDeviceType::dimmable, 50);
@@ -357,7 +358,7 @@ void ShelfWeb::_handleFileUpload() {
 void ShelfWeb::_handleDefault() {
   String path = _server.urlDecode(_server.uri());
   Sprintf("Request to: %s\n", path.c_str());
-  if (espalexa.handleAlexaApiCall(_server.uri(), _server.arg(0))) {
+  if (espalexa.handleAlexaApiCall(_server.uri(), _server.arg("plain"))) {
     return;
   }
   if (_server.method() == HTTP_GET) {
