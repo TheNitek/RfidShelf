@@ -46,8 +46,6 @@ void ShelfWeb::_deviceCallback(EspalexaDevice* device) {
     default:
       Sprintln("Callback ignored");
   }
-
-
 }
 
 void ShelfWeb::_playbackCallback(PlaybackState state, uint8_t volume) {

@@ -6,8 +6,6 @@
 #include <DNSServer.h>
 #include <ESP8266mDNS.h>
 #include <ESP8266httpUpdate.h>
-#define ESPALEXA_MAXDEVICES 1
-//#define ESPALEXA_DEBUG
 #include <Espalexa.h>
 #include <Adafruit_VS1053.h>
 #include <SdFat.h>
