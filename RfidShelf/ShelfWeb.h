@@ -21,6 +21,7 @@ class ShelfWeb {
     ShelfWeb(ShelfPlayback &playback, ShelfRfid &rfid, sdfat::SdFat &sd) : _playback(playback), _rfid(rfid), _SD(sd) {}
     void begin();
     void work();
+    bool isFileUploading();
   private:
     ShelfPlayback &_playback;
     ShelfRfid &_rfid;

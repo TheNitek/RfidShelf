@@ -20,8 +20,6 @@
 #include "ShelfButtons.h"
 #endif
 
-WiFiManager wifiManager;
-
 sdfat::SdFat sdCard;
 
 ShelfPlayback playback(sdCard);
@@ -67,7 +65,7 @@ void setup() {
     sdCard.initErrorHalt();
   }
   Sprintln(F("SDFat ready"));
-  if(!SD.begin(SD_CS)){
+  if(!SD.begin(SD_CS, SPI_FULL_SPEED)){
     Sprintln(F("Could not initialize SD card with SD"));
   }
   Sprintln(F("SD ready"));
@@ -84,6 +82,7 @@ void setup() {
   Sprint("Hostname: "); Sprintln(ShelfConfig::config.hostname);
   WiFi.hostname(ShelfConfig::config.hostname);
 
+  WiFiManager wifiManager;
   wifiManager.setConfigPortalTimeout(3 * 60);
   if (!wifiManager.autoConnect("MP3-SHELF-SETUP", "lacklack")) {
     Sprintln(F("Setup timed out, starting AP"));
@@ -121,6 +120,15 @@ void setup() {
 }
 
 void loop() {
+  MDNS.update();
+
+  webInterface.work();
+
+  // Skip the rest while file is uploading to improve performance (playback won't work anyway)
+  if(webInterface.isFileUploading()) {
+    return;
+  }
+
 #ifdef BUTTONS_ENABLE
   buttons.work();
 #endif
@@ -129,11 +137,7 @@ void loop() {
   ArduinoOTA.handle();
 #endif
 
-  MDNS.update();
-
   playback.work();
 
   rfid.handleRfid();
-
-  webInterface.work();
 }

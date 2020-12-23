@@ -518,6 +518,10 @@ void ShelfWeb::_handleDefault() {
   Sprintln("404: " + path);
 }
 
+bool ShelfWeb::isFileUploading() {
+  return _uploadFile.isOpen();
+}
+
 void ShelfWeb::work() {
   // Not needed because espalexa does it
   //_server.handleClient();
