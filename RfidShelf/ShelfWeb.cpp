@@ -13,7 +13,7 @@ void ShelfWeb::begin() {
   //_server.begin();
 
   DeviceCallbackFunction deviceCallback = std::bind(&ShelfWeb::_deviceCallback, this, std::placeholders::_1);
-  _alexaDevice = new EspalexaDevice(ShelfConfig::config.hostname, deviceCallback, EspalexaDeviceType::dimmable, 50);
+  _alexaDevice = new EspalexaDevice(_config.hostname, deviceCallback, EspalexaDeviceType::dimmable, 50);
   _alexaDevice->setPercent(2*(50-_playback.volume()));
   espalexa.addDevice(_alexaDevice);
   espalexa.begin(&_server);
@@ -142,45 +142,44 @@ void ShelfWeb::_sendJsonStatus() {
 }
 
 void ShelfWeb::_sendJsonConfig() {
-  using namespace ShelfConfig;
   char output[768] = "{\"host\":\"";
   char buffer[101];
 
-  strcat(output, config.hostname);
+  strcat(output, _config.hostname);
   strcat(output, "\",\"ntp\":\"");
-  strcat(output, config.ntpServer);
+  strcat(output, _config.ntpServer);
   strcat(output, "\",\"tz\":\"");
-  strcat(output, config.timezone);
+  strcat(output, _config.timezone);
   strcat(output, "\",\"volume\":");
-  snprintf(buffer, sizeof(buffer), "%d", config.defaultVolumne);
+  snprintf(buffer, sizeof(buffer), "%d", _config.defaultVolumne);
   strcat(output, buffer);
   strcat(output, ",\"repeat\":");
-  strcat(output, config.defaultRepeat ? "true" : "false");
+  strcat(output, _config.defaultRepeat ? "true" : "false");
   strcat(output, ",\"shuffle\":");
-  strcat(output, config.defaultShuffle ? "true" : "false");
+  strcat(output, _config.defaultShuffle ? "true" : "false");
   strcat(output, ",\"stopOnRemove\":");
-  strcat(output, config.defaultStopOnRemove ? "true" : "false");
+  strcat(output, _config.defaultStopOnRemove ? "true" : "false");
   strcat(output, ",\"nightMode\":[");
-  for(uint8_t i = 0; i < sizeof(config.nightModeTimes)/sizeof(Timeslot_t); i++) {
+  for(uint8_t i = 0; i < sizeof(_config.nightModeTimes)/sizeof(Timeslot_t); i++) {
     strcat(output, "{");
     strcat(output, "\"days\":[");
-    strcat(output, config.nightModeTimes[i].monday ? "true," : "false,");
-    strcat(output, config.nightModeTimes[i].tuesday ? "true," : "false,");
-    strcat(output, config.nightModeTimes[i].wednesday ? "true," : "false,");
-    strcat(output, config.nightModeTimes[i].thursday ? "true," : "false,");
-    strcat(output, config.nightModeTimes[i].friday ? "true," : "false,");
-    strcat(output, config.nightModeTimes[i].saturday ? "true," : "false,");
-    strcat(output, config.nightModeTimes[i].sunday ? "true" : "false");
+    strcat(output, _config.nightModeTimes[i].monday ? "true," : "false,");
+    strcat(output, _config.nightModeTimes[i].tuesday ? "true," : "false,");
+    strcat(output, _config.nightModeTimes[i].wednesday ? "true," : "false,");
+    strcat(output, _config.nightModeTimes[i].thursday ? "true," : "false,");
+    strcat(output, _config.nightModeTimes[i].friday ? "true," : "false,");
+    strcat(output, _config.nightModeTimes[i].saturday ? "true," : "false,");
+    strcat(output, _config.nightModeTimes[i].sunday ? "true" : "false");
     strcat(output, "],\"start\":\"");
-    snprintf(buffer, sizeof(buffer), "%02d:%02d", config.nightModeTimes[i].startHour, config.nightModeTimes[i].startMinutes);
+    snprintf(buffer, sizeof(buffer), "%02d:%02d", _config.nightModeTimes[i].startHour, _config.nightModeTimes[i].startMinutes);
     strcat(output, buffer);
     strcat(output, "\",\"end\":\"");
-    snprintf(buffer, sizeof(buffer), "%02d:%02d", config.nightModeTimes[i].endHour, config.nightModeTimes[i].endMinutes);
+    snprintf(buffer, sizeof(buffer), "%02d:%02d", _config.nightModeTimes[i].endHour, _config.nightModeTimes[i].endMinutes);
     strcat(output, buffer);
     strcat(output, "\"");
 
     strcat(output, "}");
-    if(i < sizeof(config.nightModeTimes)/sizeof(Timeslot_t) - 1) {
+    if(i < sizeof(_config.nightModeTimes)/sizeof(Timeslot_t) - 1) {
       strcat(output, ",");
     }
   }

@@ -42,7 +42,7 @@ void ShelfPlayback::begin() {
     Sprintln("Could not load patch");
   }
 
-  volume(ShelfConfig::config.defaultVolumne);
+  volume(_config.defaultVolumne);
 
   setBassAndTreble(TREBLE_AMPLITUDE, TREBLE_FREQLIMIT, BASS_AMPLITUDE, BASS_FREQLIMIT);
 
@@ -153,8 +153,8 @@ void ShelfPlayback::stopPlayback() {
   }
   _shuffleHistory.clear();
   _shufflePlaybackCount = 0;
-  _repeatMode = ShelfConfig::config.defaultRepeat;
-  _shuffleMode = ShelfConfig::config.defaultShuffle;
+  _repeatMode = _config.defaultRepeat;
+  _shuffleMode = _config.defaultShuffle;
   if(isNight()) {
     _lastNightActivity = millis();
   }

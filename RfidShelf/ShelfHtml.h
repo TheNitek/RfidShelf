@@ -1,5 +1,4 @@
-#ifndef ShelfHtml_h
-#define ShelfHtml_h
+#pragma once
 
 #include <Arduino.h>
 
@@ -8,4 +7,3 @@ class ShelfHtml {
         static const char INDEX[];
         static const size_t INDEX_SIZE;
 };
-#endif // ShelfHtml_h

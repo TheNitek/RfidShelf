@@ -1,5 +1,4 @@
-#ifndef ShelfConfig_h
-#define ShelfConfig_h
+#pragma once
 
 #include <Arduino.h>
 #include <TZ.h>
@@ -79,29 +78,17 @@ struct Timeslot_t
     uint8_t endMinutes = 0;
 };
 
-struct ShelfConfig_t {
-    ShelfConfig_t() {
-        sprintf(hostname, "SHELF_%06X", ESP.getChipId());
-        defaultRepeat = true;
-        defaultShuffle = false;
-        defaultStopOnRemove = true;
-        strncpy(timezone, TZ_Europe_Berlin, sizeof(timezone));
-        strncpy(ntpServer, "pool.ntp.org", sizeof(ntpServer));
-    };
-    uint8_t version = 1;
-    char hostname[20];
-    char ntpServer[100];
-    char timezone[50];
-    uint8_t defaultVolumne = 10;
-    bool defaultRepeat : 1;
-    bool defaultShuffle : 1;
-    bool defaultStopOnRemove : 1;
-    Timeslot_t nightModeTimes[5];
+class ShelfConfig {
+    public:
+        ShelfConfig() {};
+        void init();
+        uint8_t version = 1;
+        char hostname[20];
+        char ntpServer[100];
+        char timezone[50];
+        uint8_t defaultVolumne = 10;
+        bool defaultRepeat : 1;
+        bool defaultShuffle : 1;
+        bool defaultStopOnRemove : 1;
+        Timeslot_t nightModeTimes[5];
 };
-
-namespace ShelfConfig {
-    extern ShelfConfig_t config;
-    void init();
-};
-
-#endif // ShelfConfig_h

@@ -1,5 +1,4 @@
-#ifndef ShelfPlayback_h
-#define ShelfPlayback_h
+#pragma once
 
 #include "ShelfPins.h"
 #include "ShelfConfig.h"
@@ -13,7 +12,8 @@ typedef std::function<void(PlaybackState state, uint8_t volume)> PlaybackCallbac
 
 class ShelfPlayback {
   public:
-    ShelfPlayback(sdfat::SdFat &sd) :
+    ShelfPlayback(ShelfConfig &config, sdfat::SdFat &sd) :
+      _config(config),
       _musicPlayer(Adafruit_VS1053_FilePlayer(BREAKOUT_RESET, BREAKOUT_CS, BREAKOUT_DCS, DREQ, SD_CS)),
       _SD(sd)
       {};
@@ -47,6 +47,7 @@ class ShelfPlayback {
     bool playingByCard = true;
     PlaybackCallbackFunction callback = nullptr;
   private:
+    ShelfConfig _config;
     uint8_t _volume;
     PlaybackState _playing = PLAYBACK_NO;
     Adafruit_VS1053_FilePlayer _musicPlayer;
@@ -64,5 +65,3 @@ class ShelfPlayback {
     // Store playback history for shuffle playback to prevent repititions
     BoolArray _shuffleHistory;
 };
-
-#endif // ShelfPlayback_h

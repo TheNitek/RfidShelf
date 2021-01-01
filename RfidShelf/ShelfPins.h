@@ -1,5 +1,4 @@
-#ifndef ShelfPins_h
-#define ShelfPins_h
+#pragma once
 
 #define RC522_CS        D8
 #define SD_CS           D2
@@ -14,5 +13,3 @@
 #define PAUSE_BTN       D10   // GPIO1 = TX
 #define SKIP_BTN        D9    // GPIO3 = RX
 #define VOLUME          A0
-
-#endif // ShelfPins_h

@@ -1,5 +1,4 @@
-#ifndef ShelfButtons_h
-#define ShelfButtons_h
+#pragma once
 
 #include <EasyButton.h>
 #include "ShelfConfig.h"
@@ -8,13 +7,14 @@
 
 class ShelfButtons {
   public:
-    ShelfButtons(ShelfPlayback &playback);
+    ShelfButtons(ShelfConfig &config, ShelfPlayback &playback);
     void begin();
     void work();
     static void handlePause();
     static void handleSkip();
   private:
     static ShelfButtons *_instance;
+    ShelfConfig &_config;
     ShelfPlayback &_playback;
     unsigned long _lastAnalogCheck = 0L;
     EasyButton _pauseButton;
@@ -22,5 +22,3 @@ class ShelfButtons {
     uint8_t _lastAnalogVolume;
     void _handleVolume();
 };
-
-#endif // ShelfButtons_h

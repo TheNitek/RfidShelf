@@ -1,5 +1,4 @@
-#ifndef ShelfRfid_h
-#define ShelfRfid_h
+#pragma once
 
 #include "ShelfConfig.h"
 #include "ShelfPins.h"
@@ -28,7 +27,8 @@ struct nfcTagObject {
 
 class ShelfRfid {
   public:
-    ShelfRfid(ShelfPlayback &playback) :
+    ShelfRfid(ShelfConfig &config, ShelfPlayback &playback) :
+      _config(config),
       _playback(playback),
       _mfrc522(RC522_CS, UINT8_MAX)
       {};
@@ -38,6 +38,7 @@ class ShelfRfid {
     nfcTagObject getPairingConfig();
     bool hasActivePairing = false;
   private:
+    ShelfConfig &_config;
     ShelfPlayback &_playback;
     MFRC522 _mfrc522; // Create MFRC522 instance.
     MFRC522::MIFARE_Key _key;
@@ -54,5 +55,3 @@ class ShelfRfid {
     void _setPlaybackOptions(uint8_t repeat, uint8_t shuffle);
     void _dumpCurrentCard(const nfcTagObject* card);
 };
-
-#endif // ShelfRfid_h

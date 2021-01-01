@@ -22,11 +22,12 @@
 
 sdfat::SdFat sdCard;
 
-ShelfPlayback playback(sdCard);
-ShelfRfid rfid(playback);
-ShelfWeb webInterface(playback, rfid, sdCard);
+ShelfConfig config;
+ShelfPlayback playback(config, sdCard);
+ShelfRfid rfid(config, playback);
+ShelfWeb webInterface(config, playback, rfid, sdCard);
 #ifdef BUTTONS_ENABLE
-ShelfButtons buttons(playback);
+ShelfButtons buttons(config, playback);
 #endif
 
 void timeCallback() {
@@ -55,7 +56,7 @@ void setup() {
   randomSeed(analogRead(A0));
 
   // Load config
-  ShelfConfig::init();
+  config.init();
 
   rfid.begin();
     
@@ -73,14 +74,14 @@ void setup() {
 
   playback.begin();
 
-  if(strcmp(ShelfConfig::config.ntpServer, "") != 0) {
+  if(strcmp(config.ntpServer, "") != 0) {
     settimeofday_cb(timeCallback);
-    configTime(ShelfConfig::config.timezone, ShelfConfig::config.ntpServer);
+    configTime(config.timezone, config.ntpServer);
   }
 
 
-  Sprint("Hostname: "); Sprintln(ShelfConfig::config.hostname);
-  WiFi.hostname(ShelfConfig::config.hostname);
+  Sprint("Hostname: "); Sprintln(config.hostname);
+  WiFi.hostname(config.hostname);
 
   WiFiManager wifiManager;
   wifiManager.setConfigPortalTimeout(3 * 60);
@@ -98,7 +99,7 @@ void setup() {
     Sprint(F("Connected! IP address: ")); Sprintln(WiFi.localIP());
   }
 
-  if (!MDNS.begin(ShelfConfig::config.hostname)) {
+  if (!MDNS.begin(config.hostname)) {
     Sprintln("Error setting up MDNS responder!");
   }
 

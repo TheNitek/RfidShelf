@@ -19,7 +19,7 @@ void ShelfRfid::handleRfid() {
   _lastRfidCheck = millis();
 
   // While playing check if the tag is still present
-  if ((_playback.playbackState() == PLAYBACK_FILE) && _playback.playingByCard && (_currentCard.config.stopOnRemove == 1 || (_currentCard.config.stopOnRemove == 2 && ShelfConfig::config.defaultStopOnRemove))) {
+  if ((_playback.playbackState() == PLAYBACK_FILE) && _playback.playingByCard && (_currentCard.config.stopOnRemove == 1 || (_currentCard.config.stopOnRemove == 2 && _config.defaultStopOnRemove))) {
 
     // Since wireless communication is voodoo we'll give it a few retrys before killing the music
     for (int i = 0; i < 3; i++) {
@@ -146,7 +146,7 @@ bool ShelfRfid::_handleRfidConfig() {
     if(_currentCard.config.magicByte != RFID_CONFIG_MARKER || _currentCard.config.size != 1) {
       Sprintln(F("Setting magic byte and volume"));
       _currentCard.config.magicByte = RFID_CONFIG_MARKER;
-      _currentCard.config.volume = ShelfConfig::config.defaultVolumne;
+      _currentCard.config.volume = _config.defaultVolumne;
     }
     _writeConfigBlock(&_currentCard.config);
   }
@@ -158,13 +158,13 @@ bool ShelfRfid::_handleRfidConfig() {
 
 
 void ShelfRfid::_setPlaybackOptions(const uint8_t repeat, const uint8_t shuffle) {
-  if(repeat == 1 || (repeat == 2 && ShelfConfig::config.defaultRepeat)) {
+  if(repeat == 1 || (repeat == 2 && _config.defaultRepeat)) {
     _playback.startRepeat();
   } else {
     _playback.stopRepeat();
   }
   
-  if(shuffle == 1 || (shuffle == 2 && ShelfConfig::config.defaultShuffle)) {
+  if(shuffle == 1 || (shuffle == 2 && _config.defaultShuffle)) {
     _playback.startShuffle();
   } else {
     _playback.stopShuffle();

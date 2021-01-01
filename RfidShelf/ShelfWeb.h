@@ -1,5 +1,4 @@
-#ifndef ShelfWeb_h
-#define ShelfWeb_h
+#pragma once
 
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
@@ -18,11 +17,12 @@
 
 class ShelfWeb {
   public:
-    ShelfWeb(ShelfPlayback &playback, ShelfRfid &rfid, sdfat::SdFat &sd) : _playback(playback), _rfid(rfid), _SD(sd) {}
+    ShelfWeb(ShelfConfig &config, ShelfPlayback &playback, ShelfRfid &rfid, sdfat::SdFat &sd) : _config(config), _playback(playback), _rfid(rfid), _SD(sd) {}
     void begin();
     void work();
     bool isFileUploading();
   private:
+    ShelfConfig &_config;
     ShelfPlayback &_playback;
     ShelfRfid &_rfid;
     sdfat::SdFat &_SD;
@@ -46,5 +46,3 @@ class ShelfWeb {
     void _updateOTA();
     void _playbackCallback(PlaybackState state, uint8_t volume);
 };
-
-#endif // ShelfWeb_h
