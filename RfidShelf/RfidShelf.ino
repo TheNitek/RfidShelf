@@ -31,10 +31,10 @@ ShelfButtons buttons(config, playback);
 #endif
 
 void timeCallback() {
-      Sprint("Time updated: ");
-      time_t now = time(nullptr);
-      Sprintln(ctime(&now));
-    }
+  Sprint("Time updated: ");
+  time_t now = time(nullptr);
+  Sprintln(ctime(&now));
+}
 
 void setup() {
 #ifdef DEBUG_ENABLE
@@ -96,7 +96,7 @@ void setup() {
   }
 
   if(WiFi.isConnected()) {
-    Sprint(F("Connected! IP address: ")); Sprintln(WiFi.localIP());
+    Sprint(F("Connected! http://")); Sprintln(WiFi.localIP());
   }
 
   if (!MDNS.begin(config.hostname)) {

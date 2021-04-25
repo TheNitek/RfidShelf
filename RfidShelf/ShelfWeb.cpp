@@ -15,8 +15,8 @@ void ShelfWeb::begin() {
   DeviceCallbackFunction deviceCallback = std::bind(&ShelfWeb::_deviceCallback, this, std::placeholders::_1);
   _alexaDevice = new EspalexaDevice(_config.hostname, deviceCallback, EspalexaDeviceType::dimmable, 50);
   _alexaDevice->setPercent(2*(50-_playback.volume()));
-  espalexa.addDevice(_alexaDevice);
-  espalexa.begin(&_server);
+  _espalexa.addDevice(_alexaDevice);
+  _espalexa.begin(&_server);
 
   PlaybackCallbackFunction playbackCallback = std::bind(&ShelfWeb::_playbackCallback, this, std::placeholders::_1, std::placeholders::_2);
   _playback.callback = playbackCallback;
@@ -124,20 +124,21 @@ void ShelfWeb::_sendJsonStatus() {
   snprintf(buffer, sizeof(buffer), "%lu", time(nullptr));
   strcat(output, buffer);
 
-  // This is too slow on bigger cards, so it needs to be moved somewhere else
-  /*strcat(output, ",\"sdfree\":");
-  snprintf(buffer, sizeof(buffer), "%u", (uint32_t)(0.000512*_SD.vol()->freeClusterCount()*_SD.vol()->blocksPerCluster()));
-  strcat(output, buffer);
-  strcat(output, ",\"sdsize\":");
-  snprintf(buffer, sizeof(buffer), "%u", (uint32_t)(0.000512*_SD.card()->cardCapacity()));
-  strcat(output, buffer);*/
-
-
   strcat(output, ",\"version\":");
   snprintf(buffer, sizeof(buffer), "\"%d.%d\"", MAJOR_VERSION, MINOR_VERSION);
   strcat(output, buffer);
   strcat(output, "}");
 
+  _server.send_P(200, "application/json", output);
+}
+
+void ShelfWeb::_sendJsonFSUsage() {
+  uint32_t free = (uint32_t)(0.000512*_SD.vol()->freeClusterCount()*_SD.vol()->blocksPerCluster());
+  uint32_t total = (uint32_t)(0.000512*_SD.card()->cardCapacity());
+
+  // This is too slow on bigger cards, so it needs to be moved somewhere else
+  char output[51] = "";
+  snprintf(output, sizeof(output), "{\"free\":%u,\"total\":%u}", free, total);
   _server.send_P(200, "application/json", output);
 }
 
@@ -194,7 +195,7 @@ void ShelfWeb::_sendJsonFS(const char *path) {
 
   sdfat::SdFile dir;
   dir.open(path, sdfat::O_READ);
-  dir.rewind();
+  //dir.rewind();
 
   sdfat::SdFile entry;
 
@@ -355,16 +356,20 @@ void ShelfWeb::_handleFileUpload() {
 void ShelfWeb::_handleDefault() {
   String path = _server.urlDecode(_server.uri());
   Sprintf("Request to: %s\n", path.c_str());
-  if (espalexa.handleAlexaApiCall(_server.uri(), _server.arg("plain"))) {
+  if(_espalexa.handleAlexaApiCall(_server.uri(), _server.arg("plain"))) {
     return;
   }
-  if (_server.method() == HTTP_GET) {
-    if (_server.hasArg("status")) {
+  if(_server.method() == HTTP_GET) {
+    if(_server.hasArg("status")) {
       _sendJsonStatus();
       return;
     }
-    if (_server.hasArg("config")) {
+    if(_server.hasArg("config")) {
       _sendJsonConfig();
+      return;
+    }
+    if(_server.hasArg("usage")) {
+      _sendJsonFSUsage();
       return;
     }
     if(path == "/" && !_server.hasArg("fs")) {
@@ -375,15 +380,15 @@ void ShelfWeb::_handleDefault() {
     // start file download
     _loadFromSdCard(path.c_str());
     return;
-  } else if (_server.method() == HTTP_DELETE) {
-    if (path == "/" || !_SD.exists(path.c_str())) {
+  } else if(_server.method() == HTTP_DELETE) {
+    if(path == "/" || !_SD.exists(path.c_str())) {
       _returnHttpStatus(400, "Bad path");
       return;
     }
 
     sdfat::SdFile file;
     file.open(path.c_str());
-    if (file.isDir()) {
+    if(file.isDir()) {
       if(!file.rmRfStar()) {
         Sprintln("Could not delete folder");
       }
@@ -395,13 +400,18 @@ void ShelfWeb::_handleDefault() {
     file.close();
     _returnOK();
     return;
-  } else if (_server.method() == HTTP_POST) {
-    if (_server.hasArg("newFolder")) {
+  } else if(_server.method() == HTTP_POST) {
+    if(_server.hasArg("newFolder")) {
       Sprint("Creating folder "); Sprintln(_server.arg("newFolder"));
-      _SD.mkdir(_server.arg("newFolder").c_str());
-      _returnOK();
+      if(_SD.mkdir(_server.arg("newFolder").c_str())) {
+        _SD.cacheClear();
+        _returnOK();
+      } else {
+        Sprintln("Folder creation failed");
+        _returnHttpStatus(500, "Folder creation failed");
+      }
       return;
-    } else if (_server.hasArg("ota")) {
+    } else if(_server.hasArg("ota")) {
       Sprint("Starting OTA from "); Sprintln(_server.arg("ota"));
       std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
       // do not validate certificate
@@ -422,36 +432,36 @@ void ShelfWeb::_handleDefault() {
       }
       _returnOK();
       return;
-    } else if (_server.hasArg("downloadpatch")) {
+    } else if(_server.hasArg("downloadpatch")) {
       _downloadPatch();
       return;
-    } else if (_server.hasArg("stop")) {
+    } else if(_server.hasArg("stop")) {
       _playback.stopPlayback();
       _sendJsonStatus();
       return;
-    } else if (_server.hasArg("pause")) {
+    } else if(_server.hasArg("pause")) {
       _playback.pausePlayback();
       _sendJsonStatus();
       return;
-    } else if (_server.hasArg("resume")) {
+    } else if(_server.hasArg("resume")) {
       _playback.playingByCard = false;
       _playback.resumePlayback();
       _sendJsonStatus();
       return;
-    } else if (_server.hasArg("skip")) {
+    } else if(_server.hasArg("skip")) {
       _playback.playingByCard = false;
       _playback.skipFile();
       _sendJsonStatus();
       return;
-    } else if (_server.hasArg("volumeUp")) {
+    } else if(_server.hasArg("volumeUp")) {
       _playback.volumeUp();
       _sendJsonStatus();
       return;
-    } else if (_server.hasArg("volumeDown")) {
+    } else if(_server.hasArg("volumeDown")) {
       _playback.volumeDown();
       _sendJsonStatus();
       return;
-    } else if (_server.hasArg("toggleNight")) {
+    } else if(_server.hasArg("toggleNight")) {
       if(_playback.isNight()) {
         _playback.stopNight();
       } else {
@@ -459,7 +469,7 @@ void ShelfWeb::_handleDefault() {
       }
       _sendJsonStatus();
       return;
-    } else if (_server.hasArg("toggleShuffle")) {
+    } else if(_server.hasArg("toggleShuffle")) {
       if(_playback.isShuffle()) {
         _playback.stopShuffle();
       } else {
@@ -467,13 +477,13 @@ void ShelfWeb::_handleDefault() {
       }
       _sendJsonStatus();
       return;
-    } else if (_server.uri() == "/") {
+    } else if(_server.uri() == "/") {
       Sprintln("Probably got an upload request");
       _returnOK();
       return;
-    } else if (_SD.exists(path.c_str())) {
+    } else if(_SD.exists(path.c_str())) {
       // <= 17 here because leading "/"" is included
-      if (_server.hasArg("write") && path.length() <= 17) {
+      if(_server.hasArg("write") && path.length() <= 17) {
         const char *target = path.c_str();
         const uint8_t volume = 50-(uint8_t)_server.arg("volume").toInt();
         uint8_t repeat = _server.arg("repeat").toInt();
@@ -481,16 +491,16 @@ void ShelfWeb::_handleDefault() {
         uint8_t stopOnRemove = _server.arg("stopOnRemove").toInt();
         // Remove leading "/""
         target++;
-        if (_rfid.startPairing(target, volume, repeat, shuffle, stopOnRemove)) {
+        if(_rfid.startPairing(target, volume, repeat, shuffle, stopOnRemove)) {
           _sendJsonStatus();
           return;
         }
-      } else if (_server.hasArg("play") && _playback.switchFolder(path.c_str())) {
+      } else if(_server.hasArg("play") && _playback.switchFolder(path.c_str())) {
         _playback.startPlayback();
         _playback.playingByCard = false;
         _sendJsonStatus();
         return;
-      } else if (_server.hasArg("playfile")) {
+      } else if(_server.hasArg("playfile")) {
         char* pathCStr = (char *)path.c_str();
         char* folderRaw = strtok(pathCStr, "/");
         char* file = strtok(NULL, "/");
@@ -524,5 +534,5 @@ bool ShelfWeb::isFileUploading() {
 void ShelfWeb::work() {
   // Not needed because espalexa does it
   //_server.handleClient();
-  espalexa.loop();
+  _espalexa.loop();
 }

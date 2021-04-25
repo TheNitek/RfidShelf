@@ -26,7 +26,7 @@ class ShelfWeb {
     ShelfPlayback &_playback;
     ShelfRfid &_rfid;
     sdfat::SdFat &_SD;
-    Espalexa espalexa;
+    Espalexa _espalexa;
     EspalexaDevice* _alexaDevice;
     ESP8266WebServer _server;
     sdfat::SdFile _uploadFile;
@@ -36,6 +36,7 @@ class ShelfWeb {
     void _sendHTML();
     void _sendJsonStatus();
     void _sendJsonConfig();
+    void _sendJsonFSUsage();
     void _sendJsonFS(const char *path);
     bool _loadFromSdCard(const char *path);
     void _handleWriteRfid(const char *folder);

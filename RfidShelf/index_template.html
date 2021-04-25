@@ -151,7 +151,7 @@
      function formatBytes(a) {
          if (0 == a)return "0 Bytes";
          var c = 1024, e = ["Bytes", "KB", "MB", "GB"], f = Math.floor(Math.log(a) / Math.log(c));
-         return parseFloat((a / Math.pow(c, f)).toFixed(2)) + " " + e[f]
+         return parseFloat((a / Math.pow(c, f)).toFixed(2)) + e[f]
      }
      function formatNumbers() {
          $('.number').forEach(function (n) {
@@ -272,6 +272,26 @@
      function showConfig() {
         show(_('loading'));
         loadConfig();
+     }
+     function loadFSUsage() {
+        ajax('GET', '/?usage', function(r) {
+            let d = JSON.parse(r);
+            let t = document.importNode(_('fsUsageContainerT').content, true);
+            let c = _('fsUsageContainer');
+            c.innerHTML ='';
+            c.appendChild(t);
+            c.innerHTML = c.innerHTML.replace(/\{free\}/g, formatBytes(d.free*1024*1024))
+                .replace(/\{total\}/g, formatBytes(d.total*1024*1024))
+                .replace(/\{used\}/g, formatBytes((d.total-d.free)*1024*1024))
+                .replace(/\{totalRaw\}/g, d.total)
+                .replace(/\{usedRaw\}/g, d.total-d.free);
+            show(c);
+            hide(_('loading'));
+        });
+     }
+     function showFSUsage() {
+        show(_('loading'));
+        loadFSUsage();
      }
      function showMkdir() {
          _('mkdirForm').reset();
@@ -449,7 +469,7 @@
  }
 
  .modal { position: fixed; top: 0; left: 0; bottom: 0; right: 0; background: rgba(229, 229, 229, 0.8); }
- .modal form { padding: 10px; border: 1px solid #e5e5e5; max-width: 500px; margin: 30px auto; background: #fafafa; }
+ .modal form, .modal div { padding: 10px; border: 1px solid #e5e5e5; max-width: 500px; margin: 30px auto; background: #fafafa; }
  .modal form > div { margin-bottom: 10px; display: flex; align-items: center; }
  .modal span, .modal label { width: 200px; }
 </style>
@@ -506,6 +526,14 @@
    <button class="close" style="margin-left: 10px;" onclick="hide(_('pairingContainer')); return false;">close</button>
   </div>
  </form>
+</div>
+<template id="fsUsageContainerT">
+  <div>
+    {used} of {total} used ({free} available)<br />
+    <progress value="{usedRaw}" max="{totalRaw}" style="width:300px;">{used}/{total}</progress>
+  </div>
+</template>
+<div id="fsUsageContainer" class="hidden modal">
 </div>
 <div id="configContainer" class="hidden modal">
  <form id="configForm">
@@ -629,7 +657,7 @@
 </section>
    
 <section id="fsContainer" class="hidden">
- <h3 style="float:left">SD-Card entries:</h3>
+ <h3 style="float:left">SD-Card (<a href="#" onclick="showFSUsage(); return false;">&#x1F6C8;</a>):</h3>
  <div style="float:right">
     <button class="create" title="create folder" onclick="showMkdir(); return false;">+</button>
     <button title="settings" onclick="showConfig(); return false;">&#x2699;</button>
