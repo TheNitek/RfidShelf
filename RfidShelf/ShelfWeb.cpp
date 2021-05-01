@@ -263,40 +263,25 @@ void ShelfWeb::_downloadPatch() {
   httpClient.begin(*client, VS1053_PATCH_URL);
   int httpCode = httpClient.GET();
   if (httpCode < 0) {
+    httpClient.end();
     _returnHttpStatus(500, httpClient.errorToString(httpCode).c_str());
     return;
   }
   if (httpCode != HTTP_CODE_OK) {
+    httpClient.end();
     char buffer[32];
     snprintf(buffer, sizeof(buffer), "invalid response code: %d", httpCode);
     _returnHttpStatus(500, buffer);
     return;
   }
-  int len = httpClient.getSize();
-  WiFiClient* stream = httpClient.getStreamPtr();
-  uint8_t buffer[128] = { 0 };
-  sdfat::SdFile patchFile;
-  patchFile.open("/patches.053",sdfat::O_WRITE | sdfat::O_CREAT);
-  while (httpClient.connected() && (len > 0 || len == -1)) {
-    // get available data size
-    size_t size = stream->available();
-    if (size) {
-      // read til buffer is full
-      int c = stream->readBytes(buffer, ((size > sizeof(buffer)) ? sizeof(buffer) : size));
-      // write the buffer to our patch file
-      if (patchFile.isOpen()) {
-        patchFile.write(buffer, c);
-      }
-      // reduce len until we the end (= zero) if len not -1
-      if (len > 0) {
-        len -= c;
-      }
-    }
-    delay(1);
+
+  sdfat::File patchFile("/patches.053",sdfat::O_WRITE | sdfat::O_CREAT);
+  if(!patchFile.isOpen()) {
+    httpClient.end();
+    _returnHttpStatus(500, "Could not open patch file");
+    return;
   }
-  if (patchFile.isOpen()) {
-    patchFile.close();
-  }
+  patchFile.close();
   _returnOK();
   _server.client().flush();
   ESP.restart();
@@ -313,11 +298,6 @@ void ShelfWeb::_handleFileUpload() {
 
   if (upload.status == UPLOAD_FILE_START) {
     String filename = upload.filename;
-
-    if (!Adafruit_VS1053_FilePlayer::isMP3File((char *)filename.c_str())) {
-      Sprint("Not a MP3: "); Sprintln(filename);
-      return;
-    }
 
     if (!filename.startsWith("/")) {
       Sprintln("Invalid upload target");

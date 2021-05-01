@@ -11,6 +11,7 @@
 #include "ShelfPlayback.h"
 #include "ShelfRfid.h"
 #include "ShelfWeb.h"
+#include "ShelfPodcast.h"
 
 #ifdef ARDUINO_OTA_ENABLE
 #include <ArduinoOTA.h>
@@ -26,6 +27,7 @@ ShelfConfig config;
 ShelfPlayback playback(config, sdCard);
 ShelfRfid rfid(config, playback);
 ShelfWeb webInterface(config, playback, rfid, sdCard);
+ShelfPodcast podcast(config, playback, sdCard);
 #ifdef BUTTONS_ENABLE
 ShelfButtons buttons(config, playback);
 #endif
@@ -141,4 +143,6 @@ void loop() {
   playback.work();
 
   rfid.handleRfid();
+
+  podcast.work();
 }
