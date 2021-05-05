@@ -1,72 +1,100 @@
 #include "ShelfPodcast.h"
 
 void ShelfPodcast::_episodeCallback(PodcastState *state, const char *url, const char *guid) {
-  if(state->lastGuid.equals(guid) || (++(state->episodeCount) > state->maxEpisodes)) {
+  if((strcmp(state->lastGuid, guid) == 0) || (++(state->episodeCount) > state->maxEpisodes)) {
     state->done = true;
     return;
   }
 
-  state->episodeUrl = String(url);
-  state->episodeGuid = String(guid);
+  strncpy(state->episodeUrl, url, sizeof(state->episodeUrl)-1);
+  strncpy(state->episodeGuid, guid, sizeof(state->episodeGuid)-1);
 #ifdef DEBUG_ENABLE
   Serial.printf("%s %s\n", url, guid);
 #endif
 }
 
-void ShelfPodcast::work() {
-  if(_lastUpdate != 0) {
-    return;
-  }
-  _lastUpdate = millis();
-
-  PodcastState state;
-
-  const char folder[] = "/test/";
-
-  char filename[50] = "";
-  snprintf(filename, sizeof(filename), "/%s/.podcast", folder);
-
-  if(!_SD.exists(filename)) {
-    Sprintf("No .podcast in %s\n", folder);
-    return;
+bool ShelfPodcast::_nextPodcast(char *folder) {
+  sdfat::SdFile root;
+  if(!root.open("/")) {
+    Sprintln("Could not open root");
+    return false;
   }
 
-  sdfat::SdFile podfile(filename, sdfat::O_READ);
-  if(!podfile.isOpen()) {
-    Sprintf("Could not open %s\n", filename);
-    return;
+  bool lastFolder = false;
+  
+  sdfat::SdFile entry;
+  while(entry.openNext(&root, sdfat::O_READ)) {
+    if(!entry.isDir()) {
+      entry.close();
+      continue;
+    }
+
+    char newFolder[13] = {0};
+    entry.getSFN(newFolder);
+
+    if(!entry.exists(".podcast")) {
+      Sprintf("No .podcast in %s\n", newFolder);
+      entry.close();
+      continue;
+    }
+
+    if(strlen(folder) == 0 || lastFolder) {
+      strncpy(folder, newFolder, sizeof(newFolder));
+      entry.close();
+      root.close();
+      return true;
+    }
+    
+    if(strcmp(folder, newFolder) == 0) {
+      lastFolder = true;
+    }
+
+    entry.close();
   }
 
-  char feedUrl[151] = {0};
-  if(podfile.fgets(feedUrl, sizeof(feedUrl)-1) < 8) {
-    Sprintln("Could not read podcast URL");
-    return;
-  }
-  feedUrl[strcspn(feedUrl, "\n\r")] = '\0';
+  root.close();
+  return false;
 
-  char buffer[151] = {0};
-  if(podfile.fgets(buffer, sizeof(buffer)-1) < 1) {
-    Sprintln("Could not read max episode count");
-    return;
-  }
-  state.maxEpisodes = atoi(buffer);
+};
 
-  if(podfile.fgets(buffer, sizeof(buffer)-1) < 1) {
-    Sprintln("Could not read last guid");
-    return;
-  }
-  buffer[strcspn(buffer, "\n\r")] = '\0';
-  state.lastGuid = String(buffer);
+bool ShelfPodcast::_readPodcastFile(PodcastState &state, const char* podFilename) {
+      sdfat::SdFile podfile(podFilename, sdfat::O_READ);
+      if(!podfile.isOpen()) {
+        Sprintf("Could not open %s\n", podFilename);
+        return false;;
+      }
 
-  podfile.close();
+      if(podfile.fgets(state.feedUrl, sizeof(state.feedUrl)-1) < 8) {
+        Sprintln("Could not read podcast URL");
+        podfile.close();
+        return false;;
+      }
+      state.feedUrl[strcspn(state.feedUrl, "\n\r")] = '\0';
 
-  do {
-    state.done = false;
-    unsigned long start = millis();
-    _loadFeed(&state, feedUrl);
-    _downloadEpisodes(&state, folder);
-    Sprint("Episode took: "); Sprintln((millis()-start)/(1000*60));
-  } while(state.done);
+      char buffer[5] = {0};
+      if(podfile.fgets(buffer, sizeof(buffer)-1) < 1) {
+        Sprintln("Could not read max episode count");
+        podfile.close();
+        return false;;
+      }
+      state.maxEpisodes = atoi(buffer);
+
+      if(podfile.fgets(state.lastGuid, sizeof(state.lastGuid)-1) < 1) {
+        Sprintln("Could not read last guid");
+        podfile.close();
+        return false;;
+      }
+      state.lastGuid[strcspn(state.lastGuid, "\n\r")] = '\0';
+
+      if(podfile.fgets(buffer, sizeof(buffer)-1) < 1) {
+        Sprintln("Could not read last file no");
+        podfile.close();
+        return false;;
+      }
+      state.lastFileNo = atoi(buffer);
+
+      podfile.close();
+      return true;
 }
 
 void ShelfPodcast::_loadFeed(PodcastState *state, const char *podcastUrl) {
@@ -84,6 +112,7 @@ void ShelfPodcast::_loadFeed(PodcastState *state, const char *podcastUrl) {
   } httpClient;
   httpClient.begin(*client, podcastUrl);
   httpClient.setReuse(false);
+  httpClient.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
   int httpCode = httpClient.GET();
   if (httpCode != HTTP_CODE_OK) {
     Serial.printf("HTTP Error: %d\n", httpCode);
@@ -138,23 +167,19 @@ void ShelfPodcast::_loadFeed(PodcastState *state, const char *podcastUrl) {
     }
   }
   httpClient.end();
-  state->done = true;
   Serial.println("Fetched NEW podcast");
 }
 
-void ShelfPodcast::_downloadEpisodes(PodcastState *state, const char *folder) {
-  if(state->episodeUrl.isEmpty()) {
-    return;
+boolean ShelfPodcast::_downloadEpisodes(PodcastState *state, const char *folder) {
+  if(strlen(state->episodeUrl) == 0) {
+    Sprintln("Episode URL empty");
+    return false;
   }
 
-  uint16_t fileCount = 0;
-  char filename[50] = "";
-  do {
-    fileCount++;
-    snprintf(filename, sizeof(filename), "/test/%05d.mp3", fileCount);
-  } while(_SD.exists(filename));
+  char tmpFilename[50] = "";
+  snprintf(tmpFilename, sizeof(tmpFilename), "/%s/download.tmp", folder);
 
-  Sprint("File "); Sprintln(filename);
+  Sprint("File "); Sprintln(tmpFilename);
   Sprint("Downloading "); Sprintln(state->episodeUrl);
 
   std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
@@ -167,23 +192,134 @@ void ShelfPodcast::_downloadEpisodes(PodcastState *state, const char *folder) {
   httpClient.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
   int httpCode = httpClient.GET();
   if (httpCode != HTTP_CODE_OK) {
-    Sprintf("invalid response code: %d", httpCode);
+    Sprintf("invalid response code: %d\n", httpCode);
     httpClient.end();
-    return;
+    return false;
   }
 
-  snprintf(filename, sizeof(filename), "/test/%05d.mp3", fileCount);
-  sdfat::File episodeFile(filename,sdfat::O_WRITE | sdfat::O_CREAT);
+  sdfat::File episodeFile(tmpFilename, sdfat::O_WRITE | sdfat::O_CREAT | sdfat::O_TRUNC);
   if(!episodeFile.isOpen()) {
     Sprintln("Failed to open target file");
     httpClient.end();
-    return;
+    return false;
   }
 
   httpClient.writeToStream(&episodeFile);
   httpClient.end();
 
   episodeFile.close();
-  state->lastGuid = state->episodeGuid;
+
+  char filename[50] = "";
+  do {
+    state->lastFileNo++;
+    snprintf(filename, sizeof(filename), "/%s/%05d.mp3", folder, state->lastFileNo);
+  } while(_SD.exists(filename));
+
+  Sprintf("Renaming to %s\n", filename);
+  if(!_SD.rename(tmpFilename, filename)) {
+    Sprintln("Failed to rename tmp file");
+    return false;
+  }
+
+  strncpy(state->lastGuid, state->episodeGuid, sizeof(state->lastGuid)-1);
   Sprintln("Download done");
+  return true;
+}
+
+void ShelfPodcast::_cleanupEpisodes(PodcastState &state, const char *folderName) {
+  Sprintln("Cleaning up old episodes");
+  sdfat::SdFile dir;
+  if(!dir.open(folderName, sdfat::O_READ)) {
+    Sprintf("Could not open folder /%s/\n", folderName);
+    return;
+  }
+
+  uint16_t mp3Count = 0;
+  do {
+    char filename[50] = "";
+    dir.rewind();
+    uint16_t oldestDate = UINT16_MAX;
+    uint16_t oldestTime = UINT16_MAX;
+    mp3Count = 0;
+    sdfat::SdFile file;
+    while(file.openNext(&dir, sdfat::O_READ)) {
+      char sfn[13] = "";
+      file.getSFN(sfn);
+      if(Adafruit_VS1053_FilePlayer::isMP3File(sfn)) {
+        mp3Count++;
+        sdfat::dir_t d;
+        file.dirEntry(&d);
+        if((d.creationDate < oldestDate) || ((d.creationDate == oldestDate) && (d.creationTime < oldestTime))) {
+          snprintf(filename, sizeof(filename), "/%s/%s", folderName, sfn);
+        }
+      }
+      file.close();
+    }
+
+    if((strlen(filename) > 0) && (mp3Count > state.maxEpisodes)) {
+      if(_SD.remove(filename)) {
+        Sprintf("Deleted %s\n", filename);
+      } else {
+        Sprintf("Failed to delete %s\n", filename);
+      }
+    }
+  } while(mp3Count > state.maxEpisodes);
+}
+
+void ShelfPodcast::work() {
+  if(_lastUpdate != 0) {
+    return;
+  }
+  _lastUpdate = millis();
+
+  char folder[13] = {0};
+
+  while(true) {
+    if(!_nextPodcast(folder)) {
+      break;
+    }
+
+    char podFilename[25] = {0};
+    snprintf(podFilename, sizeof(podFilename), "/%s/.podcast", folder);
+
+    if(!_readPodcastFile(state, podFilename)) {
+      continue;
+    }
+
+    Sprintf("Podcast: %s\n", state.feedUrl);
+
+    _web.pause();
+
+    do {
+      state.done = false;
+      state.episodeUrl[0] = '\0';
+      state.episodeGuid[0] = '\0';
+      state.episodeCount = 0;
+
+      unsigned long start = millis();
+      _loadFeed(&state, state.feedUrl);
+
+      if(_downloadEpisodes(&state, folder)) {
+        Sprintln("Updating .podcast");
+        sdfat::SdFile podfile(podFilename,  sdfat::O_WRITE | sdfat::O_TRUNC);
+        if(!podfile.isOpen()) {
+          Sprintf("Could not open %s\n", podFilename);
+          return;
+        }
+        podfile.println(state.feedUrl);
+        podfile.println(state.maxEpisodes);
+        podfile.println(state.lastGuid);
+        podfile.println(state.lastFileNo);
+        podfile.close();
+      }
+
+      Sprint("Episode took: "); Sprintln((millis()-start)/(1000*60));
+    } while(strlen(state.episodeUrl) > 0);
+
+    _cleanupEpisodes(state, folder);
+
+    _web.unpause();
+  }
+
+  Sprintln("Done with podcasts");
 }

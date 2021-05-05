@@ -26,8 +26,8 @@ sdfat::SdFat sdCard;
 ShelfConfig config;
 ShelfPlayback playback(config, sdCard);
 ShelfRfid rfid(config, playback);
-ShelfWeb webInterface(config, playback, rfid, sdCard);
-ShelfPodcast podcast(config, playback, sdCard);
+ShelfWeb web(config, playback, rfid, sdCard);
+ShelfPodcast podcast(config, playback, web, sdCard);
 #ifdef BUTTONS_ENABLE
 ShelfButtons buttons(config, playback);
 #endif
@@ -111,7 +111,7 @@ void setup() {
   ArduinoOTA.begin();
 #endif
 
-  webInterface.begin();
+  web.begin();
 
 #ifdef BUTTONS_ENABLE
   buttons.begin();
@@ -125,10 +125,10 @@ void setup() {
 void loop() {
   MDNS.update();
 
-  webInterface.work();
+  web.work();
 
   // Skip the rest while file is uploading to improve performance (playback won't work anyway)
-  if(webInterface.isFileUploading()) {
+  if(web.isFileUploading()) {
     return;
   }
 

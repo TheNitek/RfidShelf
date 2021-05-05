@@ -195,7 +195,6 @@ void ShelfWeb::_sendJsonFS(const char *path) {
 
   sdfat::SdFile dir;
   dir.open(path, sdfat::O_READ);
-  //dir.rewind();
 
   sdfat::SdFile entry;
 
@@ -511,7 +510,20 @@ bool ShelfWeb::isFileUploading() {
   return _uploadFile.isOpen();
 }
 
+void ShelfWeb::pause() {
+  _paused = true;
+  _server.stop();
+}
+
+void ShelfWeb::unpause() {
+  _paused = false;
+  _server.begin();
+}
+
 void ShelfWeb::work() {
+  if(_paused) {
+    return;
+  }
   // Not needed because espalexa does it
   //_server.handleClient();
   _espalexa.loop();

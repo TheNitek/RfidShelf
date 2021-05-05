@@ -14,7 +14,7 @@ class ShelfPlayback {
   public:
     ShelfPlayback(ShelfConfig &config, sdfat::SdFat &sd) :
       _config(config),
-      _musicPlayer(Adafruit_VS1053_FilePlayer(BREAKOUT_RESET, BREAKOUT_CS, BREAKOUT_DCS, DREQ, SD_CS)),
+      _musicPlayer(BREAKOUT_RESET, BREAKOUT_CS, BREAKOUT_DCS, DREQ, SD_CS),
       _SD(sd)
       {};
     void begin();

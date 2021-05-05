@@ -21,6 +21,8 @@ class ShelfWeb {
     void begin();
     void work();
     bool isFileUploading();
+    void pause();
+    void unpause();
   private:
     ShelfConfig &_config;
     ShelfPlayback &_playback;
@@ -31,6 +33,7 @@ class ShelfWeb {
     ESP8266WebServer _server;
     sdfat::SdFile _uploadFile;
     uint32_t _uploadStart;
+    bool _paused = false;
     void _returnOK();
     void _returnHttpStatus(uint16_t statusCode, const char *msg);
     void _sendHTML();
