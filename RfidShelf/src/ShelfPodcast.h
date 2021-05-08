@@ -23,15 +23,17 @@ class ShelfPodcast {
       char episodeGuid[151] = {0};
       uint16_t episodeCount = 0;
       bool done = false;
-      char lastGuid[151] = {0};
-      uint16_t lastFileNo = 0;
-      char feedUrl[151] = {0};
+    };
+    struct PodcastInfo {
+      String feedUrl;
       uint16_t maxEpisodes = 0;
-    } state;
-    void _episodeCallback(PodcastState *state, const char *url, const char *guid);
+      String lastGuid;
+      uint16_t lastFileNo = 0;
+    };
+    void _episodeCallback(PodcastState *state, const char *lastGuid, const uint16 maxEpisodes, const char *url, const char *guid);
     bool _nextPodcast(char *folder);
-    bool _readPodcastFile(PodcastState &state, const char* podFilename);
-    void _loadFeed(PodcastState *state, const char *podcastUrl);
-    bool _downloadEpisodes(PodcastState *state, const char *folder);
-    void _cleanupEpisodes(PodcastState &state, const char *folder);
+    bool _readPodcastFile(PodcastInfo &state, const char* podFilename);
+    void _loadFeed(PodcastInfo &info, PodcastState &state);
+    bool _downloadEpisodes(PodcastState &state, PodcastInfo &info, const char *folder);
+    void _cleanupEpisodes(uint16_t maxEpisodes, const char *folder);
 };

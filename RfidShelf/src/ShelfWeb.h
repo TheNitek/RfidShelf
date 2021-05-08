@@ -17,7 +17,7 @@
 
 class ShelfWeb {
   public:
-    ShelfWeb(ShelfConfig &config, ShelfPlayback &playback, ShelfRfid &rfid, sdfat::SdFat &sd) : _config(config), _playback(playback), _rfid(rfid), _SD(sd) {}
+    ShelfWeb(ShelfConfig &config, ShelfPlayback &playback, ShelfRfid &rfid, sdfat::SdFat &sd) : _config(config), _playback(playback), _rfid(rfid), _SD(sd), _alexaDevice(_config.hostname, std::bind(&ShelfWeb::_deviceCallback, this, std::placeholders::_1), EspalexaDeviceType::dimmable, 50) {}
     void begin();
     void work();
     bool isFileUploading();
@@ -29,13 +29,13 @@ class ShelfWeb {
     ShelfRfid &_rfid;
     sdfat::SdFat &_SD;
     Espalexa _espalexa;
-    EspalexaDevice* _alexaDevice;
+    EspalexaDevice _alexaDevice;
     ESP8266WebServer _server;
     sdfat::SdFile _uploadFile;
     uint32_t _uploadStart;
     bool _paused = false;
     void _returnOK();
-    void _returnHttpStatus(uint16_t statusCode, const char *msg);
+    void _returnHttpStatus(const uint16_t statusCode, const char *msg);
     void _sendHTML();
     void _sendJsonStatus();
     void _sendJsonConfig();

@@ -33,7 +33,7 @@ ShelfButtons buttons(config, playback);
 #endif
 
 void timeCallback() {
-  Sprint("Time updated: ");
+  Sprint(F("Time updated: "));
   time_t now = time(nullptr);
   Sprintln(ctime(&now));
 }
@@ -82,7 +82,7 @@ void setup() {
   }
 
 
-  Sprint("Hostname: "); Sprintln(config.hostname);
+  Sprint(F("Hostname: ")); Sprintln(config.hostname);
   WiFi.hostname(config.hostname);
 
   WiFiManager wifiManager;
@@ -102,7 +102,7 @@ void setup() {
   }
 
   if (!MDNS.begin(config.hostname)) {
-    Sprintln("Error setting up MDNS responder!");
+    Sprintln(F("Error setting up MDNS responder!"));
   }
 
 #ifdef ARDUINO_OTA_ENABLE

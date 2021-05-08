@@ -51,7 +51,7 @@
 #ifdef DEBUG_ENABLE
     #define Sprintln(a) (Serial.println(a))
     #define Sprint(a) (Serial.print(a))
-    #define Sprintf(a, b) (Serial.printf(a, b))
+    #define Sprintf(a, b) (Serial.printf_P(PSTR(a), b))
 #else
     #define Sprintln(a)
     #define Sprint(a)

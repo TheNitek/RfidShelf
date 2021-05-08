@@ -6,15 +6,15 @@ void ShelfPlayback::begin() {
     // Disable amp
     pinMode(AMP_POWER, OUTPUT);
     digitalWrite(AMP_POWER, LOW);
-    Sprintln("Amp powered down");
+    Sprintln(F("Amp powered down"));
   }
 
   // initialise the music player
   if (!_musicPlayer.begin()) { // initialise the music player
-    Sprintln("Couldn't find VS1053, do you have the right pins defined?");
+    Sprintln(F("Couldn't find VS1053, do you have the right pins defined?"));
     while (1) delay(500);
   }
-  Sprintln("VS1053 found");
+  Sprintln(F("VS1053 found"));
 
   /* Fix for the design fuckup of the cheap LC Technology MP3 shield
     see http://www.bajdi.com/lcsoft-vs1053-mp3-module/#comment-33773
@@ -25,7 +25,7 @@ void ShelfPlayback::begin() {
   _musicPlayer.GPIO_digitalWrite(0x0000);
   _musicPlayer.softReset();
 
-  Sprintln("VS1053 soft reset done");
+  Sprintln(F("VS1053 soft reset done"));
 
   if (_patchVS1053()) {
 #ifdef USE_DIFFERENTIAL_OUTPUT
@@ -37,27 +37,27 @@ void ShelfPlayback::begin() {
     _musicPlayer.sciWrite(VS1053_REG_WRAMADDR, 0x1e09);
     _musicPlayer.sciWrite(VS1053_REG_WRAM, 0x0001);
 #endif
-    Sprintln("VS1053 patch installed");
+    Sprintln(F("VS1053 patch installed"));
   } else {
-    Sprintln("Could not load patch");
+    Sprintln(F("Could not load patch"));
   }
 
   volume(_config.defaultVolumne);
 
   setBassAndTreble(TREBLE_AMPLITUDE, TREBLE_FREQLIMIT, BASS_AMPLITUDE, BASS_FREQLIMIT);
 
-  Sprintln("VS1053 initialized");
+  Sprintln(F("VS1053 initialized"));
 
   if(_shuffleHistory.begin(BOOLARRAY_MAXSIZE) != BOOLARRAY_OK){
-    Sprintln("Error initializing shuffle history");
+    Sprintln(F("Error initializing shuffle history"));
   }
 }
 
 const bool ShelfPlayback::switchFolder(const char *folder) {
-  Sprint("Switching folder to "); Sprintln(folder);
+  Sprint(F("Switching folder to ")); Sprintln(folder);
 
   if (!_SD.exists(folder)) {
-    Sprintln("Folder does not exist");
+    Sprintln(F("Folder does not exist"));
     return false;
   }
   stopPlayback();
@@ -98,7 +98,7 @@ void ShelfPlayback::resumePlayback() {
   }
   if(!_musicPlayer.currentTrack) {
     // Workaround until https://github.com/adafruit/Adafruit_VS1053_Library/pull/58 gets merged
-    Sprintln("No playback file open");
+    Sprintln(F("No playback file open"));
     return;
   }
   if (AMP_POWER > 0) {
@@ -138,7 +138,7 @@ void ShelfPlayback::togglePause() {
 }
 
 void ShelfPlayback::stopPlayback() {
-  Sprintln("Stopping playback");
+  Sprintln(F("Stopping playback"));
   if(_playing == PLAYBACK_NO) {
     return;
   }
@@ -180,7 +180,7 @@ void ShelfPlayback::startPlayback() {
       file.getName(filenameChar, sizeof(filenameChar));
 
       if (file.isDir() || !_musicPlayer.isMP3File(filenameChar)) {
-        Sprint("Ignoring "); Sprintln(filenameChar);
+        Sprint(F("Ignoring ")); Sprintln(filenameChar);
         file.close();
         continue;
       }
@@ -207,7 +207,7 @@ void ShelfPlayback::startPlayback() {
       file.getName(filenameChar, sizeof(filenameChar));
 
       if (file.isDir() || !_musicPlayer.isMP3File(filenameChar)) {
-        Sprint("Ignoring "); Sprintln(filenameChar);
+        Sprint(F("Ignoring ")); Sprintln(filenameChar);
         file.close();
         continue;
       }
@@ -227,7 +227,7 @@ void ShelfPlayback::startPlayback() {
     }
     if (strlen(_currentFile) == 0) {
       // No _currentFile && no nextFile => Nothing to play!
-      Sprintln("No mp3 files found");
+      Sprintln(F("No mp3 files found"));
       stopPlayback();
       return;
     } else {
@@ -249,9 +249,9 @@ void ShelfPlayback::startPlayback() {
 
 void ShelfPlayback::startFilePlayback(const char *folder, const char *file) {
   char fullPath[201];
-  snprintf(fullPath, sizeof(fullPath), "/%s/%s", folder, file);
+  snprintf_P(fullPath, sizeof(fullPath), PSTR("/%s/%s"), folder, file);
 
-  Sprint("Playing "); Sprintln(fullPath);
+  Sprint(F("Playing ")); Sprintln(fullPath);
 
   if(_playing != PLAYBACK_FILE) {
     _playing = PLAYBACK_FILE;
@@ -265,7 +265,7 @@ void ShelfPlayback::startFilePlayback(const char *folder, const char *file) {
   }
 
   if(!_musicPlayer.startPlayingFile(fullPath)) {
-    Sprintln("Could not start playback");
+    Sprintln(F("Could not start playback"));
     stopPlayback();
   }
 }
@@ -319,10 +319,12 @@ void ShelfPlayback::setBassAndTreble(uint8_t trebleAmplitude, uint8_t trebleFreq
 }
 
 const bool ShelfPlayback::_patchVS1053() {
-  Sprintln("Installing patch to VS1053");
+  Sprintln(F("Installing patch to VS1053"));
 
   sdfat::SdFile file;
-  if (!file.open("patches.053", sdfat::O_READ)) return false;
+  if (!file.open("patches.053", sdfat::O_READ)) {
+    return false;
+  }
 
   uint16_t addr, n, val, i = 0;
 
@@ -407,7 +409,7 @@ void ShelfPlayback::work() {
       return;
     }
 
-    Sprintln("Flushing VS1053 buffer");
+    Sprintln(F("Flushing VS1053 buffer"));
 
     // Follow the datasheet:
     // Read extra parameter value endFillByte
@@ -417,7 +419,8 @@ void ShelfPlayback::work() {
     memset(endFillBytes, endFillByte, sizeof(endFillBytes));
     // Send at least 2052 bytes of endFillByte[7:0] (we'll do a few more)
     for(uint8_t i = 0; i <= 64; i++) {
-      while(!_musicPlayer.readyForData()) ESP.wdtFeed();
+      while(!_musicPlayer.readyForData())
+        ESP.wdtFeed();
       _musicPlayer.playData(endFillBytes, sizeof(endFillBytes));
     }
     // Set SCI MODE bit SM CANCEL
@@ -425,13 +428,14 @@ void ShelfPlayback::work() {
     // Send at least 32 bytes of endFillByte[7:0]
     // Read SCI MODE. If SM CANCEL is still set, send again. 
     for(uint8_t i = 0; i <= 64; i++) {
-      while(!_musicPlayer.readyForData()) ESP.wdtFeed();
+      while(!_musicPlayer.readyForData())
+        ESP.wdtFeed();
       _musicPlayer.playData(endFillBytes, sizeof(endFillBytes));
       if((_musicPlayer.sciRead(VS1053_REG_MODE) & VS1053_MODE_SM_CANCEL) == 0) {
         uint16_t hdat0 = _musicPlayer.sciRead(VS1053_REG_HDAT0);
         uint16_t hdat1 = _musicPlayer.sciRead(VS1053_REG_HDAT1);
         if(hdat0 != 0 || hdat1 != 0) {
-          Sprint("HDAT not 0: "); Sprint(hdat0); Sprint(" "); Sprint(hdat1); Sprintln();
+          Sprint(F("HDAT not 0: ")); Sprint(hdat0); Sprint(" "); Sprint(hdat1); Sprintln();
         }
         return;
       }
@@ -439,7 +443,7 @@ void ShelfPlayback::work() {
 
     // If SM CANCEL hasn’t cleared after sending 2048 bytes, do a 
     // software reset (this should be extremely rare)
-    Sprintln("Cancel after playback failed.");
+    Sprintln(F("Cancel after playback failed."));
     // TODO check if this deletes the patch
     _musicPlayer.softReset();
     return;

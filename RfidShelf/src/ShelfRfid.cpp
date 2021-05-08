@@ -134,7 +134,7 @@ bool ShelfRfid::_handleRfidConfig() {
     return false;
   }
 
-  memcpy(&_currentCard.config, configBuffer, sizeof(cardConfig));
+  memcpy(&_currentCard.config, configBuffer, sizeof(CardConfig));
 
   if(_currentCard.config.magicByte != RFID_CONFIG_MARKER || _currentCard.config.size != 2) {
     // "Upgrade" card
@@ -171,7 +171,7 @@ void ShelfRfid::_setPlaybackOptions(const uint8_t repeat, const uint8_t shuffle)
   }
 }
 
-nfcTagObject ShelfRfid::getPairingConfig() {
+NFCTagObject ShelfRfid::getPairingConfig() {
   return _pairingCard;
 }
 
@@ -194,7 +194,7 @@ bool ShelfRfid::startPairing(const char *folder, const uint8_t volume, const uin
   return true;
 }
 
-void ShelfRfid::_dumpCurrentCard(const nfcTagObject *card) {
+void ShelfRfid::_dumpCurrentCard(const NFCTagObject *card) {
   Sprintln(F("Current card data: "));
   Sprint(F("  folder: ")); Sprintln(card->folder);
   Sprint(F("  volume: ")); Sprintln(card->config.volume);
@@ -203,13 +203,13 @@ void ShelfRfid::_dumpCurrentCard(const nfcTagObject *card) {
   Sprint(F("  stopOnRemove: ")); Sprintln(card->config.stopOnRemove);
 }
 
-void ShelfRfid::_writeConfigBlock(const cardConfig *config) {
+void ShelfRfid::_writeConfigBlock(const CardConfig *config) {
 
   // Store config (like volume)
-  uint8_t configBuffer[sizeof(cardConfig)];
+  uint8_t configBuffer[sizeof(CardConfig)];
 
-  memcpy(configBuffer, config, sizeof(cardConfig));
-  _writeRfidBlock(2, 0, configBuffer, sizeof(cardConfig));
+  memcpy(configBuffer, config, sizeof(CardConfig));
+  _writeRfidBlock(2, 0, configBuffer, sizeof(CardConfig));
 }
 
 bool ShelfRfid::_writeRfidBlock(const uint8_t sector, const uint8_t relativeBlock, const uint8_t *content, const uint8_t contentSize) {
