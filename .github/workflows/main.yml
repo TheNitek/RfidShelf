@@ -29,7 +29,7 @@ jobs:
         pip install --upgrade platformio
     - name: Build
       env:
-        PLATFORMIO_CI_SRC: RfidShelf
+        PLATFORMIO_CI_SRC: RfidShelf/src
       run: platformio ci --board=nodemcuv2 --project-conf=RfidShelf/platformio.ini
     - name: Upload artifact
       uses: actions/upload-artifact@v2
