@@ -121,6 +121,10 @@ void ShelfWeb::_sendJsonStatus() {
   snprintf(buffer, sizeof(buffer), "%lu", time(nullptr));
   strcat(output, buffer);
 
+  strcat_P(output, PSTR(",\"uptime\":"));
+  snprintf(buffer, sizeof(buffer), "%lu", (millis()/(1000*60)));
+  strcat(output, buffer);
+
   strcat_P(output, PSTR(",\"version\":"));
   snprintf_P(buffer, sizeof(buffer), PSTR("\"%d.%d\""), MAJOR_VERSION, MINOR_VERSION);
   strcat(output, buffer);

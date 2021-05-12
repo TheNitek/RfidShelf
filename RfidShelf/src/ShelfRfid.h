@@ -33,7 +33,7 @@ class ShelfRfid {
       _mfrc522(RC522_CS, UINT8_MAX)
       {};
     void begin();
-    void handleRfid();
+    void handleRfid(bool ignoreTagData = false);
     bool startPairing(const char *folder, const uint8_t volume, const uint8_t repeat, const uint8_t shuffle, const uint8_t stopOnRemove);
     NFCTagObject getPairingConfig();
     bool hasActivePairing = false;

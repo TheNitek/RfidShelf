@@ -12,7 +12,7 @@ void ShelfRfid::begin() {
   Sprintln(F("RFID initialized"));
 }
 
-void ShelfRfid::handleRfid() {
+void ShelfRfid::handleRfid(bool ignoreTagData) {
   if ((_playback.playbackState() != PLAYBACK_NO) && (millis() - _lastRfidCheck < 500)) {
     return;
   }
@@ -44,6 +44,15 @@ void ShelfRfid::handleRfid() {
 
   // Look for new cards and select one if it exists
   if (!_mfrc522.PICC_IsNewCardPresent() ||  !_mfrc522.PICC_ReadCardSerial()) {
+    return;
+  }
+
+  if(ignoreTagData) {
+    Sprintln(F("Ignoring current tag"));
+    // Halt PICC
+    _mfrc522.PICC_HaltA();
+    // Stop encryption on PCD
+    _mfrc522.PCD_StopCrypto1();
     return;
   }
 

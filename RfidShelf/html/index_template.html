@@ -238,6 +238,8 @@
          }
          t('.firmwareVersion', d.version);
          t('.shelfTime', (new Date(d.time * 1000)).toUTCString());
+         t('.shelfUptime', d.uptime);
+
      }
      function showPairing(f) {
          _('pairingForm').reset();
@@ -694,7 +696,7 @@
 </section>
 
 <section>
- <p id="time">Shelf Time: <span class="shelfTime">&nbsp;</span></p>
+ <p id="time">Shelf Time: <span class="shelfTime">&nbsp;</span> Uptime: <span class="shelfUptime">&nbsp;</span></p>
 </section>
 
 <script>loadStatus();

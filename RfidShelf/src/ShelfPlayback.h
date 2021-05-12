@@ -47,7 +47,7 @@ class ShelfPlayback {
     bool playingByCard = true;
     PlaybackCallbackFunction callback = nullptr;
   private:
-    ShelfConfig _config;
+    ShelfConfig &_config;
     uint8_t _volume;
     PlaybackState _playing = PLAYBACK_NO;
     Adafruit_VS1053_FilePlayer _musicPlayer;
@@ -55,7 +55,6 @@ class ShelfPlayback {
     sdfat::SdFile _currentFolder;
     uint16_t _currentFolderFileCount;
     char _currentFile[100];
-    const bool _patchVS1053();
     bool _nightMode = false;
     // Night mode timeouts NIGHT_TIMEOUT minutes after playback ends, so we need to keep count
     unsigned long _lastNightActivity;
@@ -64,4 +63,5 @@ class ShelfPlayback {
     uint16_t _shufflePlaybackCount;
     // Store playback history for shuffle playback to prevent repititions
     BoolArray _shuffleHistory;
+    const bool _patchVS1053();
 };

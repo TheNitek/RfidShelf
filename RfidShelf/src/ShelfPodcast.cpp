@@ -1,18 +1,5 @@
 #include "ShelfPodcast.h"
 
-void ShelfPodcast::_episodeCallback(PodcastState *state, const char *lastGuid, const uint16 maxEpisodes, const char *url, const char *guid) {
-  if((strcmp(lastGuid, guid) == 0) || (++(state->episodeCount) > maxEpisodes)) {
-    state->done = true;
-    return;
-  }
-
-  strncpy(state->episodeUrl, url, sizeof(state->episodeUrl)-1);
-  strncpy(state->episodeGuid, guid, sizeof(state->episodeGuid)-1);
-#ifdef DEBUG_ENABLE
-  Serial.printf_P(PSTR("%s %s\n"), url, guid);
-#endif
-}
-
 bool ShelfPodcast::_nextPodcast(char *folder) {
   sdfat::SdFile root;
   if(!root.open("/")) {
@@ -54,67 +41,62 @@ bool ShelfPodcast::_nextPodcast(char *folder) {
 
   root.close();
   return false;
-
 };
 
-bool ShelfPodcast::_readPodcastFile(PodcastInfo &state, const char* podFilename) {
-      sdfat::SdFile podfile(podFilename, sdfat::O_READ);
-      if(!podfile.isOpen()) {
-        Sprintf("Could not open %s\n", podFilename);
-        return false;;
-      }
+bool ShelfPodcast::_readPodcastFile(PodcastInfo &info, const char* podFilename) {
+  sdfat::SdFile podfile(podFilename, sdfat::O_READ);
+  if(!podfile.isOpen()) {
+    Sprintf("Could not open %s\n", podFilename);
+    return false;;
+  }
 
-      char feedUrl[151] = {0};
-      if(podfile.fgets(feedUrl, sizeof(feedUrl)-1) < 8) {
-        Sprintln(F("Could not read podcast URL"));
-        podfile.close();
-        return false;;
-      }
-      feedUrl[strcspn(feedUrl, "\n\r")] = '\0';
-      state.feedUrl = feedUrl;
+  char buffer[201] = {0};
 
-      char buffer[5] = {0};
-      if(podfile.fgets(buffer, sizeof(buffer)-1) < 1) {
-        Sprintln(F("Could not read max episode count"));
-        podfile.close();
-        return false;;
-      }
-      state.maxEpisodes = atoi(buffer);
+  if(podfile.fgets(buffer, sizeof(buffer)-1) < 8) {
+    Sprintln(F("Could not read podcast URL"));
+    podfile.close();
+    return false;;
+  }
+  buffer[strcspn(buffer, "\n\r")] = '\0';
+  info.feedUrl = buffer;
 
-      char lastGuid[151] = {0};
-      if(podfile.fgets(lastGuid, sizeof(lastGuid)-1) < 1) {
-        Sprintln(F("Could not read last guid"));
-        podfile.close();
-        return false;;
-      }
-      lastGuid[strcspn(lastGuid, "\n\r")] = '\0';
-      state.lastGuid = lastGuid;
+  memset(buffer, 0, sizeof(buffer));
+  if(podfile.fgets(buffer, sizeof(buffer)-1) < 1) {
+    Sprintln(F("Could not read max episode count"));
+    podfile.close();
+    return false;;
+  }
+  info.maxEpisodes = atoi(buffer);
 
-      if(podfile.fgets(buffer, sizeof(buffer)-1) < 1) {
-        Sprintln(F("Could not read last file no"));
-        podfile.close();
-        return false;;
-      }
-      state.lastFileNo = atoi(buffer);
+  memset(buffer, 0, sizeof(buffer));
+  if(podfile.fgets(buffer, sizeof(buffer)-1) < 1) {
+    Sprintln(F("Could not read last guid"));
+    podfile.close();
+    return false;;
+  }
+  buffer[strcspn(buffer, "\n\r")] = '\0';
+  info.lastGuid = buffer;
 
-      podfile.close();
-      return true;
+  memset(buffer, 0, sizeof(buffer));
+  if(podfile.fgets(buffer, sizeof(buffer)-1) < 1) {
+    Sprintln(F("Could not read last file no"));
+    podfile.close();
+    return false;;
+  }
+  info.lastFileNo = atoi(buffer);
+
+  podfile.close();
+  return true;
 }
 
-void ShelfPodcast::_loadFeed(PodcastInfo &info, PodcastState &state) {
+void ShelfPodcast::_loadFeed(_HTTPClient &httpClient, const String &feedUrl, PodcastState &state) {
   Podcatcher catcher;
-  EpisodeCallback episodeCallback = std::bind(&ShelfPodcast::_episodeCallback, this, &state, info.lastGuid.c_str(), info.maxEpisodes, std::placeholders::_1, std::placeholders::_2);
+  EpisodeCallback episodeCallback = std::bind(&PodcastState::episodeCallback, &state, std::placeholders::_1, std::placeholders::_2);
   catcher.begin(episodeCallback);
 
   std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
   client->setInsecure();
-  class: public HTTPClient {
-    public:
-      transferEncoding_t getTransferEncoding() {
-        return _transferEncoding;
-      }
-  } httpClient;
-  httpClient.begin(*client, info.feedUrl);
+  httpClient.begin(*client, feedUrl);
   httpClient.setReuse(false);
   httpClient.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
   int httpCode = httpClient.GET();
@@ -174,14 +156,20 @@ void ShelfPodcast::_loadFeed(PodcastInfo &info, PodcastState &state) {
   Serial.println(F("Fetched NEW podcast"));
 }
 
-boolean ShelfPodcast::_downloadEpisodes(PodcastState &state, PodcastInfo &info, const char *folder) {
-  if(strlen(state.episodeUrl) == 0) {
+boolean ShelfPodcast::_downloadNextEpisode(PodcastInfo &info, const char *folder) {
+  PodcastState state(info);
+
+  _HTTPClient httpClient;
+
+  _loadFeed(httpClient, info.feedUrl, state);
+
+  if(state.episodeUrl.isEmpty()) {
     Sprintln(F("Episode URL empty"));
     return false;
   }
 
   char tmpFilename[50] = "";
-  snprintf_P(tmpFilename, sizeof(tmpFilename), PSTR("/%s/download.tmp"), folder);
+  snprintf_P(tmpFilename, sizeof(tmpFilename)-1, PSTR("/%s/download.tmp"), folder);
 
   Sprint(F("File ")); Sprintln(tmpFilename);
   Sprint(F("Downloading ")); Sprintln(state.episodeUrl);
@@ -190,7 +178,6 @@ boolean ShelfPodcast::_downloadEpisodes(PodcastState &state, PodcastInfo &info, 
   // do not validate certificate
   client->setInsecure();
 
-  HTTPClient httpClient;
   httpClient.begin(*client, state.episodeUrl);
   httpClient.setReuse(false);
   httpClient.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
@@ -226,7 +213,6 @@ boolean ShelfPodcast::_downloadEpisodes(PodcastState &state, PodcastInfo &info, 
   }
 
   info.lastGuid = state.episodeGuid;
-  //strncpy(info.lastGuid, state.episodeGuid, sizeof(info.lastGuid)-1);
   Sprintln(F("Download done"));
   return true;
 }
@@ -271,11 +257,32 @@ void ShelfPodcast::_cleanupEpisodes(uint16_t maxEpisodes, const char *folderName
   } while(mp3Count > maxEpisodes);
 }
 
+bool ShelfPodcast::_isPodcastTime() {
+  // Only check once an hour (and thereby make sure podcast are only fetech once at podcastHour)
+  if((_lastUpdate != 0) && ((millis()-_lastUpdate) < 60*60*1000)) {
+    return false;
+  }
+
+  _lastUpdate = millis();
+
+  time_t now;
+  tm tm;
+  time(&now);
+  localtime_r(&now, &tm);
+
+  return tm.tm_hour == _config.podcastHour;
+}
+
 void ShelfPodcast::work() {
-  if(_lastUpdate != 0) {
+  if(!_isPodcastTime()) {
     return;
   }
-  _lastUpdate = millis();
+
+  _resumePlayback = (_playback.playbackState() == PLAYBACK_FILE);
+
+  if(_resumePlayback) {
+    _playback.pausePlayback();
+  }
 
   char folder[13] = {0};
 
@@ -298,12 +305,9 @@ void ShelfPodcast::work() {
     _web.pause();
 
     do {
-      PodcastState state;
-
       unsigned long start = millis();
-      _loadFeed(info, state);
 
-      if(!_downloadEpisodes(state, info, folder)) {
+      if(!_downloadNextEpisode(info, folder)) {
         break;
       }
 
@@ -327,6 +331,10 @@ void ShelfPodcast::work() {
     _cleanupEpisodes(info.maxEpisodes, folder);
 
     _web.unpause();
+  }
+
+  if(_resumePlayback) {
+    _playback.resumePlayback();
   }
 
   Sprintln(F("Done with podcasts"));

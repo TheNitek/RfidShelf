@@ -62,8 +62,7 @@
   #error "BUTTONS_ENABLE cannot be used with DEBUG_ENABLE"
 #endif
 
-struct Timeslot_t
-{
+struct Timeslot_t{
     Timeslot_t() : monday(false), tuesday(false), wednesday(false), thursday(false), friday(false), saturday(false), sunday(false) {}
     bool monday : 1;
     bool tuesday : 1;
@@ -86,6 +85,7 @@ class ShelfConfig {
         char hostname[20];
         char ntpServer[100];
         char timezone[50];
+        uint8_t podcastHour = 2;
         uint8_t defaultVolumne = 10;
         bool defaultRepeat : 1;
         bool defaultShuffle : 1;
