@@ -3,264 +3,264 @@
  <meta charset="utf-8">
  <meta name="viewport" content="width=device-width, initial-scale=1">
  <script>
-     function _(e) {
-         return document.getElementById(e);
-     }
-     function $(q) {
-         return Array.from(document.querySelectorAll(q))
-     }
-     function show(el) {
-         el.classList.remove('hidden');
-     }
-     function hide(el) {
-         el.classList.add('hidden');
-     }
-     function t(c, v) {
-         $(c).forEach(function (e) {
-             e.innerText = v
-         })
-     }
-     function ajax(m, url, cb, p) {
-         var xhr = new XMLHttpRequest();
-         xhr.onreadystatechange = function () {
-             if (xhr.readyState == 4) {
-                 cb(xhr.responseText);
-             }
-         };
-         xhr.open(m, url, true);
-         xhr.send(p);
+    function _(e) {
+        return document.getElementById(e);
+    }
+    function $(q) {
+        return Array.from(document.querySelectorAll(q))
+    }
+    function show(el) {
+        el.classList.remove('hidden');
+    }
+    function hide(el) {
+        el.classList.add('hidden');
+    }
+    function t(c, v) {
+        $(c).forEach(function (e) {
+            e.innerText = v
+        })
+    }
+    function ajax(m, url, cb, p) {
+        let xhr = new XMLHttpRequest();
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState == 4) {
+                cb(xhr.responseText);
+            }
+        };
+        xhr.open(m, url, true);
+        xhr.send(p);
      }
      function deleteUrl(url) {
-         if (confirm("Delete?")) ajax('DELETE', url, reloadFS);
+        if(confirm("Delete?")) ajax('DELETE', url, reloadFS);
      }
-     function upload() {
-         var fileInput = _('fileInput');
-         if (fileInput.files.length === 0) {
-             alert('Choose a file first');
-             return;
-         }
-         var fileTooLong = false;
-         Array.prototype.forEach.call(fileInput.files, function (file) {
-             if (file.name.length > 100) {
-                 fileTooLong = true;
-             }
-         });
-         if (fileTooLong) {
-             alert("File name too long. Files can be max. 100 characters long.");
-             return;
-         }
-         xhr = new XMLHttpRequest();
-         var d = new FormData();
-         for (var i = 0; i < fileInput.files.length; i++) {
-             d.append('data', fileInput.files[i], _('uploadForm').dataset.path + fileInput.files[i].name);
-         }
-         xhr.open('POST', '/');
-         xhr.upload.addEventListener('progress', progressHandler, false);
-         xhr.addEventListener('load', completeHandler, false);
-         xhr.addEventListener('error', errorHandler, false);
-         xhr.addEventListener('abort', abortHandler, false);
-         show(_('ulDiv'));
-         xhr.send(d);
-     }
-     function progressHandler(event) {
-         var percentage = Math.round((event.loaded / event.total) * 100);
-         _('progressBar').value = percentage;
-         _('ulStatus').innerHTML = percentage + '% (' + Math.ceil((event.loaded / (1024 * 1024)) * 10) / 10 + '/' + Math.ceil((event.total / (1024 * 1024)) * 10) / 10 + 'MB) uploaded';
-     }
-     function completeHandler(event) {
-         _('ulStatus').innerHTML = event.target.responseText;
-         reloadFS();
-         _('uploadForm').reset();
-         _('ulStatus').innerText = 'Upload done'
-     }
-     function errorHandler(event) {
-         _('ulStatus').innerText = 'Upload Failed';
-     }
-     function abortHandler(event) {
-         _('ulStatus').innerText = 'Upload Aborted';
-     }
-     function loadStatus() {
-         ajax('GET', '/?status', renderStatus)
-     }
-     function loadFS(url) {
-         show(_('loading'));
-         hide(_('fsContainer'));
-         ajax('GET', url + '?fs=1', renderFS)
-     }
-     function reloadFS() {
-         loadFS(_('fs').dataset.path)
-     }
-     function startPairing() {
-         var d = new FormData($('#pairingContainer form')[0]);
-         var url = d.get('url');
-         if (url.length > 16) {
-             alert('Folder name cannot have more than 16 characters');
-             return;
-         }
-         d.append('write', 1);
-         ajax('POST', url, function(r) { hide(_('pairingContainer')); renderStatus(r); }, d);
-     }
-     function play(url) {
-        var d = new FormData();
+    function upload() {
+        let fileInput = _('fileInput');
+        if(fileInput.files.length === 0) {
+            alert('Choose a file first');
+            return;
+        }
+        let fileTooLong = false;
+        Array.prototype.forEach.call(fileInput.files, function (file) {
+            if(file.name.length > 100) {
+            fileTooLong = true;
+            }
+        });
+        if(fileTooLong) {
+            alert("File name too long. Name can be max. 100 characters long.");
+            return;
+        }
+        xhr = new XMLHttpRequest();
+        let d = new FormData();
+        for(let i = 0; i < fileInput.files.length; i++) {
+            d.append('data', fileInput.files[i], _('uploadForm').dataset.path + fileInput.files[i].name);
+        }
+        xhr.open('POST', '/');
+        xhr.upload.addEventListener('progress', progressHandler, false);
+        xhr.addEventListener('load', completeHandler, false);
+        xhr.addEventListener('error', errorHandler, false);
+        xhr.addEventListener('abort', abortHandler, false);
+        show(_('ulDiv'));
+        xhr.send(d);
+    }
+    function progressHandler(event) {
+        let percentage = Math.round((event.loaded / event.total) * 100);
+        _('progressBar').value = percentage;
+        _('ulStatus').innerHTML = percentage + '% (' + Math.ceil((event.loaded / (1024 * 1024)) * 10) / 10 + '/' + Math.ceil((event.total / (1024 * 1024)) * 10) / 10 + 'MB) uploaded';
+    }
+    function completeHandler(event) {
+        _('ulStatus').innerHTML = event.target.responseText;
+        reloadFS();
+        _('uploadForm').reset();
+        _('ulStatus').innerText = 'Upload done'
+    }
+    function errorHandler(event) {
+        _('ulStatus').innerText = 'Upload Failed';
+    }
+    function abortHandler(event) {
+        _('ulStatus').innerText = 'Upload Aborted';
+    }
+    function loadStatus() {
+        ajax('GET', '/?status', renderStatus)
+    }
+    function loadFS(url) {
+        show(_('loading'));
+        hide(_('fsContainer'));
+        ajax('GET', url + '?fs=1', renderFS)
+    }
+    function reloadFS() {
+        loadFS(_('fs').dataset.path)
+    }
+    function startPairing() {
+        let d = new FormData($('#pairingContainer form')[0]);
+        let url = d.get('url');
+        if (url.length > 16) {
+            alert('Folder name cannot have more than 16 characters');
+            return;
+        }
+        d.append('write', 1);
+        ajax('POST', url, function(r) { hide(_('pairingContainer')); renderStatus(r); }, d);
+    }
+    function play(url) {
+        let d = new FormData();
         d.append('play', 1);
         ajax('POST', url, renderStatus, d);
-     }
-     function playFile(url) {
-        var d = new FormData();
+    }
+    function playFile(url) {
+        let d = new FormData();
         d.append('playfile', 1);
         ajax('POST', url, renderStatus, d);
-     }
-     function rootAction(action) {
-        var d = new FormData();
+    }
+    function rootAction(action) {
+        let d = new FormData();
         d.append(action, 1);
         ajax('POST', '/', renderStatus, d);
-     }
-     function mkdir() {
+    }
+    function mkdir() {
         _('mkdirSubmit').disabled=true;
-        var d = new FormData(_('mkdirForm'));
+        let d = new FormData(_('mkdirForm'));
         ajax('POST', '/', function () {
         hide(_('mkdirContainer'))
         reloadFS();
         }, d);
-     }
-     function ota() {
-         show(_('loading'));
-         var v = _('otaurl').value;
-         if(!v || !v.match(/^http.+\/\//)) v = 1;
-         var d = new FormData();
-         d.append('ota', v);
-         _('spinnerTxt').innerHtml = 'Please wait and do NOT turn off the power! Meanwhile you can have a look at the <a href="https://github.com/TheNitek/RfidShelf/releases">changelog</a>.';
-         ajax('POST', '/', function () {
-             location.reload();
-         }, d);
-     }
-     function downloadpatch() {
-         var xhr = new XMLHttpRequest();
-         xhr.onreadystatechange = function () {
-             if (xhr.readyState === 1) {
-                 document.write('Please wait while the patch is downloading! Once the download is finished the system will restart automatically.');
-             } else if (xhr.readyState === 4) {
-                 location.reload();
-             }
-         };
-         xhr.open('POST', '/');
-         var formData = new FormData();
-         formData.append('downloadpatch', 1);
-         xhr.send(formData);
-     }
-     function formatBytes(a) {
-         if (0 == a)return "0 Bytes";
-         var c = 1024, e = ["Bytes", "KB", "MB", "GB"], f = Math.floor(Math.log(a) / Math.log(c));
-         return parseFloat((a / Math.pow(c, f)).toFixed(2)) + e[f]
-     }
-     function formatNumbers() {
-         $('.number').forEach(function (n) {
-             n.innerText = formatBytes(n.innerText);
-         })
-     }
-     function renderFS(r) {
-         var p = JSON.parse(r);
-         show(_('fsContainer'));
-         _('fs').innerHTML = '';
-         _('fs').dataset.path = p.path;
-         _('uploadForm').dataset.path = p.path + '/';
-         p.fs.sort(sortFS);
-         p.fs.forEach(renderFSentry);
-         formatNumbers();
-         if (p.path === '/') {
+    }
+    function ota() {
+        show(_('loading'));
+        let v = _('otaurl').value;
+        if(!v || !v.match(/^http.+\/\//)) v = 1;
+        let d = new FormData();
+        d.append('ota', v);
+        _('spinnerTxt').innerHtml = 'Please wait and do NOT turn off the power! Meanwhile you can have a look at the <a href="https://github.com/TheNitek/RfidShelf/releases">changelog</a>.';
+        ajax('POST', '/', function () {
+            location.reload();
+        }, d);
+    }
+    function downloadpatch() {
+        let xhr = new XMLHttpRequest();
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState === 1) {
+                document.write('Please wait while the patch is downloading! Once the download is finished the system will restart automatically.');
+            } else if (xhr.readyState === 4) {
+                location.reload();
+            }
+        };
+        xhr.open('POST', '/');
+        let formData = new FormData();
+        formData.append('downloadpatch', 1);
+        xhr.send(formData);
+    }
+    function formatBytes(a) {
+        if (0 == a)return "0 Bytes";
+        let c = 1024, e = ["Bytes", "KB", "MB", "GB"], f = Math.floor(Math.log(a) / Math.log(c));
+        return parseFloat((a / Math.pow(c, f)).toFixed(2)) + e[f]
+    }
+    function formatNumbers() {
+        $('.number').forEach(function (n) {
+            n.innerText = formatBytes(n.innerText);
+        })
+    }
+    function renderFS(r) {
+    let p = JSON.parse(r);
+        show(_('fsContainer'));
+        _('fs').innerHTML = '';
+        _('fs').dataset.path = p.path;
+        _('uploadForm').dataset.path = p.path + '/';
+        p.fs.sort(sortFS);
+        p.fs.forEach(renderFSentry);
+        formatNumbers();
+        if (p.path === '/') {
             $('.root').forEach(show);
             $('.noRoot').forEach(hide);
             $('.file').forEach(function (e) {
                 e.innerHTML = e.innerHTML.replace(/\{path\}/g, '')
             })
-         } else {
+        } else {
             $('.root').forEach(hide);
             $('.noRoot').forEach(show);
             $('.file').forEach(function (e) {
                 e.innerHTML = e.innerHTML.replace(/\{path\}/g, p.path)
             })
-         }
-         hide(_('loading'));
-     }
-     function sortFS(a, b) {
-         if (('size' in a) == ('size' in b)) return ('' + a.name).localeCompare(b.name); else if (!('size' in a)) return -1; else return 1;
-     }
-     function renderFSentry(e) {
-         if ('size' in e) {
-             var t = document.importNode(_('fileT').content.querySelector('div'), true);
-             t.innerHTML = t.innerHTML.replace(/\{filename\}/g, e.name).replace(/\{filesize\}/g, e.size);
-             if (e.name.endsWith('.mp3')) {
-                 t.classList.add('mp3')
-             }
-             _('fs').appendChild(t);
-         }
-         else {
-             var t = document.importNode(_('folderT').content.querySelector('div'), true);
-             t.innerHTML = t.innerHTML.replace(/\{foldername\}/g, e.name);
-             _('fs').appendChild(t);
-         }
-     }
-     function renderStatus(r) {
-         var d = JSON.parse(r);
-         if ('pairing' in d) {
-             t('.pairingFile', '/' + d.pairing);
-             show(_('pairing'));
-         }
-         else {
-             hide(_('pairing'));
-         }
-         var pb = _('playback');
-         if ('currentFile' in d) {
-             t('.currentFile', '/' + d.currentFolder + '/' + d.currentFile);
-         }
-         if (d.playback == 'FILE') {
-             pb.className = 'playing';
-         }
-         else if (d.playback == 'PAUSED') {
-             pb.className = 'paused';
-         }
-         else {
-             pb.className = 'hidden';
-         }
+        }
+        hide(_('loading'));
+    }
+    function sortFS(a, b) {
+        if(('size' in a) == ('size' in b)) return ('' + a.name).localeCompare(b.name); else if (!('size' in a)) return -1; else return 1;
+    }
+    function renderFSentry(e) {
+        if('size' in e) {
+            let t = document.importNode(_('fileT').content.querySelector('div'), true);
+            let nameEscaped = e.name.replace(/'/g, '\\\'');
+            t.innerHTML = t.innerHTML.replace(/\{filenameEscaped\}/g, nameEscaped).replace(/\{filename\}/g, e.name).replace(/\{filesize\}/g, e.size);
+            if (e.name.endsWith('.mp3')) {
+                t.classList.add('mp3')
+            }
+            _('fs').appendChild(t);
+        } else {
+            let t = document.importNode(_('folderT').content.querySelector('div'), true);
+            t.innerHTML = t.innerHTML.replace(/\{foldername\}/g, e.name);
+            _('fs').appendChild(t);
+        }
+    }
+    function renderStatus(r) {
+        let d = JSON.parse(r);
+        if('pairing' in d) {
+            t('.pairingFile', '/' + d.pairing);
+            show(_('pairing'));
+        }
+        else {
+            hide(_('pairing'));
+        }
+        let pb = _('playback');
+        if ('currentFile' in d) {
+            t('.currentFile', '/' + d.currentFolder + '/' + d.currentFile);
+        }
+        if (d.playback == 'FILE') {
+            pb.className = 'playing';
+        }
+        else if (d.playback == 'PAUSED') {
+            pb.className = 'paused';
+        }
+        else {
+            pb.className = 'hidden';
+        }
 
-         var n = _('night'), noN = _('noNight');
-         hide(d.night ? noN : n);
-         show(d.night ? n : noN);
+        let n = _('night'), noN = _('noNight');
+        hide(d.night ? noN : n);
+        show(d.night ? n : noN);
 
-         var shuf = _('shuffle'), noShuf = _('noShuffle');
-         hide(d.shuffle ? noShuf : shuf);
-         show(d.shuffle ? shuf : noShuf);
+        let shuf = _('shuffle'), noShuf = _('noShuffle');
+        hide(d.shuffle ? noShuf : shuf);
+        show(d.shuffle ? shuf : noShuf);
 
-         _('volumeBar').value = d.volume;
-         _('volumeBar').innerHTML = d.volume;
-         if (!d.patch) {
-             show(_('patchForm'));
-         }
-         t('.firmwareVersion', d.version);
-         t('.shelfTime', (new Date(d.time * 1000)).toUTCString());
-         t('.shelfUptime', d.uptime);
+        _('volumeBar').value = d.volume;
+        _('volumeBar').innerHTML = d.volume;
+        if (!d.patch) {
+            show(_('patchForm'));
+        }
+        t('.firmwareVersion', d.version);
+        t('.shelfTime', (new Date(d.time * 1000)).toUTCString());
+        t('.shelfUptime', d.uptime);
 
-     }
-     function showPairing(f) {
-         _('pairingForm').reset();
-         show(_('pairingContainer'));
-         var sel = _('pairingFolder');
-         for(var i = 1; i < sel.options.length; i++) sel.remove(i);
-         var addOpt = function(v) {
-             var o = document.createElement("option");
-             o.text = o.val = v;
-             if(v === f) {
-                 o.selected = true;
-             }
-             sel.add(o);
-         };
-         $('#fs .folder a').forEach(function (e) { addOpt(e.innerText); });
-         _('pairingVolume').value = _('volumeBar').value;
-         _('pairingVolumeOutput').value = _('volumeBar').value;
-     }
-     function loadConfig() {
+    }
+    function showPairing(f) {
+        _('pairingForm').reset();
+        show(_('pairingContainer'));
+        let sel = _('pairingFolder');
+        for(let i = 1; i < sel.options.length; i++) sel.remove(i);
+        let addOpt = function(v) {
+        let o = document.createElement("option");
+            o.text = o.val = v;
+            if(v === f) {
+                o.selected = true;
+            }
+            sel.add(o);
+        };
+        $('#fs .folder a').forEach(function (e) { addOpt(e.innerText); });
+        _('pairingVolume').value = _('volumeBar').value;
+        _('pairingVolumeOutput').value = _('volumeBar').value;
+    }
+    function loadConfig() {
         ajax('GET', '/?config', function(r) {
-            var d = JSON.parse(r);
+            let d = JSON.parse(r);
             _('configHostname').value = d.host;
             _('configNtp').value = d.ntp;
             _('configTimezone').value = d.tz;
@@ -270,12 +270,12 @@
             show(_('configContainer'));
             hide(_('loading'));
         });
-     }
-     function showConfig() {
+    }
+    function showConfig() {
         show(_('loading'));
         loadConfig();
-     }
-     function loadFSUsage() {
+    }
+    function loadFSUsage() {
         ajax('GET', '/?usage', function(r) {
             let d = JSON.parse(r);
             let t = document.importNode(_('fsUsageContainerT').content, true);
@@ -290,18 +290,38 @@
             show(c);
             hide(_('loading'));
         });
-     }
-     function showFSUsage() {
+    }
+    function showFSUsage() {
         show(_('loading'));
         loadFSUsage();
-     }
-     function showMkdir() {
-         _('mkdirForm').reset();
-         show(_('mkdirContainer'));
-     }
-     window.onhashchange = function () {
-         loadFS(location.hash.slice(1))
-     }
+    }
+    function showMkdir() {
+        _('mkdirForm').reset();
+        show(_('mkdirContainer'));
+    }
+    function loadPodcast(d) {
+        ajax('GET', d + '?podcast', function(r) {
+            let p = JSON.parse(r);
+            show(_('podcastContainer'));
+            hide(_('loading'));
+        });
+    }
+    function showPodcast(d) {
+        show(_('loading'));
+        _('podcastContainer').reset();
+        loadPodcast(d);
+    }
+    function updatePodcast() {
+        _('podcastSubmit').disabled=true;
+        let d = new FormData(_('podcastForm'));
+        ajax('POST', '/', function () {
+        hide(_('podcastContainer'))
+        reloadFS();
+        }, d);        
+    }
+    window.onhashchange = function () {
+        loadFS(location.hash.slice(1))
+    }
 </script>
 <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAb1BMVEVHcExdretcre9crOtdre1druxcrOxdrexcrOxdre1cq+xdrexdrexdrexcru1bqu1drexdru1Voexcru1cq+terexdrexbqelVqv9drOuAv/9druxdr+xdrexcretdretVqu5crexcsfFcrOxdrezU0qxCAAAAJHRSTlMA+DOpxfBX4nKMS/2XyMIV57YNRj9t6xwGnARCXaGC3g+FJFB4ExNpAAAAhElEQVQYGQXBh2ECQRAEMAH/7B45GZzj9F+jJdiMww4AVLICOEKdVhtwPZ+2UA0YyRaq8fjbGPfPK1SzT1bGBFRTyc6YgGpq92BMWNdi21RjTJiTNNUuy5cJ52SxpPo2JxOe10+/qP5IcgB898/ctzmLNWCfpF2WR4B7kncAeNt/jVfAP9X/CDiacj3PAAAAAElFTkSuQmCC">
 <title>RfidShelf</title>
@@ -614,16 +634,32 @@
   </div>
  </div>
 </template>
-
 <template id="fileT">
  <div class="file">
   <div class="fl_exp">
    <a href="{path}/{filename}">{filename}</a> (<span class="number">{filesize}</span>)
   </div>
-  <button title="delete" class="del" onclick="deleteUrl('{path}/{filename}');">&#x2718;</button>
-  <button title="play" class="mp3only" onclick="playFile('{path}/{filename}');">&#x25b6;</button>
+  <button title="delete" class="del" onclick="deleteUrl('{path}/{filenameEscaped}');">&#x2718;</button>
+  <button title="play" class="mp3only" onclick="playFile('{path}/{filenameEscaped}');">&#x25b6;</button>
  </div>
 </template>
+<div id="podcastContainer" class="hidden modal">
+  <form id="podcastForm" onsubmit="updatePodcast(); return false;">
+    <h3>Podcast Settings</h3>
+    <div>
+     <label for="podcastUrl">Podcast URL:</label>
+     <input type="url" id="podcastUrl" name="podcastUrl" required>
+    </div>
+    <div>
+     <label for="podcastCount">Keep this many episodes:</label>
+     <input type="number" min="1" id="podcastCount" name="podcastCount" required>
+    </div>
+       <div class="fl">
+    <input type="submit" id="podcastSubmit" value="Set" class="fl_exp">
+    <button class="close" style="margin-left: 10px;" onclick="hide(_('podcastContainer')); return false;">close</button>
+    </div>
+  </form>     
+</div>
 
 <div id="loading" class="hidden"><div id="spinner"></div><div id="spinnerTxt"></div></div>
 

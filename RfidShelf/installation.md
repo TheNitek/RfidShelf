@@ -1,27 +1,9 @@
 # Firmware Installation
 You can flash the software using Arduino IDE or PlatformIO.
 
-## Using Arduino IDE
-
-1. Install [Arduino IDE](https://www.arduino.cc/en/Main/Software)
-1. Install [ESP8266 Support](https://github.com/esp8266/Arduino#installing-with-boards-manager)
-1. Install the following libraries using the library manager:
- * MFRC522
- * WifiManager
- * BoolArray
- * Adafruit_VS1053_Library
- * EasyButton
-1. Install [Espalexa](https://github.com/Aircoookie/Espalexa)
-1. Open the RfidShelf.ino sketch and flash it into the ESP8266
-1. Watch the serial console during boot up
-
-
 ## Using PlatformIO
 1. Install [PlatformIO Core](https://platformio.org/install/cli)
 1. Run "platformio run -t upload" in the RfidShelf folder
-
-## Install VS1053 patches (optional)
-* Download [VS1053 patches](https://github.com/sparkfun/LilyPad_MP3_Player/blob/master/Arduino/libraries/SFEMP3Shield/plugins/patches.053) and put it in the root folder of your SD card. It allows the MP3 decoder to do mono playback.
 
 ## Setup
 After the firmware is flashed, the shelf will create a WiFi hotspot called "MP3-SHELF-SETUP". You can connect using the password "lacklack". In the captive portal (or on http://192.168.4.1/) you can configure your WiFi.
