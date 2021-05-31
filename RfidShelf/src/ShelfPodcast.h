@@ -12,14 +12,20 @@
 class ShelfPodcast {
   public:
     ShelfPodcast(ShelfConfig &config, ShelfPlayback &playback, ShelfWeb &web, sdfat::SdFat &sd) : _config(config), _playback(playback), _web(web), _SD(sd) {}
+    struct PodcastInfo {
+      public:
+        PodcastInfo(sdfat::SdFat &sd) : _SD(sd) {}
+        String feedUrl;
+        uint16_t maxEpisodes = 0;
+        String lastGuid;
+        uint16_t lastFileNo = 0;
+        bool load(const char* podFilename);
+        bool save(const char* podFilename);
+      private:
+        sdfat::SdFat &_SD;
+    };
     void work();
   private:
-    struct PodcastInfo {
-      String feedUrl;
-      uint16_t maxEpisodes = 0;
-      String lastGuid;
-      uint16_t lastFileNo = 0;
-    };
     class PodcastState {
       public: 
         PodcastState(const PodcastInfo &info) : _info(info) {}
@@ -57,7 +63,6 @@ class ShelfPodcast {
     bool _resumePlayback = false;
     bool _isPodcastTime();
     bool _nextPodcast(char *folder);
-    bool _readPodcastFile(PodcastInfo &state, const char* podFilename);
     void _loadFeed(_HTTPClient &httpClient, const String &feedUrl, PodcastState &state);
     bool _downloadNextEpisode(PodcastInfo &info, const char *folder);
     void _cleanupEpisodes(uint16_t maxEpisodes, const char *folder);

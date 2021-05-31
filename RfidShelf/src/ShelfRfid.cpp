@@ -1,25 +1,21 @@
 #include "ShelfRfid.h"
 
 void ShelfRfid::begin() {
-  SPI.begin();        // Init SPI bus
-
   _mfrc522.PCD_Init(); // Init MFRC522 card
-
-  for (byte i = 0; i < 6; i++) {
-    _key.keyByte[i] = 0xFF;
-  }
 
   Sprintln(F("RFID initialized"));
 }
 
 void ShelfRfid::handleRfid(bool ignoreTagData) {
-  if ((_playback.playbackState() != PLAYBACK_NO) && (millis() - _lastRfidCheck < 500)) {
+  if ((_playback.playbackState() != ShelfPlayback::PLAYBACK_NO) && (millis() - _lastRfidCheck < 500)) {
     return;
   }
   _lastRfidCheck = millis();
 
   // While playing check if the tag is still present
-  if ((_playback.playbackState() == PLAYBACK_FILE) && _playback.playingByCard && (_currentCard.config.stopOnRemove == 1 || (_currentCard.config.stopOnRemove == 2 && _config.defaultStopOnRemove))) {
+  if ((_playback.playbackState() == ShelfPlayback::PLAYBACK_FILE)
+      && _playback.playingByCard
+      && (_currentCard.config.stopOnRemove == 1 || (_currentCard.config.stopOnRemove == 2 && _config.defaultStopOnRemove))) {
 
     // Since wireless communication is voodoo we'll give it a few retrys before killing the music
     for (int i = 0; i < 3; i++) {
@@ -29,11 +25,7 @@ void ShelfRfid::handleRfid(bool ignoreTagData) {
 
       MFRC522::StatusCode result = _mfrc522.PICC_WakeupA(bufferATQA, &bufferSize);
 
-      if (result == _mfrc522.STATUS_OK && _mfrc522.PICC_ReadCardSerial() && (
-            _mfrc522.uid.uidByte[0] == _lastCardUid[0] &&
-            _mfrc522.uid.uidByte[1] == _lastCardUid[1] &&
-            _mfrc522.uid.uidByte[2] == _lastCardUid[2] &&
-            _mfrc522.uid.uidByte[3] == _lastCardUid[3] )) {
+      if (result == MFRC522::STATUS_OK && _mfrc522.PICC_ReadCardSerial() && !memcmp(_mfrc522.uid.uidByte, _lastCardUid, 4)) {
         _mfrc522.PICC_HaltA();
         return;
       }
@@ -119,7 +111,7 @@ void ShelfRfid::_handleRfidData() {
   char currentFolder[101];
   currentFolder[0] = '/';
   _playback.currentFolder(currentFolder+1, sizeof(currentFolder)-1);
-  if ((_playback.playbackState() != PLAYBACK_NO) && (strcmp(readFolder, currentFolder) == 0)) {
+  if ((_playback.playbackState() != ShelfPlayback::PLAYBACK_NO) && !strcmp(readFolder, currentFolder)) {
     Sprint(F("Resuming ")); Sprintln(currentFolder);
     _playback.resumePlayback();
     _playback.playingByCard = true;
@@ -180,7 +172,7 @@ void ShelfRfid::_setPlaybackOptions(const uint8_t repeat, const uint8_t shuffle)
   }
 }
 
-NFCTagObject ShelfRfid::getPairingConfig() {
+ShelfRfid::NFCTagObject ShelfRfid::getPairingConfig() {
   return _pairingCard;
 }
 
@@ -254,8 +246,7 @@ bool ShelfRfid::_writeRfidBlock(const uint8_t sector, const uint8_t relativeBloc
 
     status = _mfrc522.MIFARE_Write(absoluteBlock + i, buffer, bufferSize);
     if (status != MFRC522::STATUS_OK) {
-      Sprint(F("MIFARE_Write() failed: "));
-      Sprintln(_mfrc522.GetStatusCodeName(status));
+      Sprint(F("MIFARE_Write() failed: ")); Sprintln(_mfrc522.GetStatusCodeName(status));
       return false;
     }
   }

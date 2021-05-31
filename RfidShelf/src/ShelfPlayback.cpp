@@ -56,23 +56,27 @@ void ShelfPlayback::begin() {
 const bool ShelfPlayback::switchFolder(const char *folder) {
   Sprint(F("Switching folder to ")); Sprintln(folder);
 
-  if (!_SD.exists(folder)) {
+  if(!_SD.exists(folder)) {
     Sprintln(F("Folder does not exist"));
     return false;
   }
   stopPlayback();
   _currentFolder.close();
-  _currentFolder.open(folder);
+  _currentFolder = _SD.open(folder);
+  if(!_currentFolder.isOpen()) {
+    Sprintln(F("Could not open folder"));
+    return false;
+  }
   _currentFolder.rewind();
   _currentFile[0] = '\0';
   _currentFolderFileCount = 0;
 
   sdfat::SdFile file;
-  char filenameChar[100];
+  char filenameChar[13];
 
   while (file.openNext(&_currentFolder, sdfat::O_READ))
   {
-    file.getName(filenameChar, sizeof(filenameChar));
+    file.getSFN(filenameChar);
 
     if (!file.isDir() && _musicPlayer.isMP3File(filenameChar)) {
       _currentFolderFileCount++;
@@ -85,6 +89,10 @@ const bool ShelfPlayback::switchFolder(const char *folder) {
 
 void ShelfPlayback::currentFolder(char *foldername, size_t size) {
   _currentFolder.getName(foldername, size);
+}
+
+void ShelfPlayback::currentFolderSFN(char *foldername) {
+  _currentFolder.getSFN(foldername);
 }
 
 void ShelfPlayback::currentFile(char *filename, size_t size) {
@@ -115,7 +123,7 @@ void ShelfPlayback::pausePlayback() {
   if(_playing != PLAYBACK_FILE) {
     return;
   }
-  if (AMP_POWER > 0) {
+  if(AMP_POWER > 0) {
     digitalWrite(AMP_POWER, LOW);
   }
   _musicPlayer.pausePlaying(true);
@@ -241,8 +249,8 @@ void ShelfPlayback::startPlayback() {
     }
   }
 
-  char folder[100];
-  _currentFolder.getName(folder, sizeof(folder));
+  char folder[13];
+  _currentFolder.getSFN(folder);
 
   startFilePlayback(folder, nextFile);
 }
@@ -306,7 +314,7 @@ void ShelfPlayback::volumeDown() {
   volume(_volume + 5);
 }
 
-void ShelfPlayback::setBassAndTreble(uint8_t trebleAmplitude, uint8_t trebleFreqLimit, uint8_t bassAmplitude, uint8_t bassFreqLimit) {
+void ShelfPlayback::setBassAndTreble(const uint8_t trebleAmplitude, const uint8_t trebleFreqLimit, const uint8_t bassAmplitude, const uint8_t bassFreqLimit) {
   uint16_t bassReg = 0;
   bassReg |= trebleAmplitude;
   bassReg <<= 4;
@@ -321,8 +329,8 @@ void ShelfPlayback::setBassAndTreble(uint8_t trebleAmplitude, uint8_t trebleFreq
 const bool ShelfPlayback::_patchVS1053() {
   Sprintln(F("Installing patch to VS1053"));
 
-  sdfat::SdFile file;
-  if (!file.open("patches.053", sdfat::O_READ)) {
+  sdfat::File32 file = _SD.open("patches.053", sdfat::O_READ);
+  if (!file.isOpen()) {
     return false;
   }
 
@@ -419,8 +427,9 @@ void ShelfPlayback::work() {
     memset(endFillBytes, endFillByte, sizeof(endFillBytes));
     // Send at least 2052 bytes of endFillByte[7:0] (we'll do a few more)
     for(uint8_t i = 0; i <= 64; i++) {
-      while(!_musicPlayer.readyForData())
+      while(!_musicPlayer.readyForData()) {
         ESP.wdtFeed();
+      }
       _musicPlayer.playData(endFillBytes, sizeof(endFillBytes));
     }
     // Set SCI MODE bit SM CANCEL
@@ -428,8 +437,9 @@ void ShelfPlayback::work() {
     // Send at least 32 bytes of endFillByte[7:0]
     // Read SCI MODE. If SM CANCEL is still set, send again. 
     for(uint8_t i = 0; i <= 64; i++) {
-      while(!_musicPlayer.readyForData())
+      while(!_musicPlayer.readyForData()) {
         ESP.wdtFeed();
+      }
       _musicPlayer.playData(endFillBytes, sizeof(endFillBytes));
       if((_musicPlayer.sciRead(VS1053_REG_MODE) & VS1053_MODE_SM_CANCEL) == 0) {
         uint16_t hdat0 = _musicPlayer.sciRead(VS1053_REG_HDAT0);

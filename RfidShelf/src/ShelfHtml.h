@@ -4,6 +4,6 @@
 
 class ShelfHtml {
     public:
-        static const char INDEX[];
+        static const char INDEX[] PROGMEM;
         static const size_t INDEX_SIZE;
 };

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <DNSServer.h>
@@ -17,7 +18,7 @@
 
 class ShelfWeb {
   public:
-    ShelfWeb(ShelfConfig &config, ShelfPlayback &playback, ShelfRfid &rfid, sdfat::SdFat &sd) : _config(config), _playback(playback), _rfid(rfid), _SD(sd), _alexaDevice(_config.hostname, std::bind(&ShelfWeb::_deviceCallback, this, std::placeholders::_1), EspalexaDeviceType::dimmable, 50) {}
+    ShelfWeb(ShelfConfig &config, ShelfPlayback &playback, ShelfRfid &rfid, sdfat::SdFat &sd) : _config(config), _playback(playback), _rfid(rfid), _SD(sd) {}
     void begin();
     void work();
     bool isFileUploading();
@@ -29,9 +30,9 @@ class ShelfWeb {
     ShelfRfid &_rfid;
     sdfat::SdFat &_SD;
     Espalexa _espalexa;
-    EspalexaDevice _alexaDevice;
+    EspalexaDevice *_alexaDevice;
     ESP8266WebServer _server;
-    sdfat::SdFile _uploadFile;
+    sdfat::File32 _uploadFile;
     uint32_t _uploadStart;
     bool _paused = false;
     void _returnOK();
@@ -42,11 +43,12 @@ class ShelfWeb {
     void _sendJsonFSUsage();
     void _sendJsonFS(const char *path);
     bool _loadFromSdCard(const char *path);
+    void _handleDelete(const char *file);
     void _handleWriteRfid(const char *folder);
     void _handleFileUpload();
     void _handleDefault();
     void _deviceCallback(EspalexaDevice* device);
     void _downloadPatch();
     void _updateOTA();
-    void _playbackCallback(PlaybackState state, uint8_t volume);
+    void _playbackCallback(ShelfPlayback::PlaybackState state, uint8_t volume);
 };

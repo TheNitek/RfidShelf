@@ -12,8 +12,9 @@ void ShelfWeb::begin() {
   // Done by espalexa
   //_server.begin();
 
-  _alexaDevice.setPercent(2*(50-_playback.volume()));
-  _espalexa.addDevice(&_alexaDevice);
+  _alexaDevice = new EspalexaDevice(_config.hostname, std::bind(&ShelfWeb::_deviceCallback, this, std::placeholders::_1), EspalexaDeviceType::dimmable, 50);
+  _alexaDevice->setPercent(2*(50-_playback.volume()));
+  _espalexa.addDevice(_alexaDevice);
   _espalexa.begin(&_server);
 
   _playback.callback = std::bind(&ShelfWeb::_playbackCallback, this, std::placeholders::_1, std::placeholders::_2);
@@ -26,12 +27,12 @@ void ShelfWeb::_deviceCallback(EspalexaDevice* device) {
 
   switch(device->getLastChangedProperty()) {
     case EspalexaDeviceProperty::off:
-      if(_playback.playbackState() == PLAYBACK_FILE) {
+      if(_playback.playbackState() == ShelfPlayback::PLAYBACK_FILE) {
         _playback.pausePlayback();
       }
       break;
     case EspalexaDeviceProperty::on: 
-      if(_playback.playbackState() == PLAYBACK_PAUSED) {
+      if(_playback.playbackState() == ShelfPlayback::PLAYBACK_PAUSED) {
         _playback.playingByCard = false;
         _playback.resumePlayback();
         device->setPercent(2*(50-_playback.volume()));
@@ -45,16 +46,16 @@ void ShelfWeb::_deviceCallback(EspalexaDevice* device) {
   }
 }
 
-void ShelfWeb::_playbackCallback(PlaybackState state, uint8_t volume) {
-  if(state == PLAYBACK_FILE) {
-    _alexaDevice.setPercent(2*(50-_playback.volume()));
+void ShelfWeb::_playbackCallback(ShelfPlayback::PlaybackState state, uint8_t volume) {
+  if(state == ShelfPlayback::PLAYBACK_FILE) {
+    _alexaDevice->setPercent(2*(50-_playback.volume()));
   } else {
-    _alexaDevice.setValue(0);
+    _alexaDevice->setValue(0);
   }
 }
 
 void ShelfWeb::_returnOK() {
-  _server.send_P(200, PSTR("text/plain"), NULL);
+  _server.send_P(200, PSTR("text/plain"), "");
 }
 
 void ShelfWeb::_returnHttpStatus(const uint16_t statusCode, const char *msg) {
@@ -70,27 +71,31 @@ void ShelfWeb::_sendJsonStatus() {
   char output[768] = "{\"playback\":\"";
   char buffer[101];
 
-  if(_playback.playbackState() == PLAYBACK_FILE) {
-    strcat_P(output, PSTR("FILE\""));
-  } else if(_playback.playbackState() == PLAYBACK_PAUSED) {
-    strcat_P(output, PSTR("PAUSED\""));
-  } else {
-    strcat_P(output, PSTR("NO\""));
+  switch(_playback.playbackState()) {
+    case ShelfPlayback::PLAYBACK_FILE:
+      strcat_P(output, PSTR("FILE\""));
+      break;
+    case ShelfPlayback::PLAYBACK_PAUSED:
+      strcat_P(output, PSTR("PAUSED\""));
+      break;
+    case ShelfPlayback::PLAYBACK_NO:
+      strcat_P(output, PSTR("NO\""));
+      break;
   }
 
   if(_rfid.hasActivePairing) {
-    NFCTagObject pairingConfig = _rfid.getPairingConfig();
+    ShelfRfid::NFCTagObject pairingConfig = _rfid.getPairingConfig();
     strcat_P(output, PSTR(",\"pairing\":\""));
     strcat(output, pairingConfig.folder);
     strcat(output, "\"");
   }
 
-  if(_playback.playbackState() != PLAYBACK_NO) {
-    _playback.currentFile(buffer, sizeof(buffer));
+  if(_playback.playbackState() != ShelfPlayback::PLAYBACK_NO) {
     strcat_P(output, PSTR(",\"currentFile\":\""));
+    _playback.currentFile(buffer, sizeof(buffer));
     strcat(output, buffer);
-    _playback.currentFolder(buffer, sizeof(buffer));
     strcat_P(output, PSTR("\",\"currentFolder\":\""));
+    _playback.currentFolder(buffer, sizeof(buffer));
     strcat(output, buffer);
     strcat(output, "\"");
   }
@@ -99,45 +104,34 @@ void ShelfWeb::_sendJsonStatus() {
   snprintf(buffer, sizeof(buffer), "%d", 50 - _playback.volume());
   strcat(output, buffer);
 
-  if (_SD.exists("/patches.053")) {
-    strcat_P(output, PSTR(",\"patch\":true"));
-  } else {
-    strcat_P(output, PSTR(",\"patch\":false"));
-  }
+  _SD.exists("/patches.053") ? strcat_P(output, PSTR(",\"patch\":true")) : strcat_P(output, PSTR(",\"patch\":false"));
 
-  if(_playback.isNight()) {
-    strcat_P(output, PSTR(",\"night\":true"));
-  } else {
-    strcat_P(output, PSTR(",\"night\":false"));
-  }
+  _playback.isNight()? strcat_P(output, PSTR(",\"night\":true")) : strcat_P(output, PSTR(",\"night\":false"));
 
-  if(_playback.isShuffle()) {
-    strcat_P(output, PSTR(",\"shuffle\":true"));
-  } else {
-    strcat_P(output, PSTR(",\"shuffle\":false"));
-  }
+  _playback.isShuffle() ? strcat_P(output, PSTR(",\"shuffle\":true")) : strcat_P(output, PSTR(",\"shuffle\":false"));
 
-  strcat_P(output, PSTR(",\"time\":"));
-  snprintf(buffer, sizeof(buffer), "%lu", time(nullptr));
+  snprintf_P(buffer, sizeof(buffer), PSTR(",\"time\":%llu"), time(nullptr));
   strcat(output, buffer);
 
-  strcat_P(output, PSTR(",\"uptime\":"));
-  snprintf(buffer, sizeof(buffer), "%lu", (millis()/(1000*60)));
+  snprintf_P(buffer, sizeof(buffer), PSTR(",\"uptime\":%lu"), (millis()/(1000*60)));
   strcat(output, buffer);
 
-  strcat_P(output, PSTR(",\"version\":"));
-  snprintf_P(buffer, sizeof(buffer), PSTR("\"%d.%d\""), MAJOR_VERSION, MINOR_VERSION);
+  snprintf_P(buffer, sizeof(buffer), PSTR(",\"version\":\"%d.%d\"}"), MAJOR_VERSION, MINOR_VERSION);
   strcat(output, buffer);
-  strcat(output, "}");
 
   _server.send_P(200, PSTR("application/json"), output);
 }
 
 void ShelfWeb::_sendJsonFSUsage() {
-  uint32_t free = (uint32_t)(0.000512*_SD.vol()->freeClusterCount()*_SD.vol()->blocksPerCluster());
-  uint32_t total = (uint32_t)(0.000512*_SD.card()->cardCapacity());
+  sdfat::csd_t m_csd;
+  if(!_SD.card()->readCSD(&m_csd)) {
+    Sprintln(PSTR("Could not read card info"));
+    _returnHttpStatus(500, PSTR("Could not read card info"));
+    return;
+  }
+  uint32_t free = (uint32_t)(0.000512*_SD.vol()->freeClusterCount()*_SD.vol()->sectorsPerCluster());
+  uint32_t total = (uint32_t)(0.000512 * sdCardCapacity(&m_csd));
 
-  // This is too slow on bigger cards, so it needs to be moved somewhere else
   char output[51] = "";
   snprintf_P(output, sizeof(output), PSTR("{\"free\":%u,\"total\":%u}"), free, total);
   _server.send_P(200, PSTR("application/json"), output);
@@ -199,10 +193,8 @@ void ShelfWeb::_sendJsonFS(const char *path) {
   _server.setContentLength(CONTENT_LENGTH_UNKNOWN);
   _server.send_P(200, PSTR("application/json"), PSTR("{\"fs\":["));
 
-  sdfat::SdFile dir;
-  dir.open(path, sdfat::O_READ);
-
-  sdfat::SdFile entry;
+  sdfat::File32 dir = _SD.open(path, sdfat::O_READ);
+  sdfat::File32 entry;
 
   char buffer[101];
   char output[256];
@@ -210,39 +202,36 @@ void ShelfWeb::_sendJsonFS(const char *path) {
   bool first = true;
 
   while (entry.openNext(&dir, sdfat::O_READ)) {
-    if(first) {
-      first = false;
-      strcpy_P(output, PSTR("{\"name\":\""));
-    } else {
-      strcpy_P(output, PSTR(",{\"name\":\""));
-    }
+    strcpy_P(output, PSTR(",{\"name\":\""));
     entry.getName(buffer, sizeof(buffer));
     // TODO encode special characters
     strcat(output, buffer);
     if (entry.isDir()) {
       strcat(output, "\"");
     } else {
-      strcat_P(output, PSTR("\",\"size\":"));
-      snprintf(buffer, sizeof(buffer), "%lu", (unsigned long) entry.fileSize());
+      snprintf_P(buffer, sizeof(buffer), PSTR("\",\"size\":%lu"), entry.fileSize());
       strcat(output, buffer);
     }
     entry.close();
     strcat(output, "}");
-    _server.sendContent_P(output);
+    if(first) {
+      first = false;
+      _server.sendContent_P(output+1);
+    } else {
+      _server.sendContent_P(output);
+    }
   }
-  _server.sendContent_P("],");
-  snprintf_P(output, sizeof(output), PSTR("\"path\":\"%s\""), path);
+  snprintf_P(output, sizeof(output), PSTR("],\"path\":\"%s\"}"), path);
   _server.sendContent_P(output);
-  _server.sendContent_P("}");
   _server.sendContent_P("");
 
   dir.close();
 }
 
 bool ShelfWeb::_loadFromSdCard(const char *path) {
-  sdfat::File dataFile = _SD.open(path);
+  sdfat::File32 dataFile = _SD.open(path);
 
-  if (!dataFile) {
+  if (!dataFile.isOpen()) {
     Sprintln(F("File not open"));
     _returnHttpStatus(404, PSTR("Not found"));
     return false;
@@ -280,7 +269,7 @@ void ShelfWeb::_downloadPatch() {
     return;
   }
 
-  sdfat::File patchFile("/patches.053", sdfat::O_WRITE | sdfat::O_CREAT);
+  sdfat::File32 patchFile = _SD.open("/patches.053", sdfat::O_WRITE | sdfat::O_CREAT);
   if(!patchFile.isOpen()) {
     httpClient.end();
     _returnHttpStatus(500, PSTR("Could not open patch file"));
@@ -292,6 +281,38 @@ void ShelfWeb::_downloadPatch() {
   ESP.restart();
 }
 
+void ShelfWeb::_handleDelete(const char *path) {
+  if((strcmp(path, "/") == 0) || !_SD.exists(path)) {
+    _returnHttpStatus(400, PSTR("Bad path"));
+    return;
+  }
+
+  sdfat::File32 file = _SD.open(path);
+  if(file.isDir()) {
+    // Check if deleting the currently playing folder
+    if(_playback.playbackState() != ShelfPlayback::PLAYBACK_NO) {
+      char sfn[13];
+      char playSfn[13];
+      file.getSFN(sfn);
+      _playback.currentFolderSFN(playSfn);
+      if(strcmp(sfn, playSfn) == 0) {
+        _playback.stopPlayback();
+      }
+    }
+    if(!file.rmRfStar()) {
+      Sprintln(F("Could not delete folder"));
+    }
+  } else {
+    // Maybe Check if deleting the currently playing file?
+    if(!_SD.remove(path)) {
+      Sprintln(F("Could not delete file"));
+    }
+  }
+  file.close();
+  _returnOK();
+  return;
+}
+
 void ShelfWeb::_handleFileUpload() {
   // Upload always happens on /
   if (_server.uri() != "/") {
@@ -301,40 +322,49 @@ void ShelfWeb::_handleFileUpload() {
 
   HTTPUpload& upload = _server.upload();
 
-  if (upload.status == UPLOAD_FILE_START) {
-    String filename = upload.filename;
+  switch(upload.status) {
+    case UPLOAD_FILE_START:
+      if (!upload.filename.startsWith("/")) {
+        Sprintln(F("Invalid upload target"));
+        return;
+      }
 
-    if (!filename.startsWith("/")) {
-      Sprintln(F("Invalid upload target"));
-      return;
-    }
+      if (_SD.exists(upload.filename.c_str())) {
+        Sprintf("File %s already exists. Skipping", upload.filename.c_str());
+        return;
+      }
 
-    if (_SD.exists(filename.c_str())) {
-      Sprintf("File %s already exists. Skipping", filename.c_str());
-      return;
-    }
+      if(_playback.playbackState() == ShelfPlayback::PLAYBACK_FILE) {
+        Sprintln(F("Pausing playback for upload"));
+        _playback.pausePlayback();
+      }
 
-    if(_playback.playbackState() == PLAYBACK_FILE) {
-      Sprintln(F("Pausing playback for upload"));
-      _playback.pausePlayback();
-    }
-
-    _uploadFile.open(filename.c_str(), sdfat::O_WRITE | sdfat::O_CREAT);
-    _uploadStart = millis();
-    Sprint(F("Upload start: "));
-    Sprintln(filename);
-  } else if (upload.status == UPLOAD_FILE_WRITE) {
-    if (_uploadFile.isOpen()) {
-      _uploadFile.write(upload.buf, upload.currentSize);
-      //Sprint("Upload write: "));
-      //Sprintln(upload.currentSize);
-    }
-  } else if (upload.status == UPLOAD_FILE_END) {
-    if (_uploadFile.isOpen()) {
-      _uploadFile.close();
-      Sprint(F("Upload end: ")); Sprintln(upload.totalSize);
-      Sprint(F("Took: ")); Sprintln(((millis()-_uploadStart)/1000));
-    }
+      _uploadFile = _SD.open(upload.filename.c_str(), sdfat::O_WRITE | sdfat::O_CREAT);
+      _uploadStart = millis();
+      Sprint(F("Upload start: "));
+      Sprintln(upload.filename);
+      break;
+    case UPLOAD_FILE_WRITE:
+      if (_uploadFile.isOpen()) {
+        _uploadFile.write(upload.buf, upload.currentSize);
+        //Sprint("Upload write: "));
+        //Sprintln(upload.currentSize);
+      }
+      break;
+    case UPLOAD_FILE_END:
+      if (_uploadFile.isOpen()) {
+        _uploadFile.close();
+        Sprint(F("Upload end: ")); Sprintln(upload.totalSize);
+        Sprint(F("Took: ")); Sprintln(((millis()-_uploadStart)/1000));
+      }
+      break;
+    case UPLOAD_FILE_ABORTED:
+      Sprintln(F("Upload aborted"));
+      if (_uploadFile.isOpen()) {
+        _uploadFile.remove();
+        _uploadFile.close();
+      }
+      break;
   }
 }
 
@@ -344,167 +374,142 @@ void ShelfWeb::_handleDefault() {
   if(_espalexa.handleAlexaApiCall(_server.uri(), _server.arg(F("plain")))) {
     return;
   }
-  if(_server.method() == HTTP_GET) {
-    if(_server.hasArg(F("status"))) {
-      _sendJsonStatus();
-      return;
-    }
-    if(_server.hasArg(F("config"))) {
-      _sendJsonConfig();
-      return;
-    }
-    if(_server.hasArg(F("usage"))) {
-      _sendJsonFSUsage();
-      return;
-    }
-    if(path == "/" && !_server.hasArg("fs")) {
-      _sendHTML();
-      return;
-    }
-
-    // start file download
-    _loadFromSdCard(path.c_str());
-    return;
-  } else if(_server.method() == HTTP_DELETE) {
-    if(path == "/" || !_SD.exists(path.c_str())) {
-      _returnHttpStatus(400, PSTR("Bad path"));
-      return;
-    }
-
-    sdfat::SdFile file;
-    file.open(path.c_str());
-    if(file.isDir()) {
-      if(!file.rmRfStar()) {
-        Sprintln(F("Could not delete folder"));
-      }
-    } else {
-      if(!_SD.remove(path.c_str())) {
-        Sprintln(F("Could not delete file"));
-      }
-    }
-    file.close();
-    _returnOK();
-    return;
-  } else if(_server.method() == HTTP_POST) {
-    if(_server.hasArg(F("newFolder"))) {
-      Sprint(F("Creating folder ")); Sprintln(_server.arg(F("newFolder")));
-      if(_SD.mkdir(_server.arg(F("newFolder")).c_str())) {
-        _SD.cacheClear();
-        _returnOK();
-      } else {
-        Sprintln(F("Folder creation failed"));
-        _returnHttpStatus(500, PSTR("Folder creation failed"));
-      }
-      return;
-    } else if(_server.hasArg(F("ota"))) {
-      Sprint(F("Starting OTA from ")); Sprintln(_server.arg(F("ota")));
-      std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
-      // do not validate certificate
-      client->setInsecure();
-      t_httpUpdate_return ret = ESPhttpUpdate.update(*client, _server.arg(F("ota")));
-      switch (ret) {
-        case HTTP_UPDATE_FAILED:
-          Sprintf("HTTP_UPDATE_FAILD Error (%d): ", ESPhttpUpdate.getLastError());
-          Sprintln(ESPhttpUpdate.getLastErrorString().c_str());
-          _returnHttpStatus(500, PSTR("Update failed, please try again"));
-          return;
-        case HTTP_UPDATE_NO_UPDATES:
-          Sprintln(F("HTTP_UPDATE_NO_UPDATES"));
-          break;
-        case HTTP_UPDATE_OK:
-          Sprintln(F("HTTP_UPDATE_OK"));
-          break;
-      }
-      _returnOK();
-      return;
-    } else if(_server.hasArg(F("downloadpatch"))) {
-      _downloadPatch();
-      return;
-    } else if(_server.hasArg(F("stop"))) {
-      _playback.stopPlayback();
-      _sendJsonStatus();
-      return;
-    } else if(_server.hasArg(F("pause"))) {
-      _playback.pausePlayback();
-      _sendJsonStatus();
-      return;
-    } else if(_server.hasArg(F("resume"))) {
-      _playback.playingByCard = false;
-      _playback.resumePlayback();
-      _sendJsonStatus();
-      return;
-    } else if(_server.hasArg(F("skip"))) {
-      _playback.playingByCard = false;
-      _playback.skipFile();
-      _sendJsonStatus();
-      return;
-    } else if(_server.hasArg(F("volumeUp"))) {
-      _playback.volumeUp();
-      _sendJsonStatus();
-      return;
-    } else if(_server.hasArg(F("volumeDown"))) {
-      _playback.volumeDown();
-      _sendJsonStatus();
-      return;
-    } else if(_server.hasArg(F("toggleNight"))) {
-      if(_playback.isNight()) {
-        _playback.stopNight();
-      } else {
-        _playback.startNight();
-      }
-      _sendJsonStatus();
-      return;
-    } else if(_server.hasArg(F("toggleShuffle"))) {
-      if(_playback.isShuffle()) {
-        _playback.stopShuffle();
-      } else {
-        _playback.startShuffle();
-      }
-      _sendJsonStatus();
-      return;
-    } else if(_server.uri() == "/") {
-      Sprintln(F("Probably got an upload request"));
-      _returnOK();
-      return;
-    } else if(_SD.exists(path.c_str())) {
-      // <= 17 here because leading "/"" is included
-      if(_server.hasArg(F("write")) && path.length() <= 17) {
-        const char *target = path.c_str();
-        const uint8_t volume = 50-(uint8_t)_server.arg(F("volume")).toInt();
-        uint8_t repeat = _server.arg(F("repeat")).toInt();
-        uint8_t shuffle = _server.arg(F("shuffle")).toInt();
-        uint8_t stopOnRemove = _server.arg(F("stopOnRemove")).toInt();
-        // Remove leading "/""
-        target++;
-        if(_rfid.startPairing(target, volume, repeat, shuffle, stopOnRemove)) {
-          _sendJsonStatus();
-          return;
-        }
-      } else if(_server.hasArg(F("play")) && _playback.switchFolder(path.c_str())) {
-        _playback.startPlayback();
-        _playback.playingByCard = false;
+  switch(_server.method()) {
+    case HTTP_GET:
+      if(_server.hasArg(F("status"))) {
         _sendJsonStatus();
         return;
-      } else if(_server.hasArg(F("playfile"))) {
-        char* pathCStr = (char *)path.c_str();
-        char* folderRaw = strtok(pathCStr, "/");
-        char* file = strtok(NULL, "/");
+      }
+      if(_server.hasArg(F("config"))) {
+        _sendJsonConfig();
+        return;
+      }
+      if(_server.hasArg(F("usage"))) {
+        _sendJsonFSUsage();
+        return;
+      }
+      if(path == "/" && !_server.hasArg("fs")) {
+        _sendHTML();
+        return;
+      }
 
-        if((folderRaw != NULL) && (file != NULL) && strlen(folderRaw) < 90) {
-
-          char folder[100] = "/";
-          strcat(folder, folderRaw);
-          strcat(folder, "/");
-
-          if(_playback.switchFolder(folder)) {
-            _playback.startFilePlayback(folderRaw, file);
-            _playback.playingByCard = false;
+      // start file download
+      _loadFromSdCard(path.c_str());
+      return;
+    case HTTP_DELETE:
+      _handleDelete(path.c_str());
+      return;
+    case HTTP_POST:
+      if(_server.hasArg(F("newFolder"))) {
+        Sprint(F("Creating folder ")); Sprintln(_server.arg(F("newFolder")));
+        if(_SD.mkdir(_server.arg(F("newFolder")).c_str())) {
+          _returnOK();
+        } else {
+          Sprintln(F("Folder creation failed"));
+          _returnHttpStatus(500, PSTR("Folder creation failed"));
+        }
+        return;
+      } else if(_server.hasArg(F("ota"))) {
+        Sprint(F("Starting OTA from ")); Sprintln(_server.arg(F("ota")));
+        _playback.stopPlayback();
+        std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
+        // do not validate certificate
+        client->setInsecure();
+        t_httpUpdate_return ret = ESPhttpUpdate.update(*client, _server.arg(F("ota")));
+        switch (ret) {
+          case HTTP_UPDATE_FAILED:
+            Sprintf("HTTP_UPDATE_FAILD Error (%d): ", ESPhttpUpdate.getLastError());
+            Sprintln(ESPhttpUpdate.getLastErrorString().c_str());
+            _returnHttpStatus(500, PSTR("Update failed, please try again"));
+            return;
+          case HTTP_UPDATE_NO_UPDATES:
+            Sprintln(F("HTTP_UPDATE_NO_UPDATES"));
+            break;
+          case HTTP_UPDATE_OK:
+            Sprintln(F("HTTP_UPDATE_OK"));
+            break;
+        }
+        _returnOK();
+        return;
+      } else if(_server.hasArg(F("downloadpatch"))) {
+        _downloadPatch();
+        return;
+      } else if(_server.hasArg(F("stop"))) {
+        _playback.stopPlayback();
+        _sendJsonStatus();
+        return;
+      } else if(_server.hasArg(F("pause"))) {
+        _playback.pausePlayback();
+        _sendJsonStatus();
+        return;
+      } else if(_server.hasArg(F("resume"))) {
+        _playback.playingByCard = false;
+        _playback.resumePlayback();
+        _sendJsonStatus();
+        return;
+      } else if(_server.hasArg(F("skip"))) {
+        _playback.playingByCard = false;
+        _playback.skipFile();
+        _sendJsonStatus();
+        return;
+      } else if(_server.hasArg(F("volumeUp"))) {
+        _playback.volumeUp();
+        _sendJsonStatus();
+        return;
+      } else if(_server.hasArg(F("volumeDown"))) {
+        _playback.volumeDown();
+        _sendJsonStatus();
+        return;
+      } else if(_server.hasArg(F("toggleNight"))) {
+        _playback.isNight() ? _playback.stopNight() : _playback.startNight();
+        _sendJsonStatus();
+        return;
+      } else if(_server.hasArg(F("toggleShuffle"))) {
+        _playback.isShuffle() ? _playback.stopShuffle() : _playback.startShuffle();
+        _sendJsonStatus();
+        return;
+      } else if(path == "/") {
+        Sprintln(F("Probably got an upload request"));
+        _returnOK();
+        return;
+      } else if(_SD.exists(path.c_str())) {
+        // <= 17 here because leading "/"" is included
+        if(_server.hasArg(F("write")) && path.length() <= 17) {
+          const char *target = path.c_str();
+          const uint8_t volume = 50-(uint8_t)_server.arg(F("volume")).toInt();
+          const uint8_t repeat = _server.arg(F("repeat")).toInt();
+          const uint8_t shuffle = _server.arg(F("shuffle")).toInt();
+          const uint8_t stopOnRemove = _server.arg(F("stopOnRemove")).toInt();
+          // Remove leading "/""
+          target++;
+          if(_rfid.startPairing(target, volume, repeat, shuffle, stopOnRemove)) {
             _sendJsonStatus();
             return;
           }
+        } else if(_server.hasArg(F("play")) && _playback.switchFolder(path.c_str())) {
+          _playback.startPlayback();
+          _playback.playingByCard = false;
+          _sendJsonStatus();
+          return;
+        } else if(_server.hasArg(F("playfile"))) {
+          char* pathCStr = strdup(path.c_str());
+          char* folder = strtok(pathCStr, "/");
+          char* file = strtok(NULL, "/");
+
+          if((folder != NULL) && (file != NULL) && (strlen(folder) < 90) && _playback.switchFolder(folder)) {
+            _playback.startFilePlayback(folder, file);
+            _playback.playingByCard = false;
+            _sendJsonStatus();
+            free(pathCStr);
+            return;
+          }
+          free(pathCStr);
         }
       }
-    }
+      break;
+    default:
+      Sprintln(PSTR("Unsupported method"));
+      break;
   }
 
   // 404 otherwise
@@ -517,11 +522,17 @@ bool ShelfWeb::isFileUploading() {
 }
 
 void ShelfWeb::pause() {
+  if(_paused) {
+    return;
+  }
   _paused = true;
   _server.stop();
 }
 
 void ShelfWeb::unpause() {
+  if(!_paused) {
+    return;
+  }
   _paused = false;
   _server.begin();
 }

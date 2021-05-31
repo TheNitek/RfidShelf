@@ -4,7 +4,6 @@
 #include <ESP8266WiFi.h>
 #include <WiFiManager.h>
 #include <SdFat.h>
-#include <SD.h>
 #include <ESP8266mDNS.h>
 #include <time.h>
 #include <coredecls.h>        // settimeofday_cb()
@@ -20,6 +19,7 @@
 #ifdef BUTTONS_ENABLE
 #include "ShelfButtons.h"
 #endif
+
 
 sdfat::SdFat sdCard;
 
@@ -38,6 +38,11 @@ void timeCallback() {
   Sprintln(ctime(&now));
 }
 
+void initCS(uint8_t pin) {
+  pinMode(pin, OUTPUT);
+  digitalWrite(pin, HIGH);
+}
+
 void setup() {
 #ifdef DEBUG_ENABLE
   Serial.begin(115200);
@@ -45,20 +50,18 @@ void setup() {
   Sprintln();
   Sprintln(F("Starting ..."));
 
-  // Init SPI SS pins
-  pinMode(RC522_CS, OUTPUT);
-  digitalWrite(RC522_CS, HIGH);
-  pinMode(SD_CS, OUTPUT);
-  digitalWrite(SD_CS, HIGH);
-  pinMode(BREAKOUT_CS, OUTPUT);
-  digitalWrite(BREAKOUT_CS, HIGH);
-  pinMode(BREAKOUT_DCS, OUTPUT);
-  digitalWrite(BREAKOUT_DCS, HIGH);
+  // Init SPI CS pins
+  initCS(RC522_CS);
+  initCS(SD_CS);
+  initCS(BREAKOUT_CS);
+  initCS(BREAKOUT_DCS);
 
   randomSeed(analogRead(A0));
 
   // Load config
   config.init();
+
+  SPI.begin();
 
   rfid.begin();
     
@@ -68,15 +71,10 @@ void setup() {
     sdCard.initErrorHalt();
   }
   Sprintln(F("SDFat ready"));
-  if(!SD.begin(SD_CS, SPI_FULL_SPEED)){
-    Sprintln(F("Could not initialize SD card with SD"));
-  }
-  Sprintln(F("SD ready"));
-
 
   playback.begin();
 
-  if(strcmp(config.ntpServer, "") != 0) {
+  if(config.ntpServer[0] != '\0') {
     settimeofday_cb(timeCallback);
     configTime(config.timezone, config.ntpServer);
   }
