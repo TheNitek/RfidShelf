@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <TZ.h>
+#include <SdFat.h>
 
 
 // -------------------------
@@ -62,23 +63,36 @@
   #error "BUTTONS_ENABLE cannot be used with DEBUG_ENABLE"
 #endif
 
-struct Timeslot_t{
-    Timeslot_t() : monday(false), tuesday(false), wednesday(false), thursday(false), friday(false), saturday(false), sunday(false) {}
-    bool monday : 1;
-    bool tuesday : 1;
-    bool wednesday : 1;
-    bool thursday : 1;
-    bool friday : 1;
-    bool saturday : 1;
-    bool sunday : 1;
-    uint8_t startHour = 0;
-    uint8_t startMinutes = 0;
-    uint8_t endHour = 0;
-    uint8_t endMinutes = 0;
-};
 
 class ShelfConfig {
     public:
+        struct PodcastConfig {
+            public:
+                PodcastConfig(sdfat::SdFat &sd) : _SD(sd) {}
+                String feedUrl;
+                uint16_t maxEpisodes = 5;
+                String lastGuid;
+                uint16_t lastFileNo = 0;
+                bool enabled = true;
+                bool load(const char* podFilename);
+                bool save(const char* podFilename);
+            private:
+                sdfat::SdFat &_SD;
+        };
+        struct Timeslot{
+            Timeslot() : monday(false), tuesday(false), wednesday(false), thursday(false), friday(false), saturday(false), sunday(false) {}
+            bool monday : 1;
+            bool tuesday : 1;
+            bool wednesday : 1;
+            bool thursday : 1;
+            bool friday : 1;
+            bool saturday : 1;
+            bool sunday : 1;
+            uint8_t startHour = 0;
+            uint8_t startMinutes = 0;
+            uint8_t endHour = 0;
+            uint8_t endMinutes = 0;
+        };
         ShelfConfig() {};
         void init();
         uint8_t version = 1;
@@ -90,5 +104,5 @@ class ShelfConfig {
         bool defaultRepeat : 1;
         bool defaultShuffle : 1;
         bool defaultStopOnRemove : 1;
-        Timeslot_t nightModeTimes[5];
+        Timeslot nightModeTimes[5];
 };

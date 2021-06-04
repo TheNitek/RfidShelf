@@ -1,67 +1,5 @@
 #include "ShelfPodcast.h"
 
-bool ShelfPodcast::PodcastInfo::load(const char* podFilename) {
-  sdfat::File32 podfile = _SD.open(podFilename, sdfat::O_READ);
-  if(!podfile.isOpen()) {
-    Sprintf("Could not open %s\n", podFilename);
-    return false;
-  }
-
-  char buffer[201] = {0};
-
-  if(podfile.fgets(buffer, sizeof(buffer)-1) < 8) {
-    Sprintln(F("Could not read podcast URL"));
-    podfile.close();
-    return false;
-  }
-  buffer[strcspn(buffer, "\n\r")] = '\0';
-  feedUrl = buffer;
-
-  memset(buffer, 0, sizeof(buffer));
-  if(podfile.fgets(buffer, sizeof(buffer)-1) < 1) {
-    Sprintln(F("Could not read max episode count"));
-    podfile.close();
-    return false;
-  }
-  maxEpisodes = atoi(buffer);
-
-  memset(buffer, 0, sizeof(buffer));
-  if(podfile.fgets(buffer, sizeof(buffer)-1) < 1) {
-    Sprintln(F("Could not read last guid"));
-    podfile.close();
-    return false;
-  }
-  buffer[strcspn(buffer, "\n\r")] = '\0';
-  lastGuid = buffer;
-
-  memset(buffer, 0, sizeof(buffer));
-  if(podfile.fgets(buffer, sizeof(buffer)-1) < 1) {
-    Sprintln(F("Could not read last file no"));
-    podfile.close();
-    return false;
-  }
-  lastFileNo = atoi(buffer);
-
-  podfile.close();
-  return true;
-}
-
-bool ShelfPodcast::PodcastInfo::save(const char* podFilename) {
-  // This writes to the SD card more often then needed, but prevents re-downloading of episodes in case of a crash.
-  Sprintln(F("Updating .podcast"));
-  sdfat::File32 podfile = _SD.open(podFilename, sdfat::O_WRITE | sdfat::O_TRUNC);
-  if(!podfile.isOpen()) {
-    Sprintf("Could not open %s\n", podFilename);
-    return false;
-  }
-  podfile.println(feedUrl);
-  podfile.println(maxEpisodes);
-  podfile.println(lastGuid);
-  podfile.println(lastFileNo);
-  podfile.close();
-  return true;
-}
-
 bool ShelfPodcast::_nextPodcast(char *folder) {
   sdfat::File32 root = _SD.open("/");
   if(!root.isOpen()) {
@@ -173,7 +111,7 @@ void ShelfPodcast::_loadFeed(_HTTPClient &httpClient, const String &feedUrl, Pod
   Serial.println(F("Fetched NEW podcast"));
 }
 
-boolean ShelfPodcast::_downloadNextEpisode(PodcastInfo &info, const char *folder) {
+boolean ShelfPodcast::_downloadNextEpisode(ShelfConfig::PodcastConfig &info, const char *folder) {
   PodcastState state(info);
 
   _HTTPClient httpClient;
@@ -324,7 +262,7 @@ void ShelfPodcast::work() {
       break;
     }
 
-    PodcastInfo info(_SD);
+    ShelfConfig::PodcastConfig info(_SD);
 
     char podFilename[25] = {0};
     snprintf_P(podFilename, sizeof(podFilename), PSTR("/%s/.podcast"), folder);

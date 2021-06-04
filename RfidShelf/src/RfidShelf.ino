@@ -58,10 +58,10 @@ void setup() {
 
   randomSeed(analogRead(A0));
 
+  SPI.begin();
+
   // Load config
   config.init();
-
-  SPI.begin();
 
   rfid.begin();
     

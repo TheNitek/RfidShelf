@@ -2,6 +2,180 @@
 <html><head>
  <meta charset="utf-8">
  <meta name="viewport" content="width=device-width, initial-scale=1">
+ <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAb1BMVEVHcExdretcre9crOtdre1druxcrOxdrexcrOxdre1cq+xdrexdrexdrexcru1bqu1drexdru1Voexcru1cq+terexdrexbqelVqv9drOuAv/9druxdr+xdrexcretdretVqu5crexcsfFcrOxdrezU0qxCAAAAJHRSTlMA+DOpxfBX4nKMS/2XyMIV57YNRj9t6xwGnARCXaGC3g+FJFB4ExNpAAAAhElEQVQYGQXBh2ECQRAEMAH/7B45GZzj9F+jJdiMww4AVLICOEKdVhtwPZ+2UA0YyRaq8fjbGPfPK1SzT1bGBFRTyc6YgGpq92BMWNdi21RjTJiTNNUuy5cJ52SxpPo2JxOe10+/qP5IcgB898/ctzmLNWCfpF2WR4B7kncAeNt/jVfAP9X/CDiacj3PAAAAAElFTkSuQmCC">
+ <title>RfidShelf</title>
+ <style>
+  body {
+   margin: 0;
+   font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";
+  }
+ 
+  #fs > div {
+   display: flex;
+   align-items: center;
+  }
+ 
+  #fs > div:nth-child(even) {
+   background: LightGray;
+  }
+ 
+  #fs {
+   background: rgb(250, 250, 250);
+   clear: both;
+  }
+ 
+  a {
+   color: #0000EE;
+   text-decoration: none;
+  }
+ 
+  .del {
+   background: #ff7272;
+  }
+ 
+  .create {
+   background: limegreen;
+  }
+ 
+  .mp3only, .hiddenPlaying, .hiddenPaused, .hidden {
+   display: none;
+  }
+ 
+  .mp3 .mp3only, .playing .hiddenPaused, .paused .hiddenPlaying {
+   display: initial;
+  }
+ 
+  #noShuffle {
+   color: gray;
+  }
+ 
+  #loading {
+   background: rgba(255, 255, 255, 0.5);
+   position: fixed;
+   height: 100%;
+   width: 100%;
+  }
+ 
+  #spinner, #spinnerTxt {
+   position: fixed;
+   top: 50%;
+   left: 50%;
+   transform: translate(-50%, -50%);
+  }
+ 
+  #spinner {
+   border: 20px solid #f3f3f3;
+   border-top: 20px solid #0000EE;
+   border-radius: 50%;
+   width: 120px;
+   height: 120px;
+   margin: -80px;
+   animation: spin 2s linear infinite;
+  }
+ 
+  @keyframes spin {
+   0% {
+    transform: rotate(0deg);
+   }
+   50% {
+    transform: rotate(360deg);
+   }
+   100% {
+    transform: rotate(0deg);
+   }
+  }
+ 
+  body > section {
+   padding: 15px 40px;
+   overflow: hidden;
+  }
+ 
+  #volume .fl > * {
+   margin-left: 5px;
+  }
+ 
+  select,
+  input[type=text],
+  input[type=url],
+  input[type=number],
+  input[type=submit],
+  input[type=file],
+  input[type=button] {
+   font-size: 14px;
+   height: 40px;
+   vertical-align: middle;
+   display: inline-block;
+   max-width: 100%;
+   width: 100%;
+   padding: 0 10px;
+   background: #fff;
+   color: #666;
+   border: 1px solid #e5e5e5;
+   transition: .2s ease-in-out;
+   transition-property: color,background-color,border;
+  }
+ 
+  input[type=submit], input[type=button], button {
+   background: #1e87f0;
+   color: #fff;
+   line-height: 38px;
+   padding: 0 15px;
+  }
+ 
+  button .close {
+     background: #e5e5e5;
+     color: #050505;
+  }
+ 
+  input[type=submit]:hover, button:hover {
+   background-color: #0f7ae5;
+  }
+ 
+  .weekdays input {
+   display: none!important;
+ }
+ 
+ .weekdays input[type=checkbox] + label {
+   display: inline-block;
+   border-radius: 6px;
+   background: #e5e5e5;
+   height: 30px;
+   width: 30px;
+   margin-right: 3px;
+   line-height: 30px;
+   text-align: center;
+   cursor: pointer;
+   margin: 5px;
+ }
+ 
+ .weekdays input[type=checkbox]:checked + label {
+   background: limegreen;
+   color: #ffffff;
+ }
+ 
+  .folder::before {
+   content: '\1f4c2';
+  }
+ 
+  .mp3::before {
+   content: '\266b';
+   padding-right: 5px;
+  }
+ 
+  .fl {
+   display: flex;
+   align-items: center;
+  }
+ 
+  .fl_exp {
+   flex: 1;
+  }
+ 
+  .modal { position: fixed; top: 0; left: 0; bottom: 0; right: 0; background: rgba(229, 229, 229, 0.8); }
+  .modal form, .modal div { padding: 10px; border: 1px solid #e5e5e5; max-width: 700px; margin: 30px auto; background: #fafafa; }
+  .modal form > div { margin-bottom: 10px; display: flex; align-items: center; }
+  .modal span, .modal label { width: 200px; }
+ </style>
  <script>
     function _(e) {
         return document.getElementById(e);
@@ -302,199 +476,33 @@
     function loadPodcast(d) {
         ajax('GET', d + '?podcast', function(r) {
             let p = JSON.parse(r);
+            _('podcastUrl').value = p.url;
+            _('podcastCount').value = p.max;
+            _('podcastGuid').value = p.guid;
+            _('podcastEnabled').checked = p.en;
+
             show(_('podcastContainer'));
             hide(_('loading'));
         });
     }
     function showPodcast(d) {
         show(_('loading'));
-        _('podcastContainer').reset();
+        _('podcastForm').reset();
+        _('podcastSubmit').disabled=false;
         loadPodcast(d);
     }
-    function updatePodcast() {
+    function updatePodcast(d) {
         _('podcastSubmit').disabled=true;
-        let d = new FormData(_('podcastForm'));
-        ajax('POST', '/', function () {
+        let f = new FormData(_('podcastForm'));
+        ajax('POST', d, function () {
         hide(_('podcastContainer'))
         reloadFS();
-        }, d);        
+        }, f);        
     }
     window.onhashchange = function () {
         loadFS(location.hash.slice(1))
     }
 </script>
-<link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAb1BMVEVHcExdretcre9crOtdre1druxcrOxdrexcrOxdre1cq+xdrexdrexdrexcru1bqu1drexdru1Voexcru1cq+terexdrexbqelVqv9drOuAv/9druxdr+xdrexcretdretVqu5crexcsfFcrOxdrezU0qxCAAAAJHRSTlMA+DOpxfBX4nKMS/2XyMIV57YNRj9t6xwGnARCXaGC3g+FJFB4ExNpAAAAhElEQVQYGQXBh2ECQRAEMAH/7B45GZzj9F+jJdiMww4AVLICOEKdVhtwPZ+2UA0YyRaq8fjbGPfPK1SzT1bGBFRTyc6YgGpq92BMWNdi21RjTJiTNNUuy5cJ52SxpPo2JxOe10+/qP5IcgB898/ctzmLNWCfpF2WR4B7kncAeNt/jVfAP9X/CDiacj3PAAAAAElFTkSuQmCC">
-<title>RfidShelf</title>
-<style>
- body {
-  margin: 0;
-  font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";
- }
-
- #fs > div {
-  display: flex;
-  align-items: center;
- }
-
- #fs > div:nth-child(even) {
-  background: LightGray;
- }
-
- #fs {
-  background: rgb(250, 250, 250);
-  clear: both;
- }
-
- a {
-  color: #0000EE;
-  text-decoration: none;
- }
-
- .del {
-  background: #ff7272;
- }
-
- .create {
-  background: limegreen;
- }
-
- .mp3only, .hiddenPlaying, .hiddenPaused, .hidden {
-  display: none;
- }
-
- .mp3 .mp3only, .playing .hiddenPaused, .paused .hiddenPlaying {
-  display: initial;
- }
-
- #noShuffle {
-  color: gray;
- }
-
- #loading {
-  background: rgba(255, 255, 255, 0.5);
-  position: fixed;
-  height: 100%;
-  width: 100%;
- }
-
- #spinner, #spinnerTxt {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
- }
-
- #spinner {
-  border: 20px solid #f3f3f3;
-  border-top: 20px solid #0000EE;
-  border-radius: 50%;
-  width: 120px;
-  height: 120px;
-  margin: -80px;
-  animation: spin 2s linear infinite;
- }
-
- @keyframes spin {
-  0% {
-   transform: rotate(0deg);
-  }
-  50% {
-   transform: rotate(360deg);
-  }
-  100% {
-   transform: rotate(0deg);
-  }
- }
-
- body > section {
-  padding: 15px 40px;
-  overflow: hidden;
- }
-
- #volume .fl > * {
-  margin-left: 5px;
- }
-
- select,
- input[type=text],
- input[type=submit],
- input[type=file],
- input[type=button] {
-  font-size: 14px;
-  height: 40px;
-  vertical-align: middle;
-  display: inline-block;
-  max-width: 100%;
-  width: 100%;
-  padding: 0 10px;
-  background: #fff;
-  color: #666;
-  border: 1px solid #e5e5e5;
-  transition: .2s ease-in-out;
-  transition-property: color,background-color,border;
- }
-
- input[type=submit], input[type=button], button {
-  background: #1e87f0;
-  color: #fff;
-  line-height: 38px;
-  padding: 0 15px;
- }
-
- button .close {
-    background: #e5e5e5;
-    color: #050505;
- }
-
- input[type=submit]:hover, button:hover {
-  background-color: #0f7ae5;
- }
-
- .weekdays input {
-  display: none!important;
-}
-
-.weekdays input[type=checkbox] + label {
-  display: inline-block;
-  border-radius: 6px;
-  background: #e5e5e5;
-  height: 30px;
-  width: 30px;
-  margin-right: 3px;
-  line-height: 30px;
-  text-align: center;
-  cursor: pointer;
-  margin: 5px;
-}
-
-.weekdays input[type=checkbox]:checked + label {
-  background: limegreen;
-  color: #ffffff;
-}
-
- .folder::before {
-  content: '\1f4c2';
- }
-
- .mp3::before {
-  content: '\266b';
-  padding-right: 5px;
- }
-
- .fl {
-  display: flex;
-  align-items: center;
- }
-
- .fl_exp {
-  flex: 1;
- }
-
- .modal { position: fixed; top: 0; left: 0; bottom: 0; right: 0; background: rgba(229, 229, 229, 0.8); }
- .modal form, .modal div { padding: 10px; border: 1px solid #e5e5e5; max-width: 500px; margin: 30px auto; background: #fafafa; }
- .modal form > div { margin-bottom: 10px; display: flex; align-items: center; }
- .modal span, .modal label { width: 200px; }
-</style>
 </head><body>
 <div id="pairingContainer" class="hidden modal">
  <form id="pairingForm" onsubmit="startPairing(); return false;">
@@ -644,7 +652,7 @@
  </div>
 </template>
 <div id="podcastContainer" class="hidden modal">
-  <form id="podcastForm" onsubmit="updatePodcast(); return false;">
+  <form id="podcastForm" onsubmit="updatePodcast(location.hash.slice(1)); return false;">
     <h3>Podcast Settings</h3>
     <div>
      <label for="podcastUrl">Podcast URL:</label>
@@ -654,9 +662,17 @@
      <label for="podcastCount">Keep this many episodes:</label>
      <input type="number" min="1" id="podcastCount" name="podcastCount" required>
     </div>
-       <div class="fl">
-    <input type="submit" id="podcastSubmit" value="Set" class="fl_exp">
-    <button class="close" style="margin-left: 10px;" onclick="hide(_('podcastContainer')); return false;">close</button>
+    <div>
+      <label for="podcastGuid">Last GUID (leave as is if you don't know what this is):</label>
+      <input type="text" id="podcastGuid" name="podcastGuid">
+    </div>
+    <div>
+      <label for="podcastEnabled">Enabled:</label>
+      <input type="checkbox" id="podcastEnabled" name="podcastEnabled">
+    </div>
+    <div class="fl">
+      <input type="submit" id="podcastSubmit" value="Set" class="fl_exp">
+      <button class="close" style="margin-left: 10px;" onclick="hide(_('podcastContainer')); return false;">close</button>
     </div>
   </form>     
 </div>
@@ -696,9 +712,12 @@
    
 <section id="fsContainer" class="hidden">
  <h3 style="float:left">SD-Card (<a href="#" onclick="showFSUsage(); return false;">&#x1F6C8;</a>):</h3>
- <div style="float:right">
+ <div style="float:right" class="root hidden">
     <button class="create" title="create folder" onclick="showMkdir(); return false;">+</button>
     <button title="settings" onclick="showConfig(); return false;">&#x2699;</button>
+ </div>
+ <div style="float:right" class="noRoot hidden">
+    <button title="podcast settings" onclick="showPodcast(location.hash.slice(1)); return false;">+</button>
  </div>
  <div id="fs">File System Loading ...</div>
 

@@ -42,9 +42,11 @@ class ShelfWeb {
     void _sendJsonConfig();
     void _sendJsonFSUsage();
     void _sendJsonFS(const char *path);
+    void _sendJsonPodcast(const char *path);
     bool _loadFromSdCard(const char *path);
     void _handleDelete(const char *file);
     void _handleWriteRfid(const char *folder);
+    void _handleWritePodcast(const char *folder);
     void _handleFileUpload();
     void _handleDefault();
     void _deviceCallback(EspalexaDevice* device);

@@ -163,7 +163,7 @@ void ShelfWeb::_sendJsonConfig() {
   strcat_P(output, PSTR(",\"stopOnRemove\":"));
   strcat_P(output, _config.defaultStopOnRemove ? t : f);
   strcat_P(output, PSTR(",\"nightMode\":["));
-  for(uint8_t i = 0; i < sizeof(_config.nightModeTimes)/sizeof(Timeslot_t); i++) {
+  for(uint8_t i = 0; i < sizeof(_config.nightModeTimes)/sizeof(ShelfConfig::Timeslot); i++) {
     strcat_P(output, PSTR("{\"days\":["));
     strcat_P(output, _config.nightModeTimes[i].monday ? tk : fk);
     strcat_P(output, _config.nightModeTimes[i].tuesday ? tk : fk);
@@ -180,7 +180,7 @@ void ShelfWeb::_sendJsonConfig() {
     strcat(output, buffer);
     strcat(output, "\"}");
 
-    if(i < sizeof(_config.nightModeTimes)/sizeof(Timeslot_t) - 1) {
+    if(i < sizeof(_config.nightModeTimes)/sizeof(ShelfConfig::Timeslot) - 1) {
       strcat(output, ",");
     }
   }
@@ -191,7 +191,7 @@ void ShelfWeb::_sendJsonConfig() {
 
 void ShelfWeb::_sendJsonFS(const char *path) {
   _server.setContentLength(CONTENT_LENGTH_UNKNOWN);
-  _server.send_P(200, PSTR("application/json"), PSTR("{\"fs\":["));
+  _server.send_P(200, PSTR("application/json"), "{\"fs\":[");
 
   sdfat::File32 dir = _SD.open(path, sdfat::O_READ);
   sdfat::File32 entry;
@@ -227,6 +227,73 @@ void ShelfWeb::_sendJsonFS(const char *path) {
 
   dir.close();
 }
+
+void ShelfWeb::_sendJsonPodcast(const char *path) {
+  sdfat::File32 folder = _SD.open(path);
+  if (!folder.isOpen()) {
+    Sprintln(F("Folder not open"));
+    _returnHttpStatus(404, PSTR("Not found"));
+    return;
+  }
+
+  char buffer[25] = "/";
+  folder.getSFN(buffer+1);
+  strcat(buffer, "/.podcast");
+
+  ShelfConfig::PodcastConfig podcast(_SD);
+  if(!podcast.load(buffer)) {
+    Sprintln("No .podcast yet");
+  }
+
+  char output[768] = "{\"url\":\"";
+  strcat(output, podcast.feedUrl.c_str());
+  strcat_P(output, PSTR("\",\"guid\":\""));
+  strcat(output, podcast.lastGuid.c_str());
+  strcat_P(output, PSTR("\",\"max\":"));
+  sprintf(buffer, "%u", podcast.maxEpisodes);
+  strcat(output, buffer);
+  strcat_P(output, PSTR(",\"en\":"));
+  strcat_P(output, podcast.enabled ? "true}" : "false}" );
+
+  _server.send_P(200, PSTR("application/json"), output);
+}
+
+void ShelfWeb::_handleWritePodcast(const char *path) {
+  if(!_server.hasArg(F("podcastUrl")) || !_server.hasArg(F("podcastCount")) || !_server.hasArg(F("podcastGuid"))) {
+    Sprintln(F("Incomplete form data missing"));
+    return;
+  }
+
+  sdfat::File32 folder = _SD.open(path);
+  if (!folder.isOpen()) {
+    Sprintln(F("Folder not open"));
+    _returnHttpStatus(404, PSTR("Not found"));
+    return;
+  }
+
+  char podFile[25] = "/";
+  folder.getSFN(podFile+1);
+  strcat(podFile, "/.podcast");
+
+  ShelfConfig::PodcastConfig podcast(_SD);
+  if(!podcast.load(podFile)) {
+    Sprintln("No .podcast yet");
+  }
+
+  podcast.feedUrl = _server.arg(F("podcastUrl"));
+  podcast.maxEpisodes = _server.arg(F("podcastCount")).toInt();;
+  podcast.lastGuid = _server.arg(F("podcastGuid"));
+  podcast.enabled = _server.hasArg(F("podcastEnabled"));
+
+  if(!podcast.save(podFile)) {
+    Sprintln(F("Could not save .podcast"));
+    _returnHttpStatus(500, PSTR("Could not save .podcast"));
+    return;
+  }
+
+  _returnOK();
+}
+
 
 bool ShelfWeb::_loadFromSdCard(const char *path) {
   sdfat::File32 dataFile = _SD.open(path);
@@ -388,6 +455,10 @@ void ShelfWeb::_handleDefault() {
         _sendJsonFSUsage();
         return;
       }
+      if(_server.hasArg(F("podcast"))) {
+        _sendJsonPodcast(path.c_str());
+        return;
+      }
       if(path == "/" && !_server.hasArg("fs")) {
         _sendHTML();
         return;
@@ -504,6 +575,9 @@ void ShelfWeb::_handleDefault() {
             return;
           }
           free(pathCStr);
+        } else if(_server.hasArg(F("podcastUrl"))) {
+          _handleWritePodcast(path.c_str());
+          return;
         }
       }
       break;
