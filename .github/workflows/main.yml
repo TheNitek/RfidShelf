@@ -30,7 +30,7 @@ jobs:
     - name: Show Workspace
       run: ls ./RfidShelf/*
     - name: Build
-      run: platformio run -e=nodemcuv2 --project-dir=RfidShelf
+      run: platformio run --project-dir=RfidShelf
     - name: Upload artifact
       uses: actions/upload-artifact@v2
       with:
