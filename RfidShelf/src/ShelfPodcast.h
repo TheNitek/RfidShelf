@@ -48,7 +48,6 @@ class ShelfPodcast {
     ShelfWeb &_web;
     sdfat::SdFat &_SD;
     unsigned long _lastUpdate = 0;
-    bool _resumePlayback = false;
     bool _isPodcastTime();
     bool _nextPodcast(char *folder);
     void _loadFeed(_HTTPClient &httpClient, const String &feedUrl, PodcastState &state);

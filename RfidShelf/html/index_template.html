@@ -20,7 +20,7 @@
   }
  
   #fs {
-   background: rgb(250, 250, 250);
+   background: #fafafa;
    clear: both;
   }
  
@@ -171,7 +171,7 @@
    flex: 1;
   }
  
-  .modal { position: fixed; top: 0; left: 0; bottom: 0; right: 0; background: rgba(229, 229, 229, 0.8); }
+  .modal { position: fixed; top: 0; left: 0; bottom: 0; right: 0; background: rgba(229, 229, 229, 0.8); z-index: 100; }
   .modal form, .modal div { padding: 10px; border: 1px solid #e5e5e5; max-width: 700px; margin: 30px auto; background: #fafafa; }
   .modal form > div { margin-bottom: 10px; display: flex; align-items: center; }
   .modal span, .modal label { width: 200px; }
@@ -293,8 +293,16 @@
         _('mkdirSubmit').disabled=true;
         let d = new FormData(_('mkdirForm'));
         ajax('POST', '/', function () {
-        hide(_('mkdirContainer'))
-        reloadFS();
+         hide(_('mkdirContainer'))
+         reloadFS();
+        }, d);
+    }
+    function say() {
+        _('saySubmit').disabled=true;
+        let d = new FormData(_('sayForm'));
+        ajax('POST', '/', function () {
+          _('sayText').value='';
+          _('saySubmit').disabled=false;
         }, d);
     }
     function ota() {
@@ -633,7 +641,20 @@
   </div>
  </form>     
 </div>
-<template id="folderT">
+<div id="sayContainer" class="hidden modal">
+    <form id="sayForm" onsubmit="say(); return false;">
+     <h3>Say something</h3>
+     <div>
+       <label for="sayText">Text:</label>
+       <input type="text" id="sayText" name="sayText" required>
+     </div>
+     <div class="fl">
+      <input type="submit" id="saySubmit" value="Say" class="fl_exp">
+      <button class="close" style="margin-left: 10px;" onclick="hide(_('sayContainer')); return false;">close</button>
+     </div>
+    </form>     
+   </div>
+   <template id="folderT">
  <div class="folder">
   <a class="fl_exp" href="#/{foldername}">{foldername}</a>
   <div>
@@ -704,6 +725,7 @@
   <button title="increase volume" onclick="rootAction('volumeUp'); return false;">+</button>
   <button title="deactivate night mode" class="hidden" id="night" onclick="rootAction('toggleNight'); return false;">&#x1f31b;</button>
   <button title="activate night mode" class="hidden" id="noNight" onclick="rootAction('toggleNight'); return false;">&#x1f31e;</button>
+  <button title="Say something" onclick="show(_('sayContainer')); return false;">&#x1F5E3;</button>
  </div>
 </section>
 

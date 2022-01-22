@@ -250,7 +250,7 @@ void ShelfPodcast::work() {
     return;
   }
 
-  _resumePlayback = (_playback.playbackState() == ShelfPlayback::PLAYBACK_FILE);
+  bool resumePlayback = (_playback.playbackState() == ShelfPlayback::PLAYBACK_FILE);
 
   if(_playback.playbackState() == ShelfPlayback::PLAYBACK_FILE) {
     _playback.pausePlayback();
@@ -307,7 +307,7 @@ void ShelfPodcast::work() {
     _web.unpause();
   }
 
-  if(_resumePlayback) {
+  if(resumePlayback) {
     if(_playback.playbackState() == ShelfPlayback::PLAYBACK_PAUSED) {
       _playback.resumePlayback();
     } else {

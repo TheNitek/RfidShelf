@@ -548,6 +548,10 @@ void ShelfWeb::_handleDefault() {
         _playback.isShuffle() ? _playback.stopShuffle() : _playback.startShuffle();
         _sendJsonStatus();
         return;
+      } else if(_server.hasArg(F("sayText"))) {
+        _playback.say(_server.arg(F("sayText")).c_str());
+        _returnOK();
+        return;
       } else if(path == "/") {
         Sprintln(F("Probably got an upload request"));
         _returnOK();
@@ -589,15 +593,15 @@ void ShelfWeb::_handleDefault() {
           return;
         }
       }
-      break;
+      // 404 otherwise
+      _returnHttpStatus(404, PSTR("Not found"));
+      Sprint(F("404: ")); Sprintln(path);
+      return;
     default:
       Sprintln(PSTR("Unsupported method"));
-      break;
+      _returnHttpStatus(405, PSTR("Method not supported"));
+      return;
   }
-
-  // 404 otherwise
-  _returnHttpStatus(404, PSTR("Not found"));
-  Sprint(F("404: ")); Sprintln(path);
 }
 
 bool ShelfWeb::isFileUploading() {

@@ -404,19 +404,81 @@ void ShelfPlayback::stopShuffle() {
   _shuffleMode = false;
 }
 
-void ShelfPlayback::work() {
-  if (_playing == PLAYBACK_FILE) {
-    if (_musicPlayer.playingMusic) {
-      _musicPlayer.feedBuffer();
+void ShelfPlayback::say(const char *text) {
+  Sprintln(F("Starting to speak"));
+  String url = tts.getSpeechUrl(text, "de");
+  bool resumePlayback = (_playing == ShelfPlayback::PLAYBACK_FILE);
+  uint8_t resumeVolume = volume();
+  stopPlayback();
+
+  std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
+  client->setInsecure();
+  HTTPClient httpClient;
+  httpClient.begin(*client, url);
+  int httpCode = httpClient.GET();
+  if (httpCode != HTTP_CODE_OK) {
+    httpClient.end();
+    char buffer[32];
+    snprintf_P(buffer, sizeof(buffer), PSTR("invalid response code: %d"), httpCode);
+    //_returnHttpStatus(500, buffer);
+    Sprintf("Bad response code: %d\n", httpCode);
+    return;
+  }
+  
+  int len = httpClient.getSize();
+  uint8_t buff[32] = { 0 };
+  WiFiClient * stream = httpClient.getStreamPtr();
+
+  if(len == -1) {
+    char chunkLength[32] = "";
+    int l = stream->readBytesUntil('\n', chunkLength, sizeof(chunkLength));
+
+    if(l <= 0) {
+      httpClient.end();
       return;
     }
 
-    // If playingMusic is false there might still be data buffered in the VS1053 so we need to query its registers
-    if((_musicPlayer.sciRead(VS1053_REG_HDAT0) == 0) && (_musicPlayer.sciRead(VS1053_REG_HDAT1) == 0)) {
-      startPlayback();
-      return;
-    }
+    chunkLength[l-1] = '\0';
 
+    len = (uint32_t) strtol(chunkLength, NULL, 16);
+    Sprintf("Chunk size: %d\n", len);
+  }
+
+  if (AMP_POWER > 0) {
+    digitalWrite(AMP_POWER, HIGH);
+  }
+  volume(0, false);
+
+  while(httpClient.connected() && (len > 0)) {
+      size_t size = stream->available();
+      while(!_musicPlayer.readyForData()) ESP.wdtFeed();
+      if(size) {
+          int c = stream->readBytes(buff, ((size > sizeof(buff)) ? sizeof(buff) : size));
+          _musicPlayer.playData(buff, c);
+          if(len > 0) {
+              len -= c;
+          }
+      }
+      ESP.wdtFeed();
+  }
+  httpClient.end();
+
+  if((_musicPlayer.sciRead(VS1053_REG_HDAT0) != 0) || (_musicPlayer.sciRead(VS1053_REG_HDAT1) != 0)) {
+    _flushVS1053();
+  }
+
+  if (AMP_POWER > 0) {
+    digitalWrite(AMP_POWER, LOW);
+  }
+  volume(resumeVolume);
+  if(resumePlayback) {
+    startPlayback();
+  }
+
+  Sprintln(F("Done speaking"));
+}
+
+void ShelfPlayback::_flushVS1053() {
     Sprintln(F("Flushing VS1053 buffer"));
 
     // Follow the datasheet:
@@ -456,6 +518,22 @@ void ShelfPlayback::work() {
     Sprintln(F("Cancel after playback failed."));
     // TODO check if this deletes the patch
     _musicPlayer.softReset();
+}
+
+void ShelfPlayback::work() {
+  if (_playing == PLAYBACK_FILE) {
+    if (_musicPlayer.playingMusic) {
+      _musicPlayer.feedBuffer();
+      return;
+    }
+
+    // If playingMusic is false there might still be data buffered in the VS1053 so we need to query its registers
+    if((_musicPlayer.sciRead(VS1053_REG_HDAT0) == 0) && (_musicPlayer.sciRead(VS1053_REG_HDAT1) == 0)) {
+      startPlayback();
+      return;
+    }
+
+    _flushVS1053();
     return;
 
   // if not playing and timeout => disable night mode

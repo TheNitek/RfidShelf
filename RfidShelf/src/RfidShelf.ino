@@ -117,8 +117,6 @@ void setup() {
   // To prevent playback after reboot if a tag is still placed on the reader
   rfid.handleRfid(true);
 
-  playback.startFilePlayback("", "ready.mp3");
-
   Sprintln(F("Init done"));
 }
 

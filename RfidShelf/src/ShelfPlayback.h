@@ -4,6 +4,7 @@
 #include "ShelfConfig.h"
 #include <Adafruit_VS1053.h>
 #include <ESP8266HTTPClient.h>
+#include <google-tts.h>
 #include <SdFat.h>
 #include <BoolArray.h>
 
@@ -20,6 +21,7 @@ class ShelfPlayback {
     const bool switchFolder(const char *folder);
     void startPlayback();
     void startFilePlayback(const char* folder, const char* file);
+    void say(const char *text);
     void skipFile();
     void pausePlayback();
     void resumePlayback();
@@ -46,12 +48,14 @@ class ShelfPlayback {
     void work();
     bool playingByCard = true;
     PlaybackCallbackFunction callback = nullptr;
+    TTS tts;
   private:
     const bool _patchVS1053();
+    void _flushVS1053();
     ShelfConfig::GlobalConfig &_config;
+    Adafruit_VS1053_FilePlayer _musicPlayer;
     uint8_t _volume;
     PlaybackState _playing = PLAYBACK_NO;
-    Adafruit_VS1053_FilePlayer _musicPlayer;
     sdfat::SdFat &_SD;
     sdfat::File32 _currentFolder;
     uint16_t _currentFolderFileCount;
