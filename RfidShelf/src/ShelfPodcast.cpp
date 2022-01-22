@@ -144,7 +144,8 @@ boolean ShelfPodcast::_downloadNextEpisode(ShelfConfig::PodcastConfig &info, con
     return false;
   }
 
-  sdfat::File32 episodeFile = _SD.open(tmpFilename, sdfat::O_WRITE | sdfat::O_CREAT | sdfat::O_TRUNC);
+  ShelfWeb::StreamFile episodeFile;
+  episodeFile.open(&_SD, tmpFilename, sdfat::O_WRITE | sdfat::O_CREAT | sdfat::O_TRUNC);
   if(!episodeFile.isOpen()) {
     Sprintln(F("Failed to open target file"));
     httpClient.end();
@@ -268,6 +269,11 @@ void ShelfPodcast::work() {
     snprintf_P(podFilename, sizeof(podFilename), PSTR("/%s/.podcast"), folder);
 
     if(!info.load(podFilename)) {
+      continue;
+    }
+
+    if(!info.enabled) {
+      Sprintln(F("Podcast disabled - Skipping"));
       continue;
     }
 

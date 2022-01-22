@@ -1,6 +1,6 @@
 #include "ShelfConfig.h"
 
-void ShelfConfig::init() {
+bool ShelfConfig::GlobalConfig::load() {
   sprintf_P(hostname, PSTR("SHELF_%06X"), ESP.getChipId());
   defaultRepeat = true;
   defaultShuffle = false;
@@ -9,6 +9,7 @@ void ShelfConfig::init() {
   strncpy_P(ntpServer, PSTR("pool.ntp.org"), sizeof(ntpServer));
 
   Sprintln(F("Loaded config"));
+  return true;
 }
 
 

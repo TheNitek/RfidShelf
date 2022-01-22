@@ -336,13 +336,22 @@ void ShelfWeb::_downloadPatch() {
     return;
   }
 
-  sdfat::File32 patchFile = _SD.open("/patches.053", sdfat::O_WRITE | sdfat::O_CREAT);
+  StreamFile patchFile;
+  patchFile.open(&_SD, "/patches.053", sdfat::O_WRITE | sdfat::O_CREAT);
   if(!patchFile.isOpen()) {
     httpClient.end();
     _returnHttpStatus(500, PSTR("Could not open patch file"));
     return;
   }
+  int bytes = httpClient.writeToStream(&patchFile);
   patchFile.close();
+  if(bytes < 0) {
+    char buffer[32];
+    snprintf_P(buffer, sizeof(buffer), PSTR("writetoStream failed: %d"), bytes);
+    _returnHttpStatus(500, buffer);
+    return;
+  }
+  Sprintf("Done: %d", bytes);
   _returnOK();
   _server.client().flush();
   ESP.restart();

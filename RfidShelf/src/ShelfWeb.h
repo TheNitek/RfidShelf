@@ -18,14 +18,21 @@
 
 class ShelfWeb {
   public:
-    ShelfWeb(ShelfConfig &config, ShelfPlayback &playback, ShelfRfid &rfid, sdfat::SdFat &sd) : _config(config), _playback(playback), _rfid(rfid), _SD(sd) {}
+    ShelfWeb(ShelfConfig::GlobalConfig &config, ShelfPlayback &playback, ShelfRfid &rfid, sdfat::SdFat &sd) : _config(config), _playback(playback), _rfid(rfid), _SD(sd) {}
     void begin();
     void work();
     bool isFileUploading();
     void pause();
     void unpause();
+    // Dirty hack to work around https://github.com/esp8266/Arduino/issues/8055
+    class StreamFile: public File32 {
+      int availableForWrite() override {
+        return 512;
+      }
+    };
+
   private:
-    ShelfConfig &_config;
+    ShelfConfig::GlobalConfig &_config;
     ShelfPlayback &_playback;
     ShelfRfid &_rfid;
     sdfat::SdFat &_SD;

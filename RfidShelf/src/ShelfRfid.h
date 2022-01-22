@@ -10,7 +10,7 @@
 
 class ShelfRfid {
   public:
-    ShelfRfid(ShelfConfig &config, ShelfPlayback &playback) :
+    ShelfRfid(ShelfConfig::GlobalConfig &config, ShelfPlayback &playback) :
       _config(config),
       _playback(playback),
       _mfrc522(RC522_CS, UINT8_MAX)
@@ -34,7 +34,7 @@ class ShelfRfid {
     NFCTagObject getPairingConfig();
     bool hasActivePairing = false;
   private:
-    ShelfConfig &_config;
+    ShelfConfig::GlobalConfig &_config;
     ShelfPlayback &_playback;
     MFRC522 _mfrc522; // Create MFRC522 instance.
     MFRC522::MIFARE_Key _key = {.keyByte={0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}};

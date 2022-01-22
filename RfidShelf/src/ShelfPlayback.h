@@ -9,7 +9,7 @@
 
 class ShelfPlayback {
   public:
-    ShelfPlayback(ShelfConfig &config, sdfat::SdFat &sd) :
+    ShelfPlayback(ShelfConfig::GlobalConfig &config, sdfat::SdFat &sd) :
       _config(config),
       _musicPlayer(BREAKOUT_RESET, BREAKOUT_CS, BREAKOUT_DCS, DREQ, sd),
       _SD(sd)
@@ -48,7 +48,7 @@ class ShelfPlayback {
     PlaybackCallbackFunction callback = nullptr;
   private:
     const bool _patchVS1053();
-    ShelfConfig &_config;
+    ShelfConfig::GlobalConfig &_config;
     uint8_t _volume;
     PlaybackState _playing = PLAYBACK_NO;
     Adafruit_VS1053_FilePlayer _musicPlayer;

@@ -23,7 +23,7 @@
 
 sdfat::SdFat sdCard;
 
-ShelfConfig config;
+ShelfConfig::GlobalConfig config(sdCard);
 ShelfPlayback playback(config, sdCard);
 ShelfRfid rfid(config, playback);
 ShelfWeb web(config, playback, rfid, sdCard);
@@ -60,8 +60,7 @@ void setup() {
 
   SPI.begin();
 
-  // Load config
-  config.init();
+  config.load();
 
   rfid.begin();
     

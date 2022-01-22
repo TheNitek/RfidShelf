@@ -3,7 +3,7 @@
 // This sucks - Maybe refactor ShelfButtons to singleton
 ShelfButtons *ShelfButtons::_instance;
 
-ShelfButtons::ShelfButtons(ShelfConfig &config, ShelfPlayback &playback) : _config(config), _playback(playback), _pauseButton(PAUSE_BTN, 50, true, false), _skipButton(SKIP_BTN, 50, true, false) {
+ShelfButtons::ShelfButtons(ShelfConfig::GlobalConfig &config, ShelfPlayback &playback) : _config(config), _playback(playback), _pauseButton(PAUSE_BTN, 50, true, false), _skipButton(SKIP_BTN, 50, true, false) {
     _instance = this;
 };
 

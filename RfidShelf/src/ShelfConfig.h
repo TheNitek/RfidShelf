@@ -66,7 +66,7 @@
 
 class ShelfConfig {
     public:
-        struct PodcastConfig {
+        class PodcastConfig {
             public:
                 PodcastConfig(sdfat::SdFat &sd) : _SD(sd) {}
                 String feedUrl;
@@ -93,16 +93,22 @@ class ShelfConfig {
             uint8_t endHour = 0;
             uint8_t endMinutes = 0;
         };
-        ShelfConfig() {};
-        void init();
-        uint8_t version = 1;
-        char hostname[20];
-        char ntpServer[100];
-        char timezone[50];
-        uint8_t podcastHour = 2;
-        uint8_t defaultVolumne = 10;
-        bool defaultRepeat : 1;
-        bool defaultShuffle : 1;
-        bool defaultStopOnRemove : 1;
-        Timeslot nightModeTimes[5];
+        class GlobalConfig {
+            public:
+                GlobalConfig(sdfat::SdFat &sd) : _SD(sd) {}
+                uint8_t version = 1;
+                char hostname[20];
+                char ntpServer[100];
+                char timezone[50];
+                uint8_t podcastHour = 2;
+                uint8_t defaultVolumne = 10;
+                bool defaultRepeat : 1;
+                bool defaultShuffle : 1;
+                bool defaultStopOnRemove : 1;
+                Timeslot nightModeTimes[5];
+                bool load();
+                //bool save();
+            private:
+                sdfat::SdFat &_SD;
+        };
 };

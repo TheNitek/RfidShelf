@@ -11,7 +11,7 @@
 
 class ShelfPodcast {
   public:
-    ShelfPodcast(ShelfConfig &config, ShelfPlayback &playback, ShelfWeb &web, sdfat::SdFat &sd) : _config(config), _playback(playback), _web(web), _SD(sd) {}
+    ShelfPodcast(ShelfConfig::GlobalConfig &config, ShelfPlayback &playback, ShelfWeb &web, sdfat::SdFat &sd): _config(config), _playback(playback), _web(web), _SD(sd) {}
     void work();
   private:
     class PodcastState {
@@ -43,7 +43,7 @@ class ShelfPodcast {
           return _transferEncoding;
         }
     };
-    ShelfConfig &_config;
+    ShelfConfig::GlobalConfig &_config;
     ShelfPlayback &_playback;
     ShelfWeb &_web;
     sdfat::SdFat &_SD;
