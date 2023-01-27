@@ -11,7 +11,7 @@
 
 class ShelfPodcast {
   public:
-    ShelfPodcast(ShelfConfig::GlobalConfig &config, ShelfPlayback &playback, ShelfWeb &web, sdfat::SdFat &sd): _config(config), _playback(playback), _web(web), _SD(sd) {}
+    ShelfPodcast(ShelfConfig::GlobalConfig &config, ShelfPlayback &playback, ShelfWeb &web, SdFat &sd): _config(config), _playback(playback), _web(web), _SD(sd) {}
     void work();
   private:
     class PodcastState {
@@ -46,7 +46,7 @@ class ShelfPodcast {
     ShelfConfig::GlobalConfig &_config;
     ShelfPlayback &_playback;
     ShelfWeb &_web;
-    sdfat::SdFat &_SD;
+    SdFat &_SD;
     unsigned long _lastUpdate = 0;
     bool _isPodcastTime();
     bool _nextPodcast(char *folder);

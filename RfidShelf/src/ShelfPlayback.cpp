@@ -71,12 +71,12 @@ const bool ShelfPlayback::switchFolder(const char *folder) {
   _currentFile[0] = '\0';
   _currentFolderFileCount = 0;
 
-  sdfat::SdFile file;
+  SdFile file;
   char filenameChar[13];
 
-  while (file.openNext(&_currentFolder, sdfat::O_READ))
+  while (file.openNext(&_currentFolder, O_READ))
   {
-    file.getSFN(filenameChar);
+    file.getSFN(filenameChar, sizeof(filenameChar));
 
     if (!file.isDir() && _musicPlayer.isMP3File(filenameChar)) {
       _currentFolderFileCount++;
@@ -91,8 +91,8 @@ void ShelfPlayback::currentFolder(char *foldername, size_t size) {
   _currentFolder.getName(foldername, size);
 }
 
-void ShelfPlayback::currentFolderSFN(char *foldername) {
-  _currentFolder.getSFN(foldername);
+void ShelfPlayback::currentFolderSFN(char *foldername, size_t size) {
+  _currentFolder.getSFN(foldername, size);
 }
 
 void ShelfPlayback::currentFile(char *filename, size_t size) {
@@ -171,7 +171,7 @@ void ShelfPlayback::stopPlayback() {
 void ShelfPlayback::startPlayback() {
   // IO takes time, reset watchdog timer so it does not kill us
   ESP.wdtFeed();
-  sdfat::SdFile file;
+  SdFile file;
   _currentFolder.rewind();
 
   char nextFile[100] = "";
@@ -184,7 +184,7 @@ void ShelfPlayback::startPlayback() {
 
     uint16_t hits = 0;
     uint16_t nextFileIndex = 0;
-    while (file.openNext(&_currentFolder, sdfat::O_READ)) {
+    while (file.openNext(&_currentFolder, O_READ)) {
       file.getName(filenameChar, sizeof(filenameChar));
 
       if (file.isDir() || !_musicPlayer.isMP3File(filenameChar)) {
@@ -210,7 +210,7 @@ void ShelfPlayback::startPlayback() {
 
   // Find next file for alphabetical playback
   if(!_shuffleMode) {
-    while (file.openNext(&_currentFolder, sdfat::O_READ))
+    while (file.openNext(&_currentFolder, O_READ))
     {
       file.getName(filenameChar, sizeof(filenameChar));
 
@@ -250,7 +250,7 @@ void ShelfPlayback::startPlayback() {
   }
 
   char folder[13];
-  _currentFolder.getSFN(folder);
+  _currentFolder.getSFN(folder, sizeof(folder));
 
   startFilePlayback(folder, nextFile);
 }
@@ -329,7 +329,7 @@ void ShelfPlayback::setBassAndTreble(const uint8_t trebleAmplitude, const uint8_
 const bool ShelfPlayback::_patchVS1053() {
   Sprintln(F("Installing patch to VS1053"));
 
-  sdfat::File32 file = _SD.open("patches.053", sdfat::O_READ);
+  File32 file = _SD.open("patches.053", O_READ);
   if (!file.isOpen()) {
     return false;
   }

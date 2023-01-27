@@ -1,7 +1,7 @@
 #include "ShelfPodcast.h"
 
 bool ShelfPodcast::_nextPodcast(char *folder) {
-  sdfat::File32 root = _SD.open("/");
+  File32 root = _SD.open("/");
   if(!root.isOpen()) {
     Sprintln(F("Could not open root"));
     return false;
@@ -10,15 +10,15 @@ bool ShelfPodcast::_nextPodcast(char *folder) {
   bool lastFolder = false;
 
   // This safes one File32 in global scope at the expense of performance. Might or might not be a good idea.
-  sdfat::File32 entry;
-  while(entry.openNext(&root, sdfat::O_READ)) {
+  File32 entry;
+  while(entry.openNext(&root, O_READ)) {
     if(!entry.isDir()) {
       entry.close();
       continue;
     }
 
     char newFolder[13] = {0};
-    entry.getSFN(newFolder);
+    entry.getSFN(newFolder, sizeof(newFolder));
 
     if(!entry.exists(".podcast")) {
       Sprintf("No .podcast in %s\n", newFolder);
@@ -145,7 +145,7 @@ boolean ShelfPodcast::_downloadNextEpisode(ShelfConfig::PodcastConfig &info, con
   }
 
   ShelfWeb::StreamFile episodeFile;
-  episodeFile.open(&_SD, tmpFilename, sdfat::O_WRITE | sdfat::O_CREAT | sdfat::O_TRUNC);
+  episodeFile.open(&_SD, tmpFilename, O_WRITE | O_CREAT | O_TRUNC);
   if(!episodeFile.isOpen()) {
     Sprintln(F("Failed to open target file"));
     httpClient.end();
@@ -186,7 +186,7 @@ boolean ShelfPodcast::_downloadNextEpisode(ShelfConfig::PodcastConfig &info, con
 
 void ShelfPodcast::_cleanupEpisodes(uint16_t maxEpisodes, const char *folderName) {
   Sprintln(F("Cleaning up old episodes"));
-  sdfat::File32 dir = _SD.open(folderName, sdfat::O_READ);
+  File32 dir = _SD.open(folderName, O_READ);
   if(!dir.isOpen()) {
     Sprintf("Could not open folder /%s/\n", folderName);
     return;
@@ -198,11 +198,11 @@ void ShelfPodcast::_cleanupEpisodes(uint16_t maxEpisodes, const char *folderName
     uint16_t oldestDate = UINT16_MAX;
     uint16_t oldestTime = UINT16_MAX;
     mp3Count = 0;
-    sdfat::File32 file;
+    File32 file;
     dir.rewind();
-    while(file.openNext(&dir, sdfat::O_READ)) {
+    while(file.openNext(&dir, O_READ)) {
       char sfn[13] = {0};
-      file.getSFN(sfn);
+      file.getSFN(sfn, sizeof(sfn));
       if(Adafruit_VS1053_FilePlayer::isMP3File(sfn)) {
         mp3Count++;
         uint16_t createDate;
@@ -278,7 +278,7 @@ void ShelfPodcast::work() {
     }
 
     char playbackFolder[13] = {0};
-    _playback.currentFolderSFN(playbackFolder);
+    _playback.currentFolderSFN(playbackFolder, sizeof(playbackFolder));
 
     // If current folder is currently playing we better stop the player to not delete anything currently played
     if(strcmp(folder, playbackFolder) == 0) {

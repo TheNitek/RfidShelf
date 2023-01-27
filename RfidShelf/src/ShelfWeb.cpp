@@ -123,7 +123,7 @@ void ShelfWeb::_sendJsonStatus() {
 }
 
 void ShelfWeb::_sendJsonFSUsage() {
-  sdfat::csd_t m_csd;
+  csd_t m_csd;
   if(!_SD.card()->readCSD(&m_csd)) {
     Sprintln(PSTR("Could not read card info"));
     _returnHttpStatus(500, PSTR("Could not read card info"));
@@ -193,15 +193,15 @@ void ShelfWeb::_sendJsonFS(const char *path) {
   _server.setContentLength(CONTENT_LENGTH_UNKNOWN);
   _server.send_P(200, PSTR("application/json"), "{\"fs\":[");
 
-  sdfat::File32 dir = _SD.open(path, sdfat::O_READ);
-  sdfat::File32 entry;
+  File32 dir = _SD.open(path, O_READ);
+  File32 entry;
 
   char buffer[101];
   char output[256];
 
   bool first = true;
 
-  while (entry.openNext(&dir, sdfat::O_READ)) {
+  while (entry.openNext(&dir, O_READ)) {
     strcpy_P(output, PSTR(",{\"name\":\""));
     entry.getName(buffer, sizeof(buffer));
     // TODO encode special characters
@@ -229,7 +229,7 @@ void ShelfWeb::_sendJsonFS(const char *path) {
 }
 
 void ShelfWeb::_sendJsonPodcast(const char *path) {
-  sdfat::File32 folder = _SD.open(path);
+  File32 folder = _SD.open(path);
   if (!folder.isOpen()) {
     Sprintln(F("Folder not open"));
     _returnHttpStatus(404, PSTR("Not found"));
@@ -237,7 +237,7 @@ void ShelfWeb::_sendJsonPodcast(const char *path) {
   }
 
   char buffer[25] = "/";
-  folder.getSFN(buffer+1);
+  folder.getSFN(buffer+1, sizeof(buffer)-1);
   strcat(buffer, "/.podcast");
 
   ShelfConfig::PodcastConfig podcast(_SD);
@@ -264,7 +264,7 @@ void ShelfWeb::_handleWritePodcast(const char *path) {
     return;
   }
 
-  sdfat::File32 folder = _SD.open(path);
+  File32 folder = _SD.open(path);
   if (!folder.isOpen()) {
     Sprintln(F("Folder not open"));
     _returnHttpStatus(404, PSTR("Not found"));
@@ -272,7 +272,7 @@ void ShelfWeb::_handleWritePodcast(const char *path) {
   }
 
   char podFile[25] = "/";
-  folder.getSFN(podFile+1);
+  folder.getSFN(podFile+1, sizeof(podFile)-1);
   strcat(podFile, "/.podcast");
 
   ShelfConfig::PodcastConfig podcast(_SD);
@@ -296,7 +296,7 @@ void ShelfWeb::_handleWritePodcast(const char *path) {
 
 
 bool ShelfWeb::_loadFromSdCard(const char *path) {
-  sdfat::File32 dataFile = _SD.open(path);
+  File32 dataFile = _SD.open(path);
 
   if (!dataFile.isOpen()) {
     Sprintln(F("File not open"));
@@ -307,7 +307,9 @@ bool ShelfWeb::_loadFromSdCard(const char *path) {
   if (dataFile.isDir()) {
     _sendJsonFS(path);
   } else {
-    if (_server.streamFile(dataFile, F("application/octet-stream")) != dataFile.size()) {
+    _server.setContentLength(dataFile.size());
+    _server.send_P(200, PSTR("application/octet-stream"), PSTR(""));
+    if (dataFile.sendAll(_server.client()) != dataFile.size()) {
       Sprintln(F("Sent less data than expected!"));
     }
   }
@@ -337,8 +339,9 @@ void ShelfWeb::_downloadPatch() {
   }
 
   StreamFile patchFile;
-  patchFile.open(&_SD, "/patches.053", sdfat::O_WRITE | sdfat::O_CREAT);
+  patchFile.open(&_SD, "/patches.053", O_WRITE | O_CREAT);
   if(!patchFile.isOpen()) {
+    Sprintln(F("Could not open patch file"));
     httpClient.end();
     _returnHttpStatus(500, PSTR("Could not open patch file"));
     return;
@@ -346,6 +349,7 @@ void ShelfWeb::_downloadPatch() {
   int bytes = httpClient.writeToStream(&patchFile);
   patchFile.close();
   if(bytes < 0) {
+    Sprintf("writeToStream failed: %d\n", bytes);
     char buffer[32];
     snprintf_P(buffer, sizeof(buffer), PSTR("writetoStream failed: %d"), bytes);
     _returnHttpStatus(500, buffer);
@@ -363,14 +367,14 @@ void ShelfWeb::_handleDelete(const char *path) {
     return;
   }
 
-  sdfat::File32 file = _SD.open(path);
+  File32 file = _SD.open(path);
   if(file.isDir()) {
     // Check if deleting the currently playing folder
     if(_playback.playbackState() != ShelfPlayback::PLAYBACK_NO) {
       char sfn[13];
       char playSfn[13];
-      file.getSFN(sfn);
-      _playback.currentFolderSFN(playSfn);
+      file.getSFN(sfn, sizeof(sfn));
+      _playback.currentFolderSFN(playSfn, sizeof(playSfn));
       if(strcmp(sfn, playSfn) == 0) {
         _playback.stopPlayback();
       }
@@ -415,7 +419,7 @@ void ShelfWeb::_handleFileUpload() {
         _playback.pausePlayback();
       }
 
-      _uploadFile = _SD.open(upload.filename.c_str(), sdfat::O_WRITE | sdfat::O_CREAT);
+      _uploadFile = _SD.open(upload.filename.c_str(), O_WRITE | O_CREAT);
       _uploadStart = millis();
       Sprint(F("Upload start: "));
       Sprintln(upload.filename);

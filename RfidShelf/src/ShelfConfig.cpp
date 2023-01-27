@@ -14,7 +14,7 @@ bool ShelfConfig::GlobalConfig::load() {
 
 
 bool ShelfConfig::PodcastConfig::load(const char* podFilename) {
-  sdfat::File32 podfile = _SD.open(podFilename, sdfat::O_READ);
+  File32 podfile = _SD.open(podFilename, O_READ);
   if(!podfile.isOpen()) {
     Sprintf("Could not open %s\n", podFilename);
     return false;
@@ -69,7 +69,7 @@ bool ShelfConfig::PodcastConfig::load(const char* podFilename) {
 bool ShelfConfig::PodcastConfig::save(const char* podFilename) {
   // This writes to the SD card more often then needed, but prevents re-downloading of episodes in case of a crash.
   Sprintln(F("Updating .podcast"));
-  sdfat::File32 podfile = _SD.open(podFilename, sdfat::O_WRITE | sdfat::O_TRUNC | sdfat::O_CREAT);
+  File32 podfile = _SD.open(podFilename, O_WRITE | O_TRUNC | O_CREAT);
   if(!podfile.isOpen()) {
     Sprintf("Could not open %s\n", podFilename);
     return false;

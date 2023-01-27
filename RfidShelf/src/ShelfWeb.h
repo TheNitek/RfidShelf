@@ -18,7 +18,7 @@
 
 class ShelfWeb {
   public:
-    ShelfWeb(ShelfConfig::GlobalConfig &config, ShelfPlayback &playback, ShelfRfid &rfid, sdfat::SdFat &sd) : _config(config), _playback(playback), _rfid(rfid), _SD(sd) {}
+    ShelfWeb(ShelfConfig::GlobalConfig &config, ShelfPlayback &playback, ShelfRfid &rfid, SdFat &sd) : _config(config), _playback(playback), _rfid(rfid), _SD(sd) {}
     void begin();
     void work();
     bool isFileUploading();
@@ -35,11 +35,11 @@ class ShelfWeb {
     ShelfConfig::GlobalConfig &_config;
     ShelfPlayback &_playback;
     ShelfRfid &_rfid;
-    sdfat::SdFat &_SD;
+    SdFat &_SD;
     Espalexa _espalexa;
     EspalexaDevice *_alexaDevice;
     ESP8266WebServer _server;
-    sdfat::File32 _uploadFile;
+    File32 _uploadFile;
     uint32_t _uploadStart;
     bool _paused = false;
     void _returnOK();

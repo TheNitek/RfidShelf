@@ -21,7 +21,7 @@
 #endif
 
 
-sdfat::SdFat sdCard;
+SdFat sdCard;
 
 ShelfConfig::GlobalConfig config(sdCard);
 ShelfPlayback playback(config, sdCard);

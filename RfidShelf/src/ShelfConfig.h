@@ -68,7 +68,7 @@ class ShelfConfig {
     public:
         class PodcastConfig {
             public:
-                PodcastConfig(sdfat::SdFat &sd) : _SD(sd) {}
+                PodcastConfig(SdFat &sd) : _SD(sd) {}
                 String feedUrl;
                 uint16_t maxEpisodes = 5;
                 String lastGuid;
@@ -77,7 +77,7 @@ class ShelfConfig {
                 bool load(const char* podFilename);
                 bool save(const char* podFilename);
             private:
-                sdfat::SdFat &_SD;
+                SdFat &_SD;
         };
         struct Timeslot{
             Timeslot() : monday(false), tuesday(false), wednesday(false), thursday(false), friday(false), saturday(false), sunday(false) {}
@@ -95,7 +95,7 @@ class ShelfConfig {
         };
         class GlobalConfig {
             public:
-                GlobalConfig(sdfat::SdFat &sd) : _SD(sd) {}
+                GlobalConfig(SdFat &sd) : _SD(sd) {}
                 uint8_t version = 1;
                 char hostname[20];
                 char ntpServer[100];
@@ -109,6 +109,6 @@ class ShelfConfig {
                 bool load();
                 //bool save();
             private:
-                sdfat::SdFat &_SD;
+                SdFat &_SD;
         };
 };
