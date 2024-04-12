@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>RfidShelf Web Installer</title>
+	<meta charset="utf-8">
+	<script type="module" src="https://unpkg.com/esp-web-tools@9/dist/web/install-button.js?module"></script>
+</head>
+<body>
+    <h1>RfidShelf Web Installer</h1>
+
+    <p class="flashable">Make sure to close anything using your devices com port (e.g. Serial monitor). Just hit the button to install the example on your CYD.</p>
+	
+	<div id="webflash" style="display: none;" class="flashable">
+        <esp-web-install-button class="installButton" manifest="manifest.json">
+            <button slot="activate"></button>
+        </esp-web-install-button>
+	</div>
+
+    <p id="notSupported" style="display: none; color: red;">
+        Your browser does not support the Web Serial API. Please open this page using Edge or Chrome.
+    </p>
+    
+
+    <script>
+        if(navigator.serial){
+            document.getElementById('webflash').style.display = 'block';
+        } else {
+			console.log('Serial not supported');
+            document.getElementById('notSupported').style.display = 'block';
+        }
+    </script>
+</body>
+</html>
