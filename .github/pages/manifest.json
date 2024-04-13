@@ -1,0 +1,12 @@
+{
+    "name": "RfidShelf",
+    "builds": [
+      {
+        "chipFamily": "ESP8266",
+        "improv": false,
+        "parts": [
+          { "path": "latest.bin", "offset": 0 }
+        ]
+      }
+    ]
+  }
