@@ -44,7 +44,7 @@ jobs:
     - name: Copy firmware
       run: cp ./RfidShelf/build/latest.bin ./.github/pages/
     - name: Setup Github Page
-      uses: actions/configure-pages@v4
+      uses: actions/configure-pages@v5
     - name: Upload webflash files
       uses: actions/upload-pages-artifact@v3
       with:
