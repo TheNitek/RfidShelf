@@ -1,5 +1,8 @@
 # Firmware Installation
-You can flash the software using Arduino IDE or PlatformIO.
+You either flash a pre-compiled firmware or build the software yourself using Arduino IDE or PlatformIO.
+
+## Web Flash
+Connect the ESP8266 to your computer and go to the [webflash page](https://thenitek.github.io/RfidShelf/). No further software needed!
 
 ## Using PlatformIO
 1. Install [PlatformIO Core](https://platformio.org/install/cli)
