@@ -27,7 +27,7 @@ bool ShelfPodcast::_nextPodcast(char *folder) {
     }
 
     if(!strlen(folder) || lastFolder) {
-      strncpy(folder, newFolder, 13);
+      strncpy(folder, newFolder, sizeof(newFolder));
       entry.close();
       root.close();
       return true;
@@ -157,7 +157,7 @@ boolean ShelfPodcast::_downloadNextEpisode(ShelfConfig::PodcastConfig &info, con
     episodeFile.preAllocate(httpClient.getSize());
   }
 
-  int byteCount = httpClient.writeToStream(&episodeFile);
+  int byteCount = httpClient.writeToPrint(&episodeFile);
   Sprintf("Downloaded %d bytes\n", byteCount);
   httpClient.end();
 
@@ -246,9 +246,11 @@ bool ShelfPodcast::_isPodcastTime() {
 }
 
 void ShelfPodcast::work() {
-  if(!_isPodcastTime()) {
+  if(!_isPodcastTime() && !_web.updatePodcastsRequested) {
     return;
   }
+
+  _web.updatePodcastsRequested=false;
 
   bool resumePlayback = (_playback.playbackState() == ShelfPlayback::PLAYBACK_FILE);
 

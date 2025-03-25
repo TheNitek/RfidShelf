@@ -24,6 +24,7 @@ class ShelfWeb {
     bool isFileUploading();
     void pause();
     void unpause();
+    bool updatePodcastsRequested = false;
     // Dirty hack to work around https://github.com/esp8266/Arduino/issues/8055
     class StreamFile: public File32 {
       int availableForWrite() override {

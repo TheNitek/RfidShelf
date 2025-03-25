@@ -209,7 +209,7 @@ void ShelfWeb::_sendJsonFS(const char *path) {
     if (entry.isDir()) {
       strcat(output, "\"");
     } else {
-      snprintf_P(buffer, sizeof(buffer), PSTR("\",\"size\":%lu"), entry.fileSize());
+      snprintf_P(buffer, sizeof(buffer), PSTR("\",\"size\":%" PRIu64), entry.fileSize());
       strcat(output, buffer);
     }
     entry.close();
@@ -346,12 +346,12 @@ void ShelfWeb::_downloadPatch() {
     _returnHttpStatus(500, PSTR("Could not open patch file"));
     return;
   }
-  int bytes = httpClient.writeToStream(&patchFile);
+  int bytes = httpClient.writeToPrint(&patchFile);
   patchFile.close();
   if(bytes < 0) {
-    Sprintf("writeToStream failed: %d\n", bytes);
+    Sprintf("writeToPrint failed: %d\n", bytes);
     char buffer[32];
-    snprintf_P(buffer, sizeof(buffer), PSTR("writetoStream failed: %d"), bytes);
+    snprintf_P(buffer, sizeof(buffer), PSTR("writeToPrint failed: %d"), bytes);
     _returnHttpStatus(500, buffer);
     return;
   }
@@ -427,7 +427,7 @@ void ShelfWeb::_handleFileUpload() {
     case UPLOAD_FILE_WRITE:
       if (_uploadFile.isOpen()) {
         _uploadFile.write(upload.buf, upload.currentSize);
-        //Sprint("Upload write: "));
+        //Sprint("Upload write: ");
         //Sprintln(upload.currentSize);
       }
       break;
@@ -554,6 +554,10 @@ void ShelfWeb::_handleDefault() {
         return;
       } else if(_server.hasArg(F("sayText"))) {
         _playback.say(_server.arg(F("sayText")).c_str());
+        _returnOK();
+        return;
+      } else if(_server.hasArg(F("updatePodcasts"))) {
+        updatePodcastsRequested = true;
         _returnOK();
         return;
       } else if(path == "/") {
