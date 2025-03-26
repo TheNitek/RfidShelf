@@ -27,7 +27,7 @@ bool ShelfPodcast::_nextPodcast(char *folder) {
     }
 
     if(!strlen(folder) || lastFolder) {
-      strncpy(folder, newFolder, sizeof(newFolder));
+      strncpy(folder, newFolder, 13);
       entry.close();
       root.close();
       return true;

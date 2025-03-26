@@ -209,7 +209,7 @@ void ShelfWeb::_sendJsonFS(const char *path) {
     if (entry.isDir()) {
       strcat(output, "\"");
     } else {
-      snprintf_P(buffer, sizeof(buffer), PSTR("\",\"size\":%" PRIu64), entry.fileSize());
+      snprintf_P(buffer, sizeof(buffer), PSTR("\",\"size\":%lu"), entry.fileSize());
       strcat(output, buffer);
     }
     entry.close();
